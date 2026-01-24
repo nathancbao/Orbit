@@ -4,7 +4,7 @@
 ## Group Members: ##
 - Nathan Bao
 - Leonardo Zavala-Jimenez
-- Jonathon
+- Jonathon Lew
 - Adrian Nguyen
 - Rashmit Shrestha
 
