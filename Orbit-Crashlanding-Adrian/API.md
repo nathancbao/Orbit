@@ -133,7 +133,8 @@ POST /auth/verify-code
     "user": {
       "id": "usr_abc123",
       "phone_number": "+14155551234",
-      "profile_complete": false
+      "profile_complete": false,
+      "created_at": "2025-01-15T10:30:00Z"
     }
   }
 }
@@ -510,7 +511,7 @@ POST /crews
 | `name` | string | Yes | Crew name (3-50 characters) |
 | `description` | string | No | Description (max 500 characters) |
 | `interest_tags` | array[string] | Yes | 1-5 interest tags |
-| `max_members` | integer | No | Max size, default 8 (3-8) |
+| `max_members` | integer | No | Max size, default 8 (3-15) |
 
 **Example Request:**
 ```json
