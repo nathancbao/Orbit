@@ -1,0 +1,8 @@
+runtime: python311
+entrypoint: gunicorn -b :$PORT main:app
+
+env_variables:
+  PROJECT_ID: "your-gcp-project-id"
+  JWT_SECRET: "generate-a-random-secret-here"
+  SENDGRID_API_KEY: "your-sendgrid-api-key"
+  GCS_BUCKET_NAME: "your-gcs-bucket-name"
