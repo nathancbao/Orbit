@@ -2,7 +2,7 @@
 
 ## Overview
 
-The Profile Creation feature allows new users to set up their Orbit profile through a guided 5-step flow. Users can also edit their existing profile at any time. This feature is fully functional on the client side with mock data, ready for server integration.
+The Profile Creation feature allows new users to set up their Orbit profile through a guided 5-step flow. Users can also edit their existing profile at any time. This feature is fully functional and integrated with the server.
 
 ---
 
@@ -17,7 +17,6 @@ The Profile Creation feature allows new users to set up their Orbit profile thro
 ┌─────────────────────────────────────────────────────────────────┐
 │                      AUTH (Zodiac)                             │
 │  Phone Entry → Verification Code → Success                       │
-│  (Currently bypassed with Dev Mode button)                       │
 └─────────────────────────────────────────────────────────────────┘
                               │
                               ▼ (if new user)
@@ -79,21 +78,21 @@ Orbit/
 │
 ├── Views/
 │   ├── Auth/
-│   │   ├── PhoneEntryView.swift      # TODO: Zodiac
-│   │   └── VerificationView.swift    # TODO: Zodiac
+│   │   ├── PhoneEntryView.swift      # Phone number entry screen
+│   │   └── VerificationView.swift    # SMS code verification screen
 │   │
 │   └── Profile/
 │       ├── ProfileSetupView.swift    # 5-step setup flow
 │       └── ProfileDisplayView.swift  # Tinder-style profile view
 │
 ├── ViewModels/
-│   ├── AuthViewModel.swift           # TODO: Zodiac
+│   ├── AuthViewModel.swift           # Auth state & logic
 │   └── ProfileViewModel.swift        # Profile form state & logic
 │
 ├── Services/
 │   ├── APIService.swift              # HTTP networking layer
-│   ├── AuthService.swift             # TODO: Zodiac
-│   └── ProfileService.swift          # Profile API calls (mock ready)
+│   ├── AuthService.swift             # Auth API calls
+│   └── ProfileService.swift          # Profile API calls
 │
 ├── Utils/
 │   ├── Constants.swift               # URLs, validation rules
@@ -191,7 +190,7 @@ Displays the completed profile:
 When authentication succeeds:
 
 ```swift
-// In your auth completion handler:
+// In auth completion handler:
 if response.isNewUser {
     // New user - needs to create profile
     appState = .profileSetup
@@ -202,24 +201,11 @@ if response.isNewUser {
 }
 ```
 
-Files to implement:
-- `AuthViewModel.swift` - see comments for suggested structure
-- `AuthService.swift` - see comments for example implementations
-- `PhoneEntryView.swift`
-- `VerificationView.swift`
+### Server Integration
 
-### For Rashmit
-
-To enable real API calls:
-
-1. Update `Constants.swift`:
+Configuration in `Constants.swift`:
 ```swift
-static let baseURL = "https://your-actual-server.appspot.com/api/v1"
-```
-
-2. Update `ProfileService.swift`:
-```swift
-private let useMockData = false  // Change from true to false
+static let baseURL = "https://orbit-server.appspot.com/api/v1"
 ```
 
 API endpoints used:
@@ -247,7 +233,7 @@ Expected response format:
 3. Press Run (⌘R)
 
 ### Testing Profile Creation
-1. Tap "Skip to Profile Setup" (dev mode)
+1. Complete phone verification to access the app
 2. Fill out each step:
    - Step 1: Enter name, age, city, state
    - Step 2: Adjust personality sliders
@@ -276,21 +262,21 @@ Or use "Files" button:
 
 ---
 
-## Current Limitations
+## Technical Notes
 
-1. **No Persistence**: Profiles are lost when app closes (waiting for server)
-2. **No Photo Upload**: Photos stored locally only (server needs upload endpoint)
-3. **No Auth**: Using dev bypass (waiting for Zodiac)
-4. **Mock Data**: ProfileService returns fake success (waiting for server)
+1. **Persistence**: Profiles are stored on the server and persist across sessions
+2. **Photo Upload**: Photos are uploaded to cloud storage and URLs are saved to profile
+3. **Auth**: Phone verification handles new vs returning users automatically
+4. **API**: ProfileService communicates with the backend REST API
 
 ---
 
-## Future Enhancements
+## Potential Future Enhancements
 
-- [ ] Add location services for auto-detecting city/state
-- [ ] Add photo cropping/editing
-- [ ] Add profile strength indicator
-- [ ] Add friendship goals step
-- [ ] Add profile preview before completing
-- [ ] Add onboarding tutorial for first-time users
+- Add location services for auto-detecting city/state
+- Add photo cropping/editing
+- Add profile strength indicator
+- Add friendship goals step
+- Add profile preview before completing
+- Add onboarding tutorial for first-time users
 
