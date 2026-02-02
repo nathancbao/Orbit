@@ -13,8 +13,7 @@ class ProfileService {
     private init() {}
 
     // Set to false when server is ready
-    // Currently true because server has startup issues (404 on all endpoints)
-    private let useMockData = true
+    private let useMockData = false
 
     // Update profile
     func updateProfile(_ profile: Profile) async throws -> ProfileResponseData {

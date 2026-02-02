@@ -71,23 +71,11 @@ struct AuthFlowView: View {
 
                 Spacer()
 
-                // Demo hint and bypass
-                VStack(spacing: 12) {
-                    Text("Demo: Use code 123456")
-                        .font(.caption)
-                        .foregroundColor(.white.opacity(0.5))
-
-                    Button(action: {
-                        // Skip auth entirely for demo/testing
-                        onAuthComplete(true) // true = new user, goes to profile setup
-                    }) {
-                        Text("Skip Auth (Demo)")
-                            .font(.caption)
-                            .fontWeight(.medium)
-                            .foregroundColor(.orange)
-                    }
-                }
-                .padding(.bottom)
+                // Demo hint
+                Text("Demo: Use code 123456")
+                    .font(.caption)
+                    .foregroundColor(.white.opacity(0.5))
+                    .padding(.bottom)
             }
         }
     }

@@ -12,8 +12,7 @@ class DiscoverService {
     static let shared = DiscoverService()
     private init() {}
 
-    // Set to false when server is ready
-    // Currently true because server has startup issues (404 on all endpoints)
+    // Keep true until there are real profiles to discover
     private let useMockData = true
 
     func getDiscoverProfiles() async throws -> [Profile] {

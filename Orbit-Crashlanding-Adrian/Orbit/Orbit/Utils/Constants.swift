@@ -15,8 +15,8 @@ enum Constants {
     // ============================================================
     enum API {
         // Local testing: "http://localhost:8080/api"
-        // Production: "https://orbit-app-486204.ue.r.appspot.com/api"
-        static let baseURL = "https://orbit-app-486204.ue.r.appspot.com/api"
+        // Production: "https://orbit-app-486204.wl.r.appspot.com/api"
+        static let baseURL = "https://orbit-app-486204.wl.r.appspot.com/api"
 
         enum Endpoints {
             // Auth endpoints
