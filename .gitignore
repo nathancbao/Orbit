@@ -58,3 +58,28 @@ playground.xcworkspace
 
 # Crash logs
 *.crash
+# Secrets & config with real values
+app.yaml
+.env
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+venv/
+.venv/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Xcode user data
+*.xcuserstate
+xcuserdata/
