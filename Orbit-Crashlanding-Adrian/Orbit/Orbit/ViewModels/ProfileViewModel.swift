@@ -197,8 +197,15 @@ class ProfileViewModel: ObservableObject {
         errorMessage = nil
 
         do {
+            // Upload photos first
+            for photoItem in selectedPhotos {
+                if let image = photoItem.image {
+                    _ = try await ProfileService.shared.uploadPhoto(image)
+                }
+            }
+
+            // Then save profile data
             let profile = buildProfile()
-            // ProfileService handles mock vs real API based on useMockData flag
             let response = try await ProfileService.shared.updateProfile(profile)
 
             if response.profileComplete {

@@ -90,8 +90,20 @@ struct ContentView: View {
     private func loadExistingProfile() async {
         do {
             let profile = try await ProfileService.shared.getProfile()
+
+            // Download photos from URLs
+            var downloadedPhotos: [UIImage] = []
+            for urlString in profile.photos {
+                if let url = URL(string: urlString),
+                   let (data, _) = try? await URLSession.shared.data(from: url),
+                   let image = UIImage(data: data) {
+                    downloadedPhotos.append(image)
+                }
+            }
+
             await MainActor.run {
                 completedProfile = profile
+                profilePhotos = downloadedPhotos
                 appState = .home
             }
         } catch {

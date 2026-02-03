@@ -309,6 +309,20 @@ struct ProfileDetailSheet: View {
     @Environment(\.dismiss) private var dismiss
     @State private var currentPhotoIndex = 0
 
+    private var placeholderGradient: some View {
+        LinearGradient(
+            colors: [.blue.opacity(0.6), .purple.opacity(0.6)],
+            startPoint: .topLeading,
+            endPoint: .bottomTrailing
+        )
+        .frame(height: 300)
+        .overlay(
+            Text(profile.name.prefix(1).uppercased())
+                .font(.system(size: 80, weight: .bold))
+                .foregroundColor(.white.opacity(0.3))
+        )
+    }
+
     var body: some View {
         NavigationView {
             ScrollView {
@@ -396,20 +410,30 @@ struct ProfileDetailSheet: View {
 
     private var profileHeader: some View {
         ZStack(alignment: .bottom) {
-            // Gradient background
-            LinearGradient(
-                colors: [.blue.opacity(0.6), .purple.opacity(0.6)],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
-            .frame(height: 200)
-            .overlay(
-                Text(profile.name.prefix(1).uppercased())
-                    .font(.system(size: 80, weight: .bold))
-                    .foregroundColor(.white.opacity(0.3))
-            )
+            // Photo or gradient background
+            if let firstPhotoURL = profile.photos.first, let url = URL(string: firstPhotoURL) {
+                AsyncImage(url: url) { phase in
+                    switch phase {
+                    case .success(let image):
+                        image
+                            .resizable()
+                            .aspectRatio(contentMode: .fill)
+                            .frame(height: 300)
+                            .clipped()
+                    case .failure(_):
+                        placeholderGradient
+                    case .empty:
+                        placeholderGradient
+                            .overlay(ProgressView())
+                    @unknown default:
+                        placeholderGradient
+                    }
+                }
+            } else {
+                placeholderGradient
+            }
 
-            // Info overlay
+            // Info overlay at bottom
             VStack(spacing: 4) {
                 HStack(alignment: .firstTextBaseline, spacing: 8) {
                     Text(profile.name)

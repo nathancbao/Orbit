@@ -12,8 +12,8 @@ class DiscoverService {
     static let shared = DiscoverService()
     private init() {}
 
-    // Keep true until there are real profiles to discover
-    private let useMockData = true
+    // Set to false to use real server data
+    private let useMockData = false
 
     func getDiscoverProfiles() async throws -> [Profile] {
         if useMockData {
