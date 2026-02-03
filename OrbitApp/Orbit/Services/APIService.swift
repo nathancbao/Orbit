@@ -15,11 +15,18 @@
 //  KEY FEATURES:
 //  - Automatic JSON encoding/decoding
 //  - Auth token handling (reads from Keychain)
+//  - Automatic token refresh on 401 with single-retry
 //  - Error handling with user-friendly messages
 //  - Snake_case <-> camelCase conversion
 //
 
 import Foundation
+
+// MARK: - Session Notification
+extension Notification.Name {
+    /// Posted when token refresh fails and the user must re-authenticate.
+    static let sessionExpired = Notification.Name("sessionExpired")
+}
 
 // MARK: - Network Error
 // Custom error types for API failures
@@ -47,6 +54,32 @@ enum NetworkError: Error, LocalizedError {
         case .networkError(let error):
             return error.localizedDescription
         }
+    }
+}
+
+// MARK: - Token Refresh Coordinator
+// Ensures only one token refresh happens at a time.
+// When multiple requests get 401 simultaneously, only the first
+// triggers a refresh; the rest await the same result.
+actor TokenRefreshCoordinator {
+    static let shared = TokenRefreshCoordinator()
+
+    private var refreshTask: Task<String, Error>?
+
+    func refreshIfNeeded() async throws -> String {
+        // If there's already a refresh in flight, piggyback on it
+        if let existingTask = refreshTask {
+            return try await existingTask.value
+        }
+
+        // Start a new refresh
+        let task = Task<String, Error> {
+            defer { self.refreshTask = nil }
+            return try await AuthService.shared.refreshToken()
+        }
+
+        refreshTask = task
+        return try await task.value
     }
 }
 
@@ -127,6 +160,9 @@ class APIService {
             request.httpBody = try JSONSerialization.data(withJSONObject: body)
         }
 
+        // Save a copy for potential retry after token refresh
+        let savedRequest = request
+
         // Make the request
         do {
             let (data, response) = try await URLSession.shared.data(for: request)
@@ -136,8 +172,15 @@ class APIService {
                 throw NetworkError.noData
             }
 
-            // Handle 401 Unauthorized
+            // Handle 401 Unauthorized - attempt token refresh for authenticated requests
             if httpResponse.statusCode == 401 {
+                // Only attempt auto-refresh for authenticated requests.
+                // The refresh call itself uses authenticated: false,
+                // so this branch is never entered for refresh requests,
+                // preventing infinite loops.
+                if authenticated {
+                    return try await handleTokenRefreshAndRetry(savedRequest: savedRequest)
+                }
                 throw NetworkError.unauthorized
             }
 
@@ -168,5 +211,55 @@ class APIService {
         } catch {
             throw NetworkError.networkError(error)
         }
+    }
+
+    // ============================================================
+    // MARK: - Token Refresh & Retry
+    // Called when an authenticated request gets a 401.
+    // Refreshes the access token via TokenRefreshCoordinator,
+    // then retries the original request exactly once.
+    // If the retry also fails with 401, posts .sessionExpired.
+    // ============================================================
+    private func handleTokenRefreshAndRetry<T: Codable>(savedRequest: URLRequest) async throws -> T {
+        let newToken: String
+        do {
+            newToken = try await TokenRefreshCoordinator.shared.refreshIfNeeded()
+        } catch {
+            // Refresh failed (bad refresh token, network error, etc.)
+            NotificationCenter.default.post(name: .sessionExpired, object: nil)
+            throw NetworkError.unauthorized
+        }
+
+        // Retry with the fresh token
+        var retryRequest = savedRequest
+        retryRequest.setValue("Bearer \(newToken)", forHTTPHeaderField: "Authorization")
+
+        let (retryData, retryResponse) = try await URLSession.shared.data(for: retryRequest)
+
+        guard let retryHttpResponse = retryResponse as? HTTPURLResponse else {
+            throw NetworkError.noData
+        }
+
+        // If retry also gets 401, the new token was already invalid
+        if retryHttpResponse.statusCode == 401 {
+            NotificationCenter.default.post(name: .sessionExpired, object: nil)
+            throw NetworkError.unauthorized
+        }
+
+        // Handle other HTTP errors on retry
+        if retryHttpResponse.statusCode >= 400 {
+            if let errorResponse = try? decoder.decode(APIResponse<String>.self, from: retryData),
+               let errorMessage = errorResponse.error {
+                throw NetworkError.serverError(errorMessage)
+            }
+            throw NetworkError.serverError("Request failed with status \(retryHttpResponse.statusCode)")
+        }
+
+        // Decode the successful retry response
+        let apiResponse = try decoder.decode(APIResponse<T>.self, from: retryData)
+        guard let responseData = apiResponse.data else {
+            throw NetworkError.noData
+        }
+        return responseData
     }
 }

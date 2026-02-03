@@ -113,10 +113,31 @@ class ProfileService {
 
         request.httpBody = body
 
-        let (data, response) = try await URLSession.shared.data(for: request)
+        var (data, response) = try await URLSession.shared.data(for: request)
 
-        guard let httpResponse = response as? HTTPURLResponse else {
+        guard var httpResponse = response as? HTTPURLResponse else {
             throw NetworkError.noData
+        }
+
+        // Handle 401 with token refresh
+        if httpResponse.statusCode == 401 {
+            let newToken: String
+            do {
+                newToken = try await TokenRefreshCoordinator.shared.refreshIfNeeded()
+            } catch {
+                NotificationCenter.default.post(name: .sessionExpired, object: nil)
+                throw NetworkError.unauthorized
+            }
+            request.setValue("Bearer \(newToken)", forHTTPHeaderField: "Authorization")
+            (data, response) = try await URLSession.shared.data(for: request)
+            guard let retryHttpResponse = response as? HTTPURLResponse else {
+                throw NetworkError.noData
+            }
+            httpResponse = retryHttpResponse
+            if httpResponse.statusCode == 401 {
+                NotificationCenter.default.post(name: .sessionExpired, object: nil)
+                throw NetworkError.unauthorized
+            }
         }
 
         if httpResponse.statusCode >= 400 {

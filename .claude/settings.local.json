@@ -1,7 +1,10 @@
 {
   "permissions": {
     "allow": [
-      "Bash(tree:*)"
+      "Bash(tree:*)",
+      "Bash(git pull:*)",
+      "Bash(git stash:*)",
+      "Bash(python3 -m pytest:*)"
     ]
   }
 }

@@ -18,6 +18,7 @@
 //
 
 import SwiftUI
+import Combine
 
 // MARK: - App State
 // Controls which screen is currently displayed
@@ -83,6 +84,13 @@ struct ContentView: View {
                     HomeView()
                 }
             }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .sessionExpired)) { _ in
+            KeychainHelper.shared.delete(forKey: Constants.Keychain.accessToken)
+            KeychainHelper.shared.delete(forKey: Constants.Keychain.refreshToken)
+            completedProfile = nil
+            profilePhotos = []
+            appState = .auth
         }
     }
 
