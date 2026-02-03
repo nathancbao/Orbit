@@ -6,10 +6,19 @@ from google.cloud import datastore
 client = datastore.Client()
 
 
+def _deep_convert(obj):
+    """Recursively convert embedded Datastore entities to plain dicts."""
+    if hasattr(obj, 'items'):
+        return {k: _deep_convert(v) for k, v in obj.items()}
+    elif isinstance(obj, list):
+        return [_deep_convert(item) for item in obj]
+    return obj
+
+
 def _entity_to_dict(entity):
     if entity is None:
         return None
-    d = dict(entity)
+    d = _deep_convert(dict(entity))
     d['id'] = entity.key.id_or_name
     return d
 

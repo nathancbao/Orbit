@@ -4,22 +4,25 @@
 
 ### Base URL
 ```
-Production: https://orbit-app.uc.r.appspot.com/api/v1
-Development: http://localhost:8080/api/v1
+Production: https://orbit-app-486204.wl.r.appspot.com/api
+Development: http://localhost:8080/api
 ```
 
 ### Authentication
-Orbit uses **SMS-based authentication** with JWT tokens.
+Orbit uses **.edu email verification** with JWT tokens.
 
-1. User requests a verification code sent to their phone number
-2. User submits the code to verify their identity
-3. Server returns an access token (short-lived) and refresh token (long-lived)
-4. Client includes the access token in all authenticated requests via the `Authorization` header
+1. User provides their `.edu` email address
+2. Server sends a 6-digit verification code to that email (via SendGrid; currently in demo mode)
+3. User submits the code to verify their identity
+4. Server returns an access token (15 min) and refresh token (7 days)
+5. Client includes the access token in all authenticated requests via the `Authorization` header
 
 **Header format:**
 ```
 Authorization: Bearer <access_token>
 ```
+
+**Demo mode:** The code `123456` is accepted as valid for any email, bypassing actual email verification.
 
 ### Standard Response Format
 
@@ -37,24 +40,22 @@ All endpoints return responses in this structure:
 ```json
 {
   "success": false,
-  "error": {
-    "code": "ERROR_CODE",
-    "message": "Human-readable error message"
-  }
+  "error": "Human-readable error message"
 }
 ```
 
-### Common Error Codes
+Note: The error field is usually a plain string. For validation errors (profile, crew, mission), it may be an array of error strings.
 
-| Code | HTTP Status | Description |
-|------|-------------|-------------|
-| `UNAUTHORIZED` | 401 | Missing or invalid access token |
-| `TOKEN_EXPIRED` | 401 | Access token has expired; use refresh token |
-| `FORBIDDEN` | 403 | User lacks permission for this action |
-| `NOT_FOUND` | 404 | Requested resource does not exist |
-| `VALIDATION_ERROR` | 400 | Request body failed validation |
-| `RATE_LIMITED` | 429 | Too many requests; slow down |
-| `SERVER_ERROR` | 500 | Internal server error |
+### Common HTTP Status Codes
+
+| HTTP Status | Description |
+|-------------|-------------|
+| 200 | Success |
+| 201 | Created (new crew/mission) |
+| 400 | Validation error or bad request |
+| 401 | Missing, invalid, or expired access token |
+| 404 | Resource not found |
+| 500 | Internal server error |
 
 ---
 
@@ -62,21 +63,21 @@ All endpoints return responses in this structure:
 
 ### Send Verification Code
 
-Sends a 6-digit SMS verification code to the provided phone number.
+Sends a 6-digit verification code to the provided .edu email address.
 
 ```
-POST /auth/send-code
+POST /api/auth/send-code
 ```
 
 **Request Body:**
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
-| `phone_number` | string | Yes | Phone number in E.164 format (e.g., "+14155551234") |
+| `email` | string | Yes | A valid `.edu` email address |
 
 **Example Request:**
 ```json
 {
-  "phone_number": "+14155551234"
+  "email": "alex@university.edu"
 }
 ```
 
@@ -85,38 +86,39 @@ POST /auth/send-code
 {
   "success": true,
   "data": {
-    "message": "Verification code sent",
-    "expires_in": 300
+    "message": "Verification code sent"
   }
 }
 ```
 
 **Errors:**
-| Code | Description |
-|------|-------------|
-| `INVALID_PHONE_NUMBER` | Phone number format is invalid |
-| `RATE_LIMITED` | Too many code requests; wait before retrying |
+| HTTP Status | Error Message |
+|-------------|---------------|
+| 400 | "Email is required" |
+| 400 | "Invalid email format" |
+| 400 | "Only .edu email addresses are allowed" |
+| 500 | "Failed to send verification code: ..." |
 
 ---
 
 ### Verify Code
 
-Verifies the SMS code and returns authentication tokens. Creates a new user if this is a new phone number.
+Verifies the email code and returns authentication tokens. Creates a new user if this is a new email.
 
 ```
-POST /auth/verify-code
+POST /api/auth/verify-code
 ```
 
 **Request Body:**
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
-| `phone_number` | string | Yes | Phone number in E.164 format |
-| `code` | string | Yes | 6-digit verification code |
+| `email` | string | Yes | The .edu email address |
+| `code` | string | Yes | 6-digit verification code (or "123456" for demo bypass) |
 
 **Example Request:**
 ```json
 {
-  "phone_number": "+14155551234",
+  "email": "alex@university.edu",
   "code": "123456"
 }
 ```
@@ -127,24 +129,26 @@ POST /auth/verify-code
   "success": true,
   "data": {
     "access_token": "eyJhbGciOiJIUzI1NiIs...",
-    "refresh_token": "dGhpcyBpcyBhIHJlZnJl...",
-    "expires_in": 3600,
+    "refresh_token": "eyJhbGciOiJIUzI1NiIs...",
+    "expires_in": 900,
     "is_new_user": true,
-    "user": {
-      "id": "usr_abc123",
-      "phone_number": "+14155551234",
-      "profile_complete": false,
-      "created_at": "2025-01-15T10:30:00Z"
-    }
+    "user_id": 5629499534213120
   }
 }
 ```
 
+**Notes:**
+- `expires_in` is 900 seconds (15 minutes) for access tokens
+- `user_id` is a numeric Datastore auto-generated ID
+- `is_new_user` indicates whether this email was seen for the first time
+
 **Errors:**
-| Code | Description |
-|------|-------------|
-| `INVALID_CODE` | Verification code is incorrect |
-| `CODE_EXPIRED` | Verification code has expired |
+| HTTP Status | Error Message |
+|-------------|---------------|
+| 400 | "Email and code are required" |
+| 400 | "No verification code found for this email" |
+| 400 | "Verification code has expired" |
+| 400 | "Invalid verification code" |
 
 ---
 
@@ -153,7 +157,7 @@ POST /auth/verify-code
 Exchanges a refresh token for a new access token.
 
 ```
-POST /auth/refresh
+POST /api/auth/refresh
 ```
 
 **Request Body:**
@@ -166,28 +170,28 @@ POST /auth/refresh
 {
   "success": true,
   "data": {
-    "access_token": "eyJhbGciOiJIUzI1NiIs...",
-    "expires_in": 3600
+    "access_token": "eyJhbGciOiJIUzI1NiIs..."
   }
 }
 ```
 
 **Errors:**
-| Code | Description |
-|------|-------------|
-| `INVALID_REFRESH_TOKEN` | Refresh token is invalid or revoked |
+| HTTP Status | Error Message |
+|-------------|---------------|
+| 400 | "refresh_token is required" |
+| 401 | "Invalid refresh token" |
+| 401 | "Token has expired" |
+| 401 | "Invalid token type" |
 
 ---
 
 ### Logout
 
-Revokes the current refresh token.
+Revokes the refresh token.
 
 ```
-POST /auth/logout
+POST /api/auth/logout
 ```
-
-**Headers:** Requires `Authorization`
 
 **Request Body:**
 | Field | Type | Required | Description |
@@ -204,16 +208,21 @@ POST /auth/logout
 }
 ```
 
+**Errors:**
+| HTTP Status | Error Message |
+|-------------|---------------|
+| 400 | "refresh_token is required" |
+
 ---
 
 ## Users & Profiles
 
 ### Get Current User Profile
 
-Returns the authenticated user's full profile.
+Returns the authenticated user's profile data and completeness status.
 
 ```
-GET /users/me
+GET /api/users/me
 ```
 
 **Headers:** Requires `Authorization`
@@ -223,50 +232,52 @@ GET /users/me
 {
   "success": true,
   "data": {
-    "id": "usr_abc123",
-    "phone_number": "+14155551234",
-    "profile_complete": true,
-    "created_at": "2025-01-15T10:30:00Z",
     "profile": {
       "name": "Alex Chen",
-      "age": 26,
+      "age": 22,
       "location": {
-        "city": "San Francisco",
+        "city": "Davis",
         "state": "CA",
-        "coordinates": {
-          "lat": 37.7749,
-          "lng": -122.4194
-        }
+        "coordinates": null
       },
-      "bio": "Software engineer who loves hiking and board games",
+      "bio": "CS major who loves hiking and photography",
       "photos": [
-        "https://storage.googleapis.com/orbit-photos/usr_abc123/1.jpg"
+        "https://storage.googleapis.com/orbit-app-486204-photos/profile_photos/abc123.jpg"
       ],
-      "interests": ["hiking", "board games", "cooking", "tech"],
+      "interests": ["Hiking", "Photography", "Coffee", "Coding"],
       "personality": {
         "introvert_extrovert": 0.6,
-        "spontaneous_planner": 0.3,
+        "spontaneous_planner": 0.4,
         "active_relaxed": 0.7
       },
       "social_preferences": {
-        "group_size": "small",
-        "meeting_frequency": "weekly",
-        "preferred_times": ["weekday_evenings", "weekends"]
+        "group_size": "Small groups (3-5)",
+        "meeting_frequency": "Weekly",
+        "preferred_times": ["Weekends", "Evenings"]
       },
-      "friendship_goals": ["activity_partners", "close_friends"]
-    }
+      "friendship_goals": []
+    },
+    "profile_complete": true
   }
 }
 ```
+
+**Profile completeness** requires: a non-empty name, at least 3 interests, and at least one preferred time.
+
+**Errors:**
+| HTTP Status | Error Message |
+|-------------|---------------|
+| 404 | "User not found" |
+| 404 | "Profile not found" (no profile saved yet) |
 
 ---
 
 ### Update Profile
 
-Updates the authenticated user's profile. Supports partial updates.
+Creates or updates the authenticated user's profile. Supports full or partial updates.
 
 ```
-PATCH /users/me/profile
+PUT /api/users/me
 ```
 
 **Headers:** Requires `Authorization`
@@ -274,25 +285,31 @@ PATCH /users/me/profile
 **Request Body (all fields optional):**
 | Field | Type | Description |
 |-------|------|-------------|
-| `name` | string | Display name (2-50 characters) |
-| `age` | integer | Age in years (18-99) |
-| `location` | object | City, state, and optional coordinates |
+| `name` | string | Display name (max 100 characters) |
+| `age` | integer | Age in years (18–100) |
+| `location` | object | `{ city, state, coordinates }` |
 | `bio` | string | Short bio (max 500 characters) |
-| `interests` | array[string] | List of interests (max 20) |
-| `personality` | object | Personality trait scores (0.0-1.0) |
-| `social_preferences` | object | Social preferences |
+| `photos` | array[string] | Photo URLs (max 6) |
+| `interests` | array[string] | List of interests (max 10) |
+| `personality` | object | `{ introvert_extrovert, spontaneous_planner, active_relaxed }` (0.0–1.0) |
+| `social_preferences` | object | `{ group_size, meeting_frequency, preferred_times }` |
 | `friendship_goals` | array[string] | What user is looking for |
 
 **Example Request:**
 ```json
 {
   "name": "Alex Chen",
-  "age": 26,
-  "interests": ["hiking", "board games", "cooking"],
+  "age": 22,
+  "interests": ["Hiking", "Photography", "Coffee"],
   "personality": {
     "introvert_extrovert": 0.6,
-    "spontaneous_planner": 0.3,
+    "spontaneous_planner": 0.4,
     "active_relaxed": 0.7
+  },
+  "social_preferences": {
+    "group_size": "Small groups (3-5)",
+    "meeting_frequency": "Weekly",
+    "preferred_times": ["Weekends", "Evenings"]
   }
 }
 ```
@@ -309,198 +326,83 @@ PATCH /users/me/profile
 ```
 
 **Errors:**
-| Code | Description |
-|------|-------------|
-| `VALIDATION_ERROR` | One or more fields failed validation |
+| HTTP Status | Error Message |
+|-------------|---------------|
+| 400 | "No data provided" |
+| 400 | Validation error list (e.g. `["name must be a non-empty string", "age must be a number between 18 and 100"]`) |
 
 ---
 
 ### Upload Photo
 
-Uploads a profile photo. Returns a URL to the uploaded image.
+Uploads a profile photo to Google Cloud Storage. Adds the public URL to the user's photos list.
 
 ```
-POST /users/me/photos
+POST /api/users/me/photo
 ```
 
 **Headers:** Requires `Authorization`
 
-**Request:** Multipart form data with `photo` field (JPEG/PNG, max 10MB)
+**Request:** Multipart form data with `photo` field
 
 **Example Response:**
 ```json
 {
   "success": true,
   "data": {
-    "photo_url": "https://storage.googleapis.com/orbit-photos/usr_abc123/2.jpg",
-    "photo_index": 1
+    "profile": { ... },
+    "profile_complete": true
   }
 }
 ```
 
----
-
-### Delete Photo
-
-Deletes a profile photo by index.
-
-```
-DELETE /users/me/photos/{photo_index}
-```
-
-**Headers:** Requires `Authorization`
-
-**Example Response:**
-```json
-{
-  "success": true,
-  "data": {
-    "message": "Photo deleted"
-  }
-}
-```
+**Errors:**
+| HTTP Status | Error Message |
+|-------------|---------------|
+| 400 | "No photo file provided" |
+| 400 | "No file selected" |
 
 ---
 
 ### Get User Profile (Public)
 
-Returns another user's public profile.
+Returns another user's profile by ID. Does not require authentication.
 
 ```
-GET /users/{user_id}
+GET /api/users/{user_id}
 ```
-
-**Headers:** Requires `Authorization`
 
 **Example Response:**
 ```json
 {
   "success": true,
   "data": {
-    "id": "usr_xyz789",
     "profile": {
       "name": "Jordan Lee",
-      "age": 24,
-      "location": {
-        "city": "San Francisco",
-        "state": "CA"
-      },
-      "bio": "Coffee enthusiast and amateur photographer",
-      "photos": ["..."],
-      "interests": ["photography", "coffee", "hiking"],
-      "friendship_goals": ["activity_partners"]
-    }
+      "age": 21,
+      "location": { "city": "Davis", "state": "CA", "coordinates": null },
+      "bio": "Film student and amateur chef",
+      "photos": [],
+      "interests": ["Movies", "Cooking", "Music"],
+      "personality": { ... },
+      "social_preferences": { ... },
+      "friendship_goals": []
+    },
+    "profile_complete": true
   }
 }
 ```
-
-**Note:** Public profiles exclude sensitive data like exact coordinates and phone number.
 
 ---
 
 ## Crews
 
-### List My Crews
-
-Returns all crews the authenticated user is a member of.
-
-```
-GET /crews
-```
-
-**Headers:** Requires `Authorization`
-
-**Query Parameters:**
-| Param | Type | Default | Description |
-|-------|------|---------|-------------|
-| `limit` | integer | 20 | Max results (1-50) |
-| `cursor` | string | - | Pagination cursor |
-
-**Example Response:**
-```json
-{
-  "success": true,
-  "data": {
-    "crews": [
-      {
-        "id": "crew_abc123",
-        "name": "SF Hiking Crew",
-        "description": "Weekly hikes around the Bay Area",
-        "interest_tags": ["hiking", "outdoors", "nature"],
-        "member_count": 5,
-        "max_members": 8,
-        "created_at": "2025-01-10T08:00:00Z",
-        "last_activity_at": "2025-01-28T14:30:00Z",
-        "my_role": "member",
-        "preview_members": [
-          { "id": "usr_1", "name": "Alex", "photo": "..." },
-          { "id": "usr_2", "name": "Jordan", "photo": "..." }
-        ]
-      }
-    ],
-    "next_cursor": "eyJsYXN0X2lkIjoi..."
-  }
-}
-```
-
----
-
-### Get Crew Details
-
-Returns full details for a specific crew.
-
-```
-GET /crews/{crew_id}
-```
-
-**Headers:** Requires `Authorization`
-
-**Example Response:**
-```json
-{
-  "success": true,
-  "data": {
-    "id": "crew_abc123",
-    "name": "SF Hiking Crew",
-    "description": "Weekly hikes around the Bay Area",
-    "interest_tags": ["hiking", "outdoors", "nature"],
-    "member_count": 5,
-    "max_members": 8,
-    "created_at": "2025-01-10T08:00:00Z",
-    "created_by": "usr_xyz789",
-    "members": [
-      {
-        "id": "usr_1",
-        "name": "Alex Chen",
-        "photo": "...",
-        "role": "admin",
-        "joined_at": "2025-01-10T08:00:00Z"
-      },
-      {
-        "id": "usr_2",
-        "name": "Jordan Lee",
-        "photo": "...",
-        "role": "member",
-        "joined_at": "2025-01-12T10:15:00Z"
-      }
-    ],
-    "upcoming_missions": [
-      { "id": "msn_1", "title": "Muir Woods Hike", "date": "2025-02-05T09:00:00Z" }
-    ],
-    "is_member": true,
-    "my_role": "member"
-  }
-}
-```
-
----
-
 ### Create Crew
 
-Creates a new crew. The creator becomes the admin.
+Creates a new crew. The creator is automatically added as a member.
 
 ```
-POST /crews
+POST /api/crews/
 ```
 
 **Headers:** Requires `Authorization`
@@ -508,32 +410,74 @@ POST /crews
 **Request Body:**
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
-| `name` | string | Yes | Crew name (3-50 characters) |
+| `name` | string | Yes | Crew name (max 100 characters) |
 | `description` | string | No | Description (max 500 characters) |
-| `interest_tags` | array[string] | Yes | 1-5 interest tags |
-| `max_members` | integer | No | Max size, default 8 (3-15) |
+| `tags` | array[string] | No | Interest tags for matching |
 
 **Example Request:**
 ```json
 {
-  "name": "SF Hiking Crew",
-  "description": "Weekly hikes around the Bay Area",
-  "interest_tags": ["hiking", "outdoors"],
-  "max_members": 8
+  "name": "Davis Hiking Crew",
+  "description": "Weekly hikes around Yolo County",
+  "tags": ["hiking", "outdoors"]
 }
 ```
+
+**Example Response (201):**
+```json
+{
+  "success": true,
+  "data": {
+    "id": 5629499534213120,
+    "name": "Davis Hiking Crew",
+    "description": "Weekly hikes around Yolo County",
+    "tags": ["hiking", "outdoors"],
+    "creator_id": 4785074604081152,
+    "member_count": 1,
+    "created_at": "2025-01-15T10:30:00Z"
+  }
+}
+```
+
+**Errors:**
+| HTTP Status | Error Message |
+|-------------|---------------|
+| 400 | Validation error list (e.g. `["name is required"]`) |
+
+---
+
+### List Crews
+
+Returns all crews, optionally filtered by tag.
+
+```
+GET /api/crews/
+```
+
+**Query Parameters:**
+| Param | Type | Description |
+|-------|------|-------------|
+| `tag` | string | Filter crews that contain this tag |
 
 **Example Response:**
 ```json
 {
   "success": true,
-  "data": {
-    "id": "crew_abc123",
-    "name": "SF Hiking Crew",
-    ...
-  }
+  "data": [
+    {
+      "id": 5629499534213120,
+      "name": "Davis Hiking Crew",
+      "description": "Weekly hikes around Yolo County",
+      "tags": ["hiking", "outdoors"],
+      "creator_id": 4785074604081152,
+      "member_count": 3,
+      "created_at": "2025-01-15T10:30:00Z"
+    }
+  ]
 }
 ```
+
+Note: Returns a flat array of crew objects, limited to 50 results.
 
 ---
 
@@ -542,7 +486,7 @@ POST /crews
 Joins an existing crew.
 
 ```
-POST /crews/{crew_id}/join
+POST /api/crews/{crew_id}/join
 ```
 
 **Headers:** Requires `Authorization`
@@ -552,131 +496,25 @@ POST /crews/{crew_id}/join
 {
   "success": true,
   "data": {
-    "message": "Successfully joined crew",
-    "crew_id": "crew_abc123"
+    "message": "Joined crew successfully"
   }
 }
 ```
 
 **Errors:**
-| Code | Description |
-|------|-------------|
-| `CREW_FULL` | Crew has reached max members |
-| `ALREADY_MEMBER` | User is already in this crew |
+| HTTP Status | Error Message |
+|-------------|---------------|
+| 400 | "Crew not found" |
+| 400 | "Already a member of this crew" |
 
 ---
 
 ### Leave Crew
 
-Leaves a crew. Admins cannot leave if they are the only admin.
+Leaves a crew.
 
 ```
-POST /crews/{crew_id}/leave
-```
-
-**Headers:** Requires `Authorization`
-
-**Example Response:**
-```json
-{
-  "success": true,
-  "data": {
-    "message": "Successfully left crew"
-  }
-}
-```
-
----
-
-### Update Crew
-
-Updates crew details. Only admins can update.
-
-```
-PATCH /crews/{crew_id}
-```
-
-**Headers:** Requires `Authorization`
-
-**Request Body:** Same fields as create (all optional)
-
----
-
-### Delete Crew
-
-Deletes a crew. Only the original creator can delete.
-
-```
-DELETE /crews/{crew_id}
-```
-
-**Headers:** Requires `Authorization`
-
----
-
-## Missions
-
-### List Missions
-
-Returns missions the user can see (their own, their crews', or public nearby).
-
-```
-GET /missions
-```
-
-**Headers:** Requires `Authorization`
-
-**Query Parameters:**
-| Param | Type | Default | Description |
-|-------|------|---------|-------------|
-| `filter` | string | "all" | "all", "my_rsvp", "my_crews", "nearby" |
-| `status` | string | "upcoming" | "upcoming", "past", "all" |
-| `limit` | integer | 20 | Max results (1-50) |
-| `cursor` | string | - | Pagination cursor |
-
-**Example Response:**
-```json
-{
-  "success": true,
-  "data": {
-    "missions": [
-      {
-        "id": "msn_abc123",
-        "title": "Board Game Night",
-        "description": "Casual games at my place",
-        "date": "2025-02-08T18:00:00Z",
-        "location": {
-          "name": "Alex's Apartment",
-          "address": "123 Main St, SF",
-          "coordinates": { "lat": 37.77, "lng": -122.41 }
-        },
-        "interest_tags": ["board games", "social"],
-        "crew_id": "crew_xyz789",
-        "crew_name": "Game Night Gang",
-        "host": {
-          "id": "usr_abc123",
-          "name": "Alex Chen",
-          "photo": "..."
-        },
-        "rsvp_count": 4,
-        "max_attendees": 6,
-        "my_rsvp": "going",
-        "created_at": "2025-01-25T10:00:00Z"
-      }
-    ],
-    "next_cursor": "..."
-  }
-}
-```
-
----
-
-### Get Mission Details
-
-Returns full details for a specific mission.
-
-```
-GET /missions/{mission_id}
+POST /api/crews/{crew_id}/leave
 ```
 
 **Headers:** Requires `Authorization`
@@ -686,125 +524,140 @@ GET /missions/{mission_id}
 {
   "success": true,
   "data": {
-    "id": "msn_abc123",
-    "title": "Board Game Night",
-    "description": "Casual games at my place. Bring snacks!",
-    "date": "2025-02-08T18:00:00Z",
-    "location": { ... },
-    "interest_tags": ["board games", "social"],
-    "crew_id": "crew_xyz789",
-    "host": { ... },
-    "attendees": [
-      { "id": "usr_1", "name": "Alex", "photo": "...", "rsvp": "going" },
-      { "id": "usr_2", "name": "Jordan", "photo": "...", "rsvp": "maybe" }
-    ],
-    "rsvp_count": 4,
-    "max_attendees": 6,
-    "my_rsvp": "going",
-    "is_host": false
-  }
-}
-```
-
----
-
-### Create Mission
-
-Creates a new mission. Can be standalone or associated with a crew.
-
-```
-POST /missions
-```
-
-**Headers:** Requires `Authorization`
-
-**Request Body:**
-| Field | Type | Required | Description |
-|-------|------|----------|-------------|
-| `title` | string | Yes | Mission title (3-100 characters) |
-| `description` | string | No | Description (max 1000 characters) |
-| `date` | string | Yes | ISO 8601 datetime |
-| `location` | object | Yes | Name, address, and/or coordinates |
-| `interest_tags` | array[string] | No | 0-5 interest tags |
-| `crew_id` | string | No | Associate with a crew |
-| `max_attendees` | integer | No | Max attendees (2-20) |
-| `visibility` | string | No | "crew_only" or "public" (default) |
-
-**Example Request:**
-```json
-{
-  "title": "Board Game Night",
-  "description": "Casual games at my place. Bring snacks!",
-  "date": "2025-02-08T18:00:00Z",
-  "location": {
-    "name": "Alex's Apartment",
-    "address": "123 Main St, San Francisco, CA"
-  },
-  "interest_tags": ["board games"],
-  "crew_id": "crew_xyz789",
-  "max_attendees": 6,
-  "visibility": "crew_only"
-}
-```
-
----
-
-### RSVP to Mission
-
-Sets or updates the user's RSVP status.
-
-```
-POST /missions/{mission_id}/rsvp
-```
-
-**Headers:** Requires `Authorization`
-
-**Request Body:**
-| Field | Type | Required | Description |
-|-------|------|----------|-------------|
-| `status` | string | Yes | "going", "maybe", or "not_going" |
-
-**Example Response:**
-```json
-{
-  "success": true,
-  "data": {
-    "mission_id": "msn_abc123",
-    "rsvp": "going",
-    "rsvp_count": 5
+    "message": "Left crew successfully"
   }
 }
 ```
 
 **Errors:**
-| Code | Description |
-|------|-------------|
-| `MISSION_FULL` | Mission has reached max attendees |
-| `MISSION_PAST` | Cannot RSVP to past missions |
+| HTTP Status | Error Message |
+|-------------|---------------|
+| 400 | "Crew not found" |
+| 400 | "Not a member of this crew" |
 
 ---
 
-### Update Mission
+## Missions
 
-Updates mission details. Only the host can update.
+### Create Mission
+
+Creates a new mission/event.
 
 ```
-PATCH /missions/{mission_id}
+POST /api/missions/
 ```
 
 **Headers:** Requires `Authorization`
 
+**Request Body:**
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `title` | string | Yes | Mission title (max 200 characters) |
+| `description` | string | Yes | Description |
+| `tags` | array[string] | No | Interest tags for matching |
+| `location` | string | No | Free-text location |
+| `time` | string | No | Free-text time/date |
+
+**Example Request:**
+```json
+{
+  "title": "Board Game Night",
+  "description": "Casual games at the student lounge",
+  "tags": ["board games", "social"],
+  "location": "Student Union Room 204",
+  "time": "Friday 7pm"
+}
+```
+
+**Example Response (201):**
+```json
+{
+  "success": true,
+  "data": {
+    "id": 5629499534213120,
+    "title": "Board Game Night",
+    "description": "Casual games at the student lounge",
+    "tags": ["board games", "social"],
+    "location": "Student Union Room 204",
+    "time": "Friday 7pm",
+    "creator_id": 4785074604081152,
+    "rsvp_count": 0,
+    "created_at": "2025-01-25T10:00:00Z"
+  }
+}
+```
+
+**Errors:**
+| HTTP Status | Error Message |
+|-------------|---------------|
+| 400 | Validation error list (e.g. `["title is required", "description is required"]`) |
+
 ---
 
-### Delete Mission
+### List Missions
 
-Cancels/deletes a mission. Only the host can delete.
+Returns all missions, optionally filtered by tag.
 
 ```
-DELETE /missions/{mission_id}
+GET /api/missions/
+```
+
+**Query Parameters:**
+| Param | Type | Description |
+|-------|------|-------------|
+| `tag` | string | Filter missions that contain this tag |
+
+**Example Response:**
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "id": 5629499534213120,
+      "title": "Board Game Night",
+      "description": "Casual games at the student lounge",
+      "tags": ["board games", "social"],
+      "location": "Student Union Room 204",
+      "time": "Friday 7pm",
+      "creator_id": 4785074604081152,
+      "rsvp_count": 3,
+      "created_at": "2025-01-25T10:00:00Z"
+    }
+  ]
+}
+```
+
+Note: Returns a flat array of mission objects, limited to 50 results.
+
+---
+
+### RSVP to Mission
+
+Adds the user's RSVP to a mission.
+
+```
+POST /api/missions/{mission_id}/rsvp
 ```
 
 **Headers:** Requires `Authorization`
+
+**Request Body:** None required.
+
+**Example Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "message": "RSVPed to mission successfully"
+  }
+}
+```
+
+**Errors:**
+| HTTP Status | Error Message |
+|-------------|---------------|
+| 400 | "Mission not found" |
+| 400 | "Already RSVPed to this mission" |
 
 ---
 
@@ -812,149 +665,128 @@ DELETE /missions/{mission_id}
 
 ### Get Suggested Users
 
-Returns AI-matched user suggestions based on compatibility.
+Returns user profiles ranked by interest overlap with the current user.
 
 ```
-GET /discover/users
+GET /api/discover/users
 ```
 
 **Headers:** Requires `Authorization`
-
-**Query Parameters:**
-| Param | Type | Default | Description |
-|-------|------|---------|-------------|
-| `limit` | integer | 10 | Max results (1-20) |
 
 **Example Response:**
 ```json
 {
   "success": true,
-  "data": {
-    "suggestions": [
-      {
-        "user": {
-          "id": "usr_xyz789",
-          "name": "Jordan Lee",
-          "age": 24,
-          "photo": "...",
-          "bio": "Coffee enthusiast...",
-          "interests": ["photography", "coffee", "hiking"]
-        },
-        "compatibility": {
-          "score": 0.87,
-          "shared_interests": ["hiking", "coffee"],
-          "reasons": [
-            "You both enjoy outdoor activities",
-            "Similar social preferences"
-          ]
-        }
-      }
-    ]
-  }
+  "data": [
+    {
+      "name": "Jordan Lee",
+      "age": 21,
+      "location": { "city": "Davis", "state": "CA", "coordinates": null },
+      "bio": "Film student and amateur chef",
+      "photos": [],
+      "interests": ["Movies", "Cooking", "Music", "Art", "Food"],
+      "personality": {
+        "introvert_extrovert": 0.4,
+        "spontaneous_planner": 0.7,
+        "active_relaxed": 0.5
+      },
+      "social_preferences": {
+        "group_size": "One-on-one",
+        "meeting_frequency": "Bi-weekly",
+        "preferred_times": ["Evenings"]
+      },
+      "friendship_goals": []
+    }
+  ]
 }
 ```
+
+Note: Returns a flat array of Profile objects (up to 20), sorted by number of shared interests (descending). Excludes users without a name and the requesting user.
 
 ---
 
 ### Get Suggested Crews
 
-Returns AI-recommended crews based on user's interests.
+Returns crews ranked by interest overlap with the current user.
 
 ```
-GET /discover/crews
+GET /api/discover/crews
 ```
 
 **Headers:** Requires `Authorization`
-
-**Query Parameters:**
-| Param | Type | Default | Description |
-|-------|------|---------|-------------|
-| `limit` | integer | 10 | Max results (1-20) |
 
 **Example Response:**
 ```json
 {
   "success": true,
-  "data": {
-    "suggestions": [
-      {
-        "crew": {
-          "id": "crew_abc123",
-          "name": "SF Hiking Crew",
-          "description": "Weekly hikes...",
-          "interest_tags": ["hiking", "outdoors"],
-          "member_count": 5,
-          "preview_members": [...]
-        },
-        "compatibility": {
-          "score": 0.92,
-          "matching_interests": ["hiking", "outdoors"],
-          "reasons": ["Matches your interest in hiking"]
-        }
-      }
-    ]
-  }
+  "data": [
+    {
+      "id": 5629499534213120,
+      "name": "Davis Hiking Crew",
+      "description": "Weekly hikes",
+      "tags": ["hiking", "outdoors"],
+      "creator_id": 4785074604081152,
+      "member_count": 3,
+      "match_score": 2,
+      "created_at": "2025-01-15T10:30:00Z"
+    }
+  ]
 }
 ```
+
+Note: Returns crew objects with an added `match_score` field (count of shared tags), up to 20 results.
 
 ---
 
 ### Get Suggested Missions
 
-Returns AI-recommended missions based on interests and availability.
+Returns missions ranked by interest overlap with the current user.
 
 ```
-GET /discover/missions
+GET /api/discover/missions
 ```
 
 **Headers:** Requires `Authorization`
-
-**Query Parameters:**
-| Param | Type | Default | Description |
-|-------|------|---------|-------------|
-| `limit` | integer | 10 | Max results (1-20) |
 
 **Example Response:**
 ```json
 {
   "success": true,
-  "data": {
-    "suggestions": [
-      {
-        "mission": {
-          "id": "msn_abc123",
-          "title": "Photography Walk",
-          "date": "2025-02-10T10:00:00Z",
-          "location": { "name": "Golden Gate Park" },
-          "host": { "id": "usr_1", "name": "Sam", "photo": "..." },
-          "rsvp_count": 3,
-          "max_attendees": 8
-        },
-        "compatibility": {
-          "score": 0.85,
-          "reasons": ["Matches your interest in photography"]
-        }
-      }
-    ]
-  }
+  "data": [
+    {
+      "id": 5629499534213120,
+      "title": "Photography Walk",
+      "description": "Explore campus with cameras",
+      "tags": ["photography", "outdoors"],
+      "location": "Main Quad",
+      "time": "Saturday 10am",
+      "creator_id": 4785074604081152,
+      "rsvp_count": 3,
+      "match_score": 1,
+      "created_at": "2025-01-20T08:00:00Z"
+    }
+  ]
 }
 ```
+
+Note: Returns mission objects with an added `match_score` field (count of shared tags), up to 20 results.
 
 ---
 
 ## Data Types Reference
 
-### Location Object
-```json
-{
-  "city": "San Francisco",
-  "state": "CA",
-  "coordinates": {
-    "lat": 37.7749,
-    "lng": -122.4194
-  }
-}
-```
+### Profile Fields
+| Field | Type | Notes |
+|-------|------|-------|
+| `name` | string | Max 100 chars |
+| `age` | integer | 18–100 |
+| `location` | object | `{ city, state, coordinates }` |
+| `bio` | string | Max 500 chars |
+| `photos` | array[string] | Max 6, GCS public URLs |
+| `interests` | array[string] | Max 10 |
+| `personality` | object | Three 0.0–1.0 float scales |
+| `social_preferences` | object | Group size, frequency, times |
+| `friendship_goals` | array[string] | Free-form strings |
 
 ### Personality Object
 All values are floats from 0.0 to 1.0:
@@ -969,17 +801,11 @@ All values are floats from 0.0 to 1.0:
 ### Social Preferences Object
 ```json
 {
-  "group_size": "small" | "medium" | "large",
-  "meeting_frequency": "weekly" | "biweekly" | "monthly" | "flexible",
-  "preferred_times": ["weekday_evenings", "weekends", "mornings"]
+  "group_size": "Small groups (3-5)",
+  "meeting_frequency": "Weekly",
+  "preferred_times": ["Weekends", "Evenings", "Mornings", "Afternoons"]
 }
 ```
 
-### Friendship Goals
-Valid values: `"activity_partners"`, `"close_friends"`, `"networking"`, `"explore_city"`, `"workout_buddy"`
-
-### RSVP Status
-Valid values: `"going"`, `"maybe"`, `"not_going"`
-
-### Crew Roles
-Valid values: `"admin"`, `"member"`
+### Entity IDs
+All entity IDs (users, crews, missions) are **numeric** auto-generated Datastore IDs (e.g., `5629499534213120`). Join entity IDs (CrewMember, MissionRSVP) are composite strings like `"{parent_id}_{user_id}"`.

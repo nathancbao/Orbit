@@ -16,8 +16,9 @@ def validate_profile_data(data):
     errors = []
     allowed_fields = {
         'name', 'age', 'location', 'bio', 'photos', 'interests',
-        'personality', 'social_preferences', 'friendship_goals'
+        'personality', 'social_preferences', 'friendship_goals',
     }
+
     for key in data:
         if key not in allowed_fields:
             errors.append(f"Unknown field: {key}")
@@ -31,8 +32,8 @@ def validate_profile_data(data):
 
     if 'age' in data:
         age = data['age']
-        if not isinstance(age, int) or age < 18 or age > 100:
-            errors.append("age must be between 18 and 100")
+        if not isinstance(age, (int, float)) or int(age) < 18 or int(age) > 100:
+            errors.append("age must be a number between 18 and 100")
 
     if 'bio' in data:
         if not isinstance(data['bio'], str):
@@ -51,6 +52,22 @@ def validate_profile_data(data):
             errors.append("photos must be a list")
         elif len(data['photos']) > 6:
             errors.append("Maximum 6 photos allowed")
+
+    if 'location' in data:
+        if not isinstance(data['location'], dict):
+            errors.append("location must be an object")
+
+    if 'personality' in data:
+        if not isinstance(data['personality'], dict):
+            errors.append("personality must be an object")
+
+    if 'social_preferences' in data:
+        if not isinstance(data['social_preferences'], dict):
+            errors.append("social_preferences must be an object")
+
+    if 'friendship_goals' in data:
+        if not isinstance(data['friendship_goals'], list):
+            errors.append("friendship_goals must be a list")
 
     if errors:
         return False, errors

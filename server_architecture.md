@@ -2,63 +2,51 @@
 
 ## Overview
 
-The Orbit server is a Python web service that handles all backend logic: user authentication, profile management, crews, missions, and AI-powered matching. It runs on Google App Engine and stores data in Firestore (Datastore mode).
+The Orbit server is a Python web service that handles all backend logic: user authentication via .edu email verification (skipping for Milestone 0), profile management, crews, missions, and interest-based matching. It runs on Google App Engine and stores data in Google Cloud Datastore.
 
 ### Tech Stack
 
 | Component | Technology |
 |-----------|------------|
 | Runtime | Google App Engine (Python 3.11) |
-| Web Framework | Flask with Blueprints |
-| Database | Firestore in Datastore mode |
+| Web Framework | Flask 3.0 with Blueprints |
+| Database | Google Cloud Datastore |
 | File Storage | Google Cloud Storage |
-| Authentication | JWT tokens (SMS verification) |
+| Authentication | JWT tokens (email verification via SendGrid) |
+| Email | SendGrid (currently in demo mode) |
 
 ---
 
 ## Project Structure
 
-```
-orbit-server/
+```ini
+Orbit/
 ├── app.yaml                 # GAE configuration
-├── main.py                  # App entry point
+├── main.py                  # App entry point, blueprint registration
 ├── requirements.txt         # Python dependencies
-├── .gcloudignore           # Files to exclude from deploy
 │
 ├── api/                     # Request handlers (routes)
-│   ├── __init__.py
-│   ├── auth.py             # Authentication endpoints
-│   ├── users.py            # User/profile endpoints
-│   ├── crews.py            # Crew endpoints
-│   ├── missions.py         # Mission endpoints
-│   └── discover.py         # Matching/discovery endpoints
+│   ├── auth.py             # /api/auth/* endpoints
+│   ├── users.py            # /api/users/* endpoints
+│   ├── crews.py            # /api/crews/* endpoints
+│   ├── missions.py         # /api/missions/* endpoints
+│   └── discover.py         # /api/discover/* endpoints
 │
 ├── services/                # Business logic
-│   ├── __init__.py
-│   ├── auth_service.py     # Auth logic (tokens, SMS)
-│   ├── user_service.py     # User/profile logic
-│   ├── crew_service.py     # Crew logic
-│   ├── mission_service.py  # Mission logic
-│   ├── matching_service.py # AI matching logic
-│   └── storage_service.py  # File upload logic
+│   ├── auth_service.py     # Email verification, JWT creation
+│   ├── user_service.py     # Profile CRUD, profile completeness
+│   ├── crew_service.py     # Crew CRUD, membership
+│   ├── mission_service.py  # Mission CRUD, RSVP
+│   ├── matching_service.py # Interest-based matching
+│   └── storage_service.py  # Photo upload to GCS
 │
 ├── models/                  # Data models
-│   ├── __init__.py
-│   └── models.py           # All Datastore entities
+│   └── models.py           # All Datastore entity functions
 │
-├── utils/                   # Shared utilities
-│   ├── __init__.py
-│   ├── auth.py             # JWT helpers, decorators
-│   ├── responses.py        # Standard response formatting
-│   └── validators.py       # Input validation
-│
-└── tests/                   # Test files
-    ├── __init__.py
-    ├── test_auth.py
-    ├── test_users.py
-    ├── test_crews.py
-    ├── test_missions.py
-    └── test_discover.py
+└── utils/                   # Shared utilities
+    ├── auth.py             # JWT helpers, @require_auth decorator
+    ├── responses.py        # Standard JSON response formatting
+    └── validators.py       # Input validation (.edu email, profile, crew, mission)
 ```
 
 ---
@@ -67,23 +55,23 @@ orbit-server/
 
 The server follows a **three-layer architecture**:
 
-```
+```ini
 ┌─────────────────────────────────────────────────────┐
-│                    API Layer                        │
+│                    API Layer                         │
 │         (api/*.py - Flask Blueprints)               │
 │   Handles HTTP requests, input validation, auth     │
 └─────────────────────┬───────────────────────────────┘
                       │
 ┌─────────────────────▼───────────────────────────────┐
-│                 Service Layer                       │
-│              (services/*.py)                        │
-│   Contains business logic, coordinates operations   │
+│                 Service Layer                        │
+│              (services/*.py)                         │
+│   Contains business logic, coordinates operations    │
 └─────────────────────┬───────────────────────────────┘
                       │
 ┌─────────────────────▼───────────────────────────────┐
-│                  Data Layer                         │
-│           (models/models.py)                        │
-│   Datastore entities, database operations           │
+│                  Data Layer                          │
+│           (models/models.py)                         │
+│   Datastore entity functions, database operations    │
 └─────────────────────────────────────────────────────┘
 ```
 
@@ -100,106 +88,127 @@ The server follows a **three-layer architecture**:
 
 ### 1. API Layer (`api/`)
 
-Each file is a Flask Blueprint that groups related endpoints.
+Each file is a Flask Blueprint with a URL prefix that groups related endpoints.
 
-| File | Purpose | Key Endpoints |
-|------|---------|---------------|
-| `auth.py` | Authentication | send-code, verify-code, refresh, logout |
-| `users.py` | User profiles | get profile, update profile, upload photo |
-| `crews.py` | Crew management | create, join, leave, list crews |
-| `missions.py` | Mission management | create, RSVP, list missions |
-| `discover.py` | AI suggestions | suggested users, crews, missions |
+| File | URL Prefix | Key Endpoints |
+|------|------------|---------------|
+| `auth.py` | `/api/auth` | send-code, verify-code, refresh, logout |
+| `users.py` | `/api/users` | GET/PUT /me, POST /me/photo, GET /<user_id> |
+| `crews.py` | `/api/crews` | POST /, GET /, POST /<id>/join, POST /<id>/leave |
+| `missions.py` | `/api/missions` | POST /, GET /, POST /<id>/rsvp |
+| `discover.py` | `/api/discover` | GET /users, GET /crews, GET /missions |
 
 **Responsibilities:**
+
 - Parse incoming requests
-- Validate input data
-- Check authentication
+- Validate input data (via `utils/validators.py`)
+- Check authentication (via `@require_auth` decorator)
 - Call the appropriate service
-- Format and return responses
+- Format and return responses (via `utils/responses.py`)
 
 **Example:**
+
 ```python
 # api/users.py
-from flask import Blueprint, request
-from services.user_service import UserService
-from utils.auth import require_auth
+from flask import Blueprint, request, g
 from utils.responses import success, error
+from utils.auth import require_auth
+from utils.validators import validate_profile_data
+from services.user_service import get_user_profile, update_user_profile
 
-users_bp = Blueprint('users', __name__)
+users_bp = Blueprint('users', __name__, url_prefix='/api/users')
 
-@users_bp.route('/users/me', methods=['GET'])
+@users_bp.route('/me', methods=['GET'])
 @require_auth
-def get_current_user(user_id):
-    user = UserService.get_user(user_id)
-    if not user:
-        return error('NOT_FOUND', 'User not found', 404)
-    return success(user.to_dict())
+def get_me():
+    profile, err = get_user_profile(g.user_id)
+    if err:
+        return error(err, 404)
+    return success(profile)
+
+@users_bp.route('/me', methods=['PUT'])
+@require_auth
+def update_me():
+    data = request.get_json(silent=True) or {}
+    valid, errors = validate_profile_data(data)
+    if not valid:
+        return error(errors, 400)
+    profile, err = update_user_profile(g.user_id, data)
+    if err:
+        return error(err, 500)
+    return success(profile)
 ```
 
 ---
 
 ### 2. Service Layer (`services/`)
 
-Services contain all business logic. They don't know about HTTP—they just take inputs and return results.
+Services contain all business logic. They don't know about HTTP—they take inputs and return `(result, error)` tuples.
 
 | File | Purpose |
 |------|---------|
-| `auth_service.py` | SMS verification, JWT creation/validation |
-| `user_service.py` | Create/update users, profile completion logic |
-| `crew_service.py` | Crew CRUD, membership management, validation |
-| `mission_service.py` | Mission CRUD, RSVP logic, date validation |
-| `matching_service.py` | Compatibility scoring, suggestion algorithms |
-| `storage_service.py` | Upload/delete photos to Cloud Storage |
+| `auth_service.py` | Email verification code generation, JWT token creation, demo mode bypass |
+| `user_service.py` | Profile retrieval/update, profile completeness check, photo upload |
+| `crew_service.py` | Crew creation, join/leave with member count tracking |
+| `mission_service.py` | Mission creation, RSVP with count tracking |
+| `matching_service.py` | Interest overlap matching for users, crews, and missions |
+| `storage_service.py` | Upload files to Google Cloud Storage with public URLs |
 
 **Responsibilities:**
+
 - Implement business rules
-- Coordinate between multiple models
-- Call external services (SMS, AI)
-- Return data or raise exceptions
+- Coordinate between multiple model functions
+- Return `(data, None)` on success or `(None, error_message)` on failure
 
 **Example:**
+
 ```python
 # services/crew_service.py
-from models.models import Crew, CrewMember
+from models.models import (
+    create_crew as db_create_crew,
+    get_crew, get_crew_member, add_crew_member,
+    remove_crew_member, update_crew_member_count,
+)
 
-class CrewService:
-    @staticmethod
-    def join_crew(user_id: str, crew_id: str) -> dict:
-        crew = Crew.get_by_id(crew_id)
+def join_crew(crew_id, user_id):
+    crew = get_crew(crew_id)
+    if not crew:
+        return None, "Crew not found"
 
-        if not crew:
-            raise ValueError('Crew not found')
+    existing = get_crew_member(crew_id, user_id)
+    if existing:
+        return None, "Already a member of this crew"
 
-        if crew.member_count >= crew.max_members:
-            raise ValueError('Crew is full')
-
-        if CrewMember.exists(user_id, crew_id):
-            raise ValueError('Already a member')
-
-        CrewMember.create(user_id, crew_id, role='member')
-        crew.increment_member_count()
-
-        return {'message': 'Successfully joined crew'}
+    add_crew_member(crew_id, user_id)
+    update_crew_member_count(crew_id, 1)
+    return {"message": "Joined crew successfully"}, None
 ```
 
 ---
 
-### 3. Data Layer (`models/`)
+### 3. Data Layer (`models/models.py`)
 
-Models represent Datastore entities and handle all database operations.
+The data layer is a single module of plain functions (not classes) that wrap the Google Cloud Datastore client. Each entity kind has its own set of CRUD functions.
 
-**Entities:**
+**Entity Kinds:**
 
-| Entity | Purpose | Key Fields |
-|--------|---------|------------|
-| `User` | User account | id, phone_number, created_at |
-| `Profile` | User profile data | user_id, name, age, interests, personality |
-| `Crew` | Friend group | id, name, interest_tags, member_count |
-| `CrewMember` | Crew membership | user_id, crew_id, role, joined_at |
-| `Mission` | One-time event | id, title, date, location, host_id |
-| `MissionRSVP` | Mission attendance | user_id, mission_id, status |
-| `RefreshToken` | Auth tokens | token, user_id, expires_at |
-| `VerificationCode` | SMS codes | phone_number, code, expires_at |
+| Kind | Purpose | Key Fields |
+|------|---------|------------|
+| `User` | User account | email, created_at |
+| `Profile` | User profile data | user_id, name, age, interests, personality, ... |
+| `Crew` | Friend group | name, description, tags, creator_id, member_count |
+| `CrewMember` | Crew membership | crew_id, user_id, joined_at |
+| `Mission` | Event | title, description, tags, location, time, creator_id, rsvp_count |
+| `MissionRSVP` | Mission attendance | mission_id, user_id, rsvped_at |
+| `RefreshToken` | Auth tokens | user_id, created_at |
+| `VerificationCode` | Email verification codes | email, code, expires_at |
+
+**Key patterns:**
+
+- Auto-generated numeric IDs for User, Crew, Mission entities
+- Composite string keys for join entities: `"{parent_id}_{user_id}"` for CrewMember and MissionRSVP
+- `_entity_to_dict()` helper converts Datastore entities to plain dicts with an `id` field
+- `_deep_convert()` recursively converts embedded Datastore entities to plain dicts
 
 ---
 
@@ -208,59 +217,61 @@ Models represent Datastore entities and handle all database operations.
 ### User & Profile
 
 ```python
-# Stored as two separate entities for flexibility
+# Stored as two separate Datastore kinds
+# User key is auto-generated numeric ID
+# Profile key uses the same numeric ID as the User
 
 User:
-    id: str                  # "usr_abc123"
-    phone_number: str        # "+14155551234"
-    profile_complete: bool
+    id: int                  # Auto-generated Datastore ID
+    email: str               # .edu email address
     created_at: datetime
 
 Profile:
-    user_id: str             # References User
+    user_id: int             # Same as User ID (used as key)
     name: str
     age: int
     location: {
-        city: str
-        state: str
-        lat: float
-        lng: float
+        city: str,
+        state: str,
+        coordinates: { lat: float, lng: float } or None
     }
     bio: str
-    photos: [str]            # Cloud Storage URLs
+    photos: [str]            # GCS public URLs
     interests: [str]
     personality: {
-        introvert_extrovert: float    # 0.0 to 1.0
-        spontaneous_planner: float
+        introvert_extrovert: float,   # 0.0 to 1.0
+        spontaneous_planner: float,
         active_relaxed: float
     }
     social_preferences: {
-        group_size: str
-        meeting_frequency: str
+        group_size: str,              # e.g. "Small groups (3-5)"
+        meeting_frequency: str,       # e.g. "Weekly"
         preferred_times: [str]
     }
     friendship_goals: [str]
+    email: str               # Copied from User entity on update
+    created_at: datetime
+    updated_at: datetime
 ```
+
+**Profile completeness** is determined by the service layer: a profile is complete when it has a non-empty name, at least 3 interests, and at least one preferred time.
 
 ### Crew & Membership
 
 ```python
 Crew:
-    id: str                  # "crew_abc123"
+    id: int                  # Auto-generated Datastore ID
     name: str
     description: str
-    interest_tags: [str]
-    member_count: int
-    max_members: int         # 3-15
-    created_by: str          # User ID
+    tags: [str]              # Interest tags for matching
+    creator_id: int          # User ID
+    member_count: int        # Tracked via delta updates
     created_at: datetime
-    last_activity_at: datetime
 
 CrewMember:
-    id: str                  # Composite: "usr_abc123_crew_xyz789"
-    user_id: str
-    crew_id: str
-    role: str                # "admin" or "member"
+    id: str                  # Composite key: "{crew_id}_{user_id}"
+    crew_id: int
+    user_id: int
     joined_at: datetime
 ```
 
@@ -268,29 +279,21 @@ CrewMember:
 
 ```python
 Mission:
-    id: str                  # "msn_abc123"
+    id: int                  # Auto-generated Datastore ID
     title: str
     description: str
-    date: datetime
-    location: {
-        name: str
-        address: str
-        lat: float
-        lng: float
-    }
-    interest_tags: [str]
-    crew_id: str             # Optional
-    host_id: str
-    max_attendees: int
-    visibility: str          # "public" or "crew_only"
+    tags: [str]              # Interest tags for matching
+    location: str            # Free-text location string
+    time: str                # Free-text time string
+    creator_id: int          # User ID
+    rsvp_count: int          # Tracked via delta updates
     created_at: datetime
 
 MissionRSVP:
-    id: str                  # Composite: "usr_abc123_msn_xyz789"
-    user_id: str
-    mission_id: str
-    status: str              # "going", "maybe", "not_going"
-    updated_at: datetime
+    id: str                  # Composite key: "{mission_id}_{user_id}"
+    mission_id: int
+    user_id: int
+    rsvped_at: datetime
 ```
 
 ---
@@ -299,7 +302,7 @@ MissionRSVP:
 
 Here's how a typical request flows through the system:
 
-```
+```ini
 1. Client sends request
         │
         ▼
@@ -307,45 +310,44 @@ Here's how a typical request flows through the system:
         │
         ▼
 3. API layer (api/*.py)
-   ├── @require_auth decorator validates JWT
-   ├── Validates request body
-   └── Calls service method
+   ├── @require_auth decorator validates JWT, sets g.user_id
+   ├── Validates request body via utils/validators.py
+   └── Calls service function
         │
         ▼
 4. Service layer (services/*.py)
    ├── Implements business logic
-   ├── Calls model methods
-   └── Returns result or raises exception
+   ├── Calls model functions
+   └── Returns (result, None) or (None, error_message)
         │
         ▼
 5. Data layer (models/models.py)
    ├── Queries/updates Datastore
-   └── Returns entity or None
+   └── Returns dict or None
         │
         ▼
 6. Response flows back up
-   └── API layer formats as JSON
+   └── API layer formats via success() or error()
         │
         ▼
-7. Client receives response
+7. Client receives JSON response
 ```
 
 **Example: User joins a crew**
 
-```
-POST /api/v1/crews/crew_abc123/join
+```rb
+POST /api/crews/12345/join
 Authorization: Bearer eyJ...
 
-1. Request hits api/crews.py → join_crew()
-2. @require_auth extracts user_id from JWT
-3. Calls CrewService.join_crew(user_id, crew_id)
+1. Request hits api/crews.py → join()
+2. @require_auth extracts user_id from JWT, stores in g.user_id
+3. Calls join_crew(crew_id, g.user_id)
 4. Service checks:
-   - Does crew exist?
-   - Is crew full?
-   - Is user already a member?
-5. Service creates CrewMember entity
-6. Service increments crew.member_count
-7. Returns success response
+   - Does crew exist? (get_crew)
+   - Is user already a member? (get_crew_member)
+5. Service calls add_crew_member(crew_id, user_id)
+6. Service calls update_crew_member_count(crew_id, 1)
+7. Returns success({"message": "Joined crew successfully"})
 ```
 
 ---
@@ -355,34 +357,47 @@ Authorization: Bearer eyJ...
 ### Authentication (`utils/auth.py`)
 
 ```python
-# Decorator to protect routes
-@require_auth
-def protected_route(user_id):
-    # user_id is automatically extracted from JWT
-    pass
+# JWT configuration
+JWT_SECRET = os.environ.get('JWT_SECRET', 'dev-secret-change-me')
+ACCESS_TOKEN_EXPIRY = 15 minutes
+REFRESH_TOKEN_EXPIRY = 7 days
 
-# Helper functions
-create_access_token(user_id) → str
-create_refresh_token(user_id) → str
-verify_token(token) → dict or None
+# Token creation
+create_access_token(user_id) → str   # JWT with type='access'
+create_refresh_token(user_id) → str  # JWT with type='refresh'
+decode_token(token) → (payload, None) or (None, error_message)
+
+# Flask decorator - extracts user_id from Bearer token, stores in g.user_id
+@require_auth
+def protected_route():
+    # g.user_id is available here
+    pass
 ```
 
 ### Responses (`utils/responses.py`)
 
 ```python
-# Consistent response formatting
-success(data) → {"success": True, "data": data}
-error(code, message, status) → {"success": False, "error": {...}}
+# Consistent JSON response formatting
+success(data, status=200) → {"success": True, "data": data}
+error(message, status=400) → {"success": False, "error": "message string"}
 ```
 
 ### Validators (`utils/validators.py`)
 
 ```python
-# Input validation
-validate_phone_number(phone) → bool
-validate_profile_data(data) → (bool, errors)
-validate_crew_data(data) → (bool, errors)
+# Input validation - returns (bool, result_or_errors)
+validate_edu_email(email) → (True, cleaned_email) or (False, error_message)
+validate_profile_data(data) → (True, None) or (False, [error_messages])
+validate_crew_data(data) → (True, None) or (False, [error_messages])
+validate_mission_data(data) → (True, None) or (False, [error_messages])
 ```
+
+**Validation rules:**
+
+- Email must be a valid `.edu` address
+- Profile: name ≤ 100 chars, age 18–100, bio ≤ 500 chars, max 10 interests, max 6 photos
+- Crew: name required, name ≤ 100 chars, description ≤ 500 chars
+- Mission: title and description required, title ≤ 200 chars
 
 ---
 
@@ -390,48 +405,47 @@ validate_crew_data(data) → (bool, errors)
 
 | Service | Purpose | Used By |
 |---------|---------|---------|
-| **Twilio** (or similar) | Send SMS verification codes | auth_service.py |
-| **Google Cloud Storage** | Store user photos | storage_service.py |
-| **OpenAI API** (optional) | Enhanced matching suggestions | matching_service.py |
+| __SendGrid__ | Send email verification codes (currently demo mode) | auth_service.py |
+| __Google Cloud Storage__ | Store user profile photos with public URLs | storage_service.py |
+| __Google Cloud Datastore__ | Primary database for all entities | models/models.py |
 
 ---
 
 ## Configuration
 
-Environment variables (set in `app.yaml` or locally):
+Environment variables (set in `app.yaml`):
 
 ```yaml
+runtime: python311
+entrypoint: gunicorn -b :$PORT main:app
+
 env_variables:
-  PROJECT_ID: "orbit-app"
-  JWT_SECRET: "your-secret-key"
-  TWILIO_ACCOUNT_SID: "..."
-  TWILIO_AUTH_TOKEN: "..."
-  TWILIO_PHONE_NUMBER: "+1..."
-  GCS_BUCKET_NAME: "orbit-photos"
+  PROJECT_ID: "orbit-app-486204"
+  JWT_SECRET: "<secret-key>"
+  SENDGRID_API_KEY: "<sendgrid-api-key>"
+  GCS_BUCKET_NAME: "orbit-app-486204-photos"
+```
+
+### Dependencies (`requirements.txt`)
+
+```sh
+Flask==3.0.0
+gunicorn==21.2.0
+google-cloud-datastore==2.19.0
+google-cloud-storage==2.14.0
+PyJWT==2.8.0
+sendgrid==6.11.0
+python-dotenv==1.0.0
 ```
 
 ---
 
-## Testing Strategy
+## Matching Algorithm
 
-Tests mirror the source structure:
+The matching service (`matching_service.py`) uses a simple interest overlap approach:
 
-| Test File | What It Tests |
-|-----------|---------------|
-| `test_auth.py` | SMS flow, token generation, token refresh |
-| `test_users.py` | Profile CRUD, photo upload |
-| `test_crews.py` | Crew creation, join/leave, permissions |
-| `test_missions.py` | Mission CRUD, RSVP logic |
-| `test_discover.py` | Matching algorithm, suggestions |
+1. **User matching**: Fetches all profiles, counts shared interests with the current user, returns up to 20 sorted by overlap count (highest first). Excludes users without a name set.
+2. **Crew matching**: Fetches all crews, counts overlap between user interests and crew `tags`, returns up to 20 sorted by overlap.
+3. **Mission matching**: Fetches all missions, counts overlap between user interests and mission `tags`, returns up to 20 sorted by overlap.
 
-**Running tests:**
-```bash
-# Run all tests
-pytest tests/
-
-# Run specific test file
-pytest tests/test_auth.py
-
-# Run with coverage
-pytest --cov=. tests/
-```
+Suggested user profiles are formatted to match the Swift `Profile` struct fields (name, age, location, bio, photos, interests, personality, social_preferences, friendship_goals).
