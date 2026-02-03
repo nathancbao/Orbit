@@ -2,7 +2,7 @@
 
 ## Overview
 
-Orbit is an iOS app that helps college students find friends through interest-based matching. Users authenticate with a .edu email, set up a detailed profile, and discover other users through a space-themed cosmos interface.
+Orbit is an iOS app that helps college students find friends through interest-based matching. Users authenticate with a .edu email, set up a detailed profile, and discover other users through an interactive solar system interface where they are the center of their own universe.
 
 ### Tech Stack
 
@@ -20,44 +20,45 @@ Orbit is an iOS app that helps college students find friends through interest-ba
 ## Project Structure
 
 ```
-Orbit/
-├── models/                        # Data structures (shared with server repo)
-│   ├── APIResponse.swift          # API response wrappers
-│   ├── Profile.swift              # Profile, Location, Personality, etc.
-│   └── User.swift                 # User model (currently unused by client)
+OrbitApp/Orbit/
+├── OrbitApp.swift                 # @main app entry point
+├── ContentView.swift              # Root navigation coordinator (AppState)
 │
-├── services/                      # Networking layer (shared with server repo)
+├── Models/
+│   ├── APIResponse.swift          # API response wrappers (generic + specific)
+│   ├── Profile.swift              # Profile, Location, Personality, SocialPreferences
+│   └── User.swift                 # User model with profile completion tracking
+│
+├── Services/
 │   ├── APIService.swift           # Base HTTP client (singleton)
 │   ├── AuthService.swift          # Email auth, token management
-│   ├── ProfileService.swift       # Profile CRUD
-│   └── DiscoverService.swift      # Suggested profiles (uses mock data)
+│   ├── ProfileService.swift       # Profile CRUD + photo upload
+│   └── DiscoverService.swift      # Fetch suggested profiles
 │
-├── utils/                         # Helpers (shared with server repo)
+├── Utils/
 │   ├── Constants.swift            # API URLs, endpoints, validation rules
 │   └── KeychainHelper.swift       # Secure token storage
 │
-└── orbitApp/                      # Main app target
-    ├── OrbitApp.swift             # @main app entry point
-    ├── ContentView.swift          # Root navigation coordinator
+├── ViewModels/
+│   ├── AuthViewModel.swift        # Email verification flow state
+│   └── ProfileViewModel.swift     # 5-step profile setup form management
+│
+└── Views/
+    ├── MainTabView.swift          # Tab bar (Discover + Profile)
     │
-    ├── ViewModels/
-    │   ├── AuthViewModel.swift    # Email verification flow
-    │   └── ProfileViewModel.swift # 5-step profile setup form
+    ├── Auth/
+    │   ├── AuthFlowView.swift     # Email entry + code verification
+    │   ├── PhoneEntryView.swift   # Placeholder (unused)
+    │   └── VerificationView.swift # Placeholder (unused)
     │
-    └── Views/
-        ├── MainTabView.swift      # Tab bar (Discover + Profile)
-        │
-        ├── Auth/
-        │   ├── AuthFlowView.swift       # Email entry + code verification
-        │   ├── PhoneEntryView.swift      # Placeholder (unused)
-        │   └── VerificationView.swift    # Placeholder (unused)
-        │
-        ├── Discover/
-        │   └── DiscoverView.swift       # Space-themed cosmos interface
-        │
-        └── Profile/
-            ├── ProfileSetupView.swift   # 5-step profile creation form
-            └── ProfileDisplayView.swift # Profile card with photo carousel
+    ├── Discover/
+    │   └── DiscoverView.swift     # Solar system discovery interface
+    │                              # Contains: Star, YourPlanet, UserPlanet,
+    │                              # ProfileDetailSheet, InfoChip, FlowLayout
+    │
+    └── Profile/
+        ├── ProfileSetupView.swift   # 5-step profile creation form
+        └── ProfileDisplayView.swift # Profile card with photo carousel
 ```
 
 ---
@@ -67,21 +68,21 @@ Orbit/
 ```
 ┌─────────────────────────────────────────────────────────────┐
 │                         VIEWS                               │
-│                    (SwiftUI Views)                           │
+│                    (SwiftUI Views)                          │
 │  Display UI, capture user input, observe ViewModel state    │
 └─────────────────────────┬───────────────────────────────────┘
                           │ @StateObject / @State
                           ▼
 ┌─────────────────────────────────────────────────────────────┐
 │                      VIEWMODELS                             │
-│              (@Observable / ObservableObject)                │
+│              (@Observable / ObservableObject)               │
 │  Handle UI logic, transform data, manage view state         │
 └─────────────────────────┬───────────────────────────────────┘
                           │ async/await calls
                           ▼
 ┌─────────────────────────────────────────────────────────────┐
 │                       SERVICES                              │
-│                    (Singletons)                              │
+│                    (Singletons)                             │
 │  Make API calls, handle auth, manage Keychain tokens        │
 └─────────────────────────┬───────────────────────────────────┘
                           │ HTTP requests (URLSession)
@@ -92,7 +93,7 @@ Orbit/
 └─────────────────────────────────────────────────────────────┘
 ```
 
-### Data Flow Example
+### Data Flow Example: Profile Save
 
 ```
 User completes profile setup form
@@ -123,87 +124,319 @@ View automatically re-renders
 
 ## Main Components
 
-### 1. Views Layer (`orbitApp/Views/`)
+### 1. Views Layer (`Views/`)
 
 Views are SwiftUI structs that display UI and respond to state changes.
 
 | Folder | Views | Purpose |
 |--------|-------|---------|
 | `Auth/` | AuthFlowView | .edu email entry and 6-digit code verification |
-| `Discover/` | DiscoverView | Space-themed cosmos with orbiting user planets |
+| `Discover/` | DiscoverView | Solar system interface with orbiting user planets |
 | `Profile/` | ProfileSetupView, ProfileDisplayView | 5-step profile creation and profile card display |
 | Root | MainTabView | Tab bar with Discover and Profile tabs |
 
-**AuthFlowView** handles both email entry and code verification in a single view, switching between states based on `AuthViewModel.authState`. Uses a dark blue gradient background.
+---
 
-**DiscoverView** renders a space-themed interface where the current user appears as a central "YOU" planet and other users appear as orbiting planets. Tapping a planet opens a profile detail sheet. Uses a star field background with pulsing animations.
+#### AuthFlowView
 
-**ProfileSetupView** is a multi-step form with 5 steps:
-1. **BasicInfoStep** - Name, age, city, state, bio
-2. **PersonalityStep** - 3 personality sliders (introvert/extrovert, spontaneous/planner, active/relaxed)
-3. **InterestsStep** - Predefined interest chips + custom interests (min 3, max 10)
-4. **SocialPreferencesStep** - Group size, meeting frequency, preferred times
-5. **PhotoUploadStep** - Up to 6 photos from Photos library or Files
+Handles both email entry and code verification in a single view, switching between states based on `AuthViewModel.authState`. Uses a dark blue gradient background.
 
-**ProfileDisplayView** shows a profile card with a photo carousel (swipeable), name/age/location header, bio, interests as tags, personality bars, and social preferences. Includes an edit button to re-enter profile setup.
+**States:**
+- `emailEntry` - User enters their .edu email address
+- `verification` - User enters the 6-digit code sent to their email
 
 ---
 
-### 2. ViewModels Layer (`orbitApp/ViewModels/`)
+#### DiscoverView - Solar System Interface
+
+The flagship discovery feature. Users explore potential friends through an immersive space-themed solar system where they are at the center.
+
+**Visual Components:**
+
+| Component | Description |
+|-----------|-------------|
+| **Space Background** | Deep space gradient (dark blue → purple → black) with 100 randomly generated animated stars |
+| **Orbit Rings** | 3 concentric decorative circles centered on the user, providing visual structure |
+| **YourPlanet** | The user's planet at the center - a blue/purple gradient sphere labeled "YOU" with a pulsing glow animation |
+| **UserPlanet** | Other users appear as colorful planets orbiting around the center. Each planet displays the user's first initial |
+| **ProfileDetailSheet** | Modal sheet that appears when tapping a planet, showing full profile details |
+
+**Key Implementation Details:**
+
+```swift
+// Star model for background
+struct Star: Identifiable {
+    let id: UUID
+    let position: CGPoint
+    let size: CGFloat        // 1-3 points
+    let opacity: Double      // 0.3-1.0
+}
+
+// YourPlanet - center of the solar system
+struct YourPlanet: View {
+    let size: CGFloat        // 90pt default
+    // Pulsing glow animation that repeats forever
+    // Blue/purple gradient fill
+    // "YOU" label below
+}
+
+// UserPlanet - other users in orbit
+struct UserPlanet: View {
+    let profile: Profile
+    let size: CGFloat        // 70pt default
+    // Color determined by hash of name (consistent across sessions)
+    // Displays first initial of name
+    // Gentle hover animation with deterministic timing
+    // Name label below planet
+}
+```
+
+**Planet Positioning Algorithm:**
+- Planets are distributed evenly around the center using angular spacing
+- Deterministic jitter based on index prevents perfect circular arrangement
+- Position caching prevents planets from moving on re-render
+- Radius varies slightly per planet for natural appearance
+
+**Color Assignment:**
+```swift
+// 8 planet colors assigned based on name hash
+let colors: [Color] = [.orange, .pink, .green, .yellow, .red, .mint, .cyan, .indigo]
+let index = abs(profile.name.hashValue) % colors.count
+```
+
+**ProfileDetailSheet Contents:**
+- Photo display (or gradient placeholder with initial)
+- Name, age, location header with gradient overlay
+- Bio section
+- Interests displayed as chips using FlowLayout
+- Social style info (group size, meeting frequency)
+- "Connect" button (connection logic TODO)
+
+---
+
+#### ProfileSetupView
+
+A multi-step form with 5 steps, each validated before allowing progression:
+
+| Step | Name | Fields | Validation |
+|------|------|--------|------------|
+| 1 | BasicInfoStep | Name, age, city, state, bio | Name required, age 18-100, city & state required |
+| 2 | PersonalityStep | 3 personality sliders | Always valid (sliders have defaults) |
+| 3 | InterestsStep | Predefined chips + custom interests | Min 3, max 10 interests |
+| 4 | SocialPreferencesStep | Group size, frequency, preferred times | All fields required |
+| 5 | PhotoUploadStep | Up to 6 photos | Optional (0-6 photos allowed) |
+
+**Personality Sliders:**
+- Introvert ↔ Extrovert (0.0 - 1.0)
+- Spontaneous ↔ Planner (0.0 - 1.0)
+- Active ↔ Relaxed (0.0 - 1.0)
+
+**Interest Categories (Predefined):**
+Sports & Fitness, Music, Art & Design, Technology, Food & Cooking, Travel, Gaming, Reading, Movies & TV, Photography, Nature, Fashion, Dancing, Volunteering, Entrepreneurship, Podcasts, Board Games, Languages, Meditation, DIY & Crafts
+
+---
+
+#### ProfileDisplayView
+
+Shows a profile card with:
+- **Photo carousel** - Swipeable with dot indicators
+- **Header** - Name, age, location
+- **Bio section**
+- **Interests** - Tags in a flow layout
+- **Personality bars** - Visual representation of the 3 traits
+- **Social preferences** - Group size, frequency, preferred times
+- **Edit button** - Returns to ProfileSetupView in edit mode
+
+---
+
+### 2. ViewModels Layer (`ViewModels/`)
 
 | ViewModel | Responsibility |
 |-----------|---------------|
 | `AuthViewModel` | .edu email validation, send/verify code flow, auth state management |
 | `ProfileViewModel` | 5-step form data, step validation, interest management, photo selection, profile save |
 
-**AuthViewModel** manages an `AuthState` enum (`.emailEntry`, `.verification`, `.authenticated`) and handles the complete auth flow. Validates that emails end in `.edu`. Supports demo bypass with code `"123456"`.
+#### AuthViewModel
 
-**ProfileViewModel** manages all form fields across the 5 setup steps. Key features:
-- Step validation (each step must be valid before proceeding)
-- Predefined interest categories with an option to add custom interests
-- Photo selection from both Photos picker and Files
-- `buildProfile()` converts form state into a `Profile` struct
-- `saveProfile()` sends the profile to the server
-- Can be pre-populated with existing profile data for editing
+Manages an `AuthState` enum and handles the complete auth flow.
+
+```swift
+class AuthViewModel: ObservableObject {
+    enum AuthState {
+        case emailEntry
+        case verification
+        case authenticated
+    }
+
+    @Published var authState: AuthState = .emailEntry
+    @Published var email = ""
+    @Published var verificationCode = ""
+    @Published var errorMessage: String?
+    @Published var isLoading = false
+    @Published var isNewUser = false
+    @Published var userId: Int?
+}
+```
+
+**Key Features:**
+- Validates emails end in `.edu`
+- Validates verification code is exactly 6 digits
+- Supports demo bypass with code `"123456"`
+- Stores tokens to Keychain on successful verification
+
+#### ProfileViewModel
+
+Manages all form fields across the 5 setup steps.
+
+```swift
+class ProfileViewModel: ObservableObject {
+    @Published var currentStep = 0
+
+    // Step 1: Basic Info
+    @Published var name = ""
+    @Published var age: Double = 20
+    @Published var city = ""
+    @Published var state = ""
+    @Published var bio = ""
+
+    // Step 2: Personality (0.0 - 1.0 sliders)
+    @Published var introvertExtrovert: Double = 0.5
+    @Published var spontaneousPlanner: Double = 0.5
+    @Published var activeRelaxed: Double = 0.5
+
+    // Step 3: Interests
+    @Published var selectedInterests: Set<String> = []
+    @Published var customInterest = ""
+
+    // Step 4: Social Preferences
+    @Published var selectedGroupSize = ""
+    @Published var selectedFrequency = ""
+    @Published var selectedTimes: Set<String> = []
+
+    // Step 5: Photos
+    @Published var selectedPhotos: [PhotoItem] = []
+
+    // State
+    @Published var isLoading = false
+    @Published var errorMessage: String?
+}
+```
+
+**Key Methods:**
+- `isCurrentStepValid` - Computed property checking current step's validation
+- `addCustomInterest()` - Adds user-typed interest to selection
+- `buildProfile()` - Converts form state into a `Profile` struct
+- `saveProfile()` - Uploads photos first, then sends profile to server
+- `init(existingProfile:)` - Pre-populates form for editing
+
+**PhotoItem Wrapper:**
+```swift
+struct PhotoItem: Identifiable {
+    let id: UUID
+    var image: UIImage?
+    var isLoading: Bool
+}
+```
 
 ---
 
-### 3. Services Layer (`services/`)
+### 3. Services Layer (`Services/`)
 
 Services are singletons accessed via `.shared`.
 
 | Service | Responsibility |
 |---------|---------------|
 | `APIService` | Generic HTTP request handler with JSON encoding/decoding, auth token injection |
-| `AuthService` | Send verification code to email, verify code, refresh token, logout, check login state |
-| `ProfileService` | Get and update user profile (supports mock data mode) |
-| `DiscoverService` | Fetch suggested profiles (currently uses mock data) |
+| `AuthService` | Send verification code to email, verify code, refresh token, logout |
+| `ProfileService` | Get and update user profile, upload photos |
+| `DiscoverService` | Fetch suggested profiles for discovery |
 
-**APIService** is the foundation all other services use. Key features:
-- Singleton pattern (`APIService.shared`)
+#### APIService (Base Networking)
+
+Foundation for all network calls.
+
+```swift
+class APIService {
+    static let shared = APIService()
+
+    private let baseURL = "https://orbit-app-486204.wl.r.appspot.com/api"
+
+    func request<T: Codable>(
+        endpoint: String,
+        method: String = "GET",
+        body: [String: Any]? = nil,
+        authenticated: Bool = false
+    ) async throws -> T
+}
+```
+
+**Key Features:**
 - Generic `request<T: Codable>()` method for all HTTP calls
-- Automatic snake_case encoding via `JSONEncoder.keyEncodingStrategy`
+- Automatic snake_case ↔ camelCase conversion via JSONEncoder/Decoder strategies
 - Bearer token injection from Keychain when `authenticated: true`
 - Decodes server responses from `{ "success": true, "data": {...} }` wrapper
 - Custom `NetworkError` enum for error handling
 
-**AuthService** sends `.edu` email and code to the server, saves returned tokens (access + refresh) to Keychain on successful verification.
+#### AuthService
 
-**ProfileService** has a `useMockData` flag (currently `false`) for development without a server. Sends profile updates via `PUT /api/users/me` and retrieves profile via `GET /api/users/me`.
+```swift
+class AuthService {
+    static let shared = AuthService()
 
-**DiscoverService** has a `useMockData` flag (currently `true`) and provides 5 hardcoded mock profiles for testing. The real API call targets `GET /api/discover/users`.
+    // POST /api/auth/send-code
+    func sendVerificationCode(email: String) async throws -> String
+
+    // POST /api/auth/verify-code (saves tokens to Keychain)
+    func verifyCode(email: String, code: String) async throws -> AuthResponseData
+
+    // POST /api/auth/refresh
+    func refreshToken() async throws -> String
+
+    // POST /api/auth/logout (clears Keychain)
+    func logout() async throws
+
+    // Check if access_token exists in Keychain
+    func isLoggedIn() -> Bool
+}
+```
+
+#### ProfileService
+
+```swift
+class ProfileService {
+    static let shared = ProfileService()
+    var useMockData = false  // Toggle for development
+
+    // GET /api/users/me
+    func getProfile() async throws -> ProfileResponseData
+
+    // PUT /api/users/me
+    func updateProfile(_ profile: Profile) async throws -> ProfileResponseData
+
+    // POST /api/users/me/photo (multipart/form-data)
+    func uploadPhoto(_ image: UIImage) async throws -> String  // Returns URL
+}
+```
+
+#### DiscoverService
+
+```swift
+class DiscoverService {
+    static let shared = DiscoverService()
+    var useMockData = true  // Currently uses mock data
+
+    // GET /api/discover/users
+    func getDiscoverProfiles() async throws -> [Profile]
+}
+```
+
+**Mock Profiles (5 total):** Used for testing without backend. Includes varied demographics, interests, and personality traits.
 
 ---
 
-### 4. Models Layer (`models/`)
+### 4. Models Layer (`Models/`)
 
-Models are Codable structs that match the API response shapes.
-
----
-
-## Key Data Models
-
-### API Response Wrappers
+#### API Response Wrappers
 
 ```swift
 struct APIResponse<T: Codable>: Codable {
@@ -221,7 +454,7 @@ struct AuthResponseData: Codable {
     let refreshToken: String      // "refresh_token"
     let expiresIn: Int            // "expires_in" (900 seconds)
     let isNewUser: Bool           // "is_new_user"
-    let userId: Int               // "user_id" (numeric Datastore ID)
+    let userId: Int               // "user_id"
 }
 
 struct ProfileResponseData: Codable {
@@ -230,7 +463,7 @@ struct ProfileResponseData: Codable {
 }
 ```
 
-### Profile
+#### Profile
 
 ```swift
 struct Profile: Codable, Identifiable {
@@ -242,8 +475,8 @@ struct Profile: Codable, Identifiable {
     var photos: [String]          // GCS public URLs
     var interests: [String]
     var personality: Personality
-    var socialPreferences: SocialPreferences   // "social_preferences"
-    var friendshipGoals: [String]              // "friendship_goals"
+    var socialPreferences: SocialPreferences
+    var friendshipGoals: [String]
 }
 
 struct Location: Codable {
@@ -258,84 +491,27 @@ struct Coordinates: Codable {
 }
 
 struct Personality: Codable {
-    var introvertExtrovert: Double    // "introvert_extrovert" (0.0–1.0)
-    var spontaneousPlanner: Double    // "spontaneous_planner" (0.0–1.0)
-    var activeRelaxed: Double         // "active_relaxed" (0.0–1.0)
+    var introvertExtrovert: Double    // 0.0 = Introvert, 1.0 = Extrovert
+    var spontaneousPlanner: Double    // 0.0 = Spontaneous, 1.0 = Planner
+    var activeRelaxed: Double         // 0.0 = Active, 1.0 = Relaxed
 }
 
 struct SocialPreferences: Codable {
-    var groupSize: String             // "group_size" e.g. "Small groups (3-5)"
-    var meetingFrequency: String      // "meeting_frequency" e.g. "Weekly"
-    var preferredTimes: [String]      // "preferred_times" e.g. ["Weekends"]
+    var groupSize: String             // "One-on-one", "Small groups (3-5)", etc.
+    var meetingFrequency: String      // "Weekly", "Bi-weekly", "Monthly", "Flexible"
+    var preferredTimes: [String]      // ["Mornings", "Afternoons", "Evenings", "Weekends"]
 }
 ```
 
-### User (defined but not actively used by client auth flow)
+#### User
 
 ```swift
 struct User: Codable, Identifiable {
     let id: String
-    let phoneNumber: String       // "phone_number" (legacy field name)
-    let profileComplete: Bool     // "profile_complete"
-    let createdAt: Date           // "created_at"
+    let phoneNumber: String       // Legacy field (now stores email)
+    let profileComplete: Bool
+    let createdAt: Date
     let profile: Profile?
-}
-```
-
----
-
-## Services Layer Detail
-
-### APIService (Base Networking)
-
-Handles all HTTP communication, token injection, and error parsing. All other services call through this.
-
-```swift
-class APIService {
-    static let shared = APIService()
-
-    private let baseURL = Constants.API.baseURL
-    // "https://orbit-app-486204.wl.r.appspot.com/api"
-
-    func request<T: Codable>(
-        endpoint: String,
-        method: String = "GET",
-        body: [String: Any]? = nil,
-        authenticated: Bool = false
-    ) async throws -> T {
-        // 1. Build URL from baseURL + endpoint
-        // 2. Set Content-Type: application/json
-        // 3. If authenticated, add Bearer token from Keychain
-        // 4. Encode body via JSONSerialization
-        // 5. Make request via URLSession.shared.data(for:)
-        // 6. Handle 401 → NetworkError.unauthorized
-        // 7. Handle 400+ → decode error message from response
-        // 8. Decode success response: APIResponse<T> → return data
-    }
-}
-```
-
-### AuthService
-
-```swift
-class AuthService {
-    static let shared = AuthService()
-
-    // POST /api/auth/send-code with {"email": "..."}
-    func sendVerificationCode(email: String) async throws -> String
-
-    // POST /api/auth/verify-code with {"email": "...", "code": "..."}
-    // Saves access_token and refresh_token to Keychain
-    func verifyCode(email: String, code: String) async throws -> AuthResponseData
-
-    // POST /api/auth/refresh with {"refresh_token": "..."}
-    func refreshToken() async throws -> String
-
-    // POST /api/auth/logout, then clears Keychain tokens
-    func logout() async throws
-
-    // Checks if access_token exists in Keychain
-    func isLoggedIn() -> Bool
 }
 ```
 
@@ -350,7 +526,7 @@ App Launch
     │
     ▼
 ┌─────────────┐
-│  OrbitApp    │ → WindowGroup with ContentView
+│  OrbitApp   │ → WindowGroup with ContentView
 └──────┬──────┘
        │
        ▼
@@ -376,24 +552,26 @@ App Launch
 │            MainTabView               │
 ├──────────────┬───────────────────────┤
 │   Discover   │       Profile         │
+│   (globe)    │      (person)         │
 └──────┬───────┴──────────┬────────────┘
        │                  │
        ▼                  ▼
   DiscoverView     ProfileDisplayView
-  (cosmos UI)      (profile card)
+  (solar system)   (profile card)
        │                  │
        ▼                  ▼
   ProfileDetail    ProfileSetupView
   Sheet (modal)    (edit mode)
-└──────────────────────────────────────┘
 ```
 
 ### Screen Inventory
 
-| Tab | Screens | Purpose |
-|-----|---------|---------|
-| **Discover** | DiscoverView | Space-themed cosmos with orbiting user planets; tap to view profile sheet |
-| **Profile** | ProfileDisplayView | View own profile with photo carousel, edit button |
+| Tab | Screen | Purpose |
+|-----|--------|---------|
+| **Discover** | DiscoverView | Solar system with user at center, other users as orbiting planets |
+| **Discover** | ProfileDetailSheet | Modal showing full profile when planet is tapped |
+| **Profile** | ProfileDisplayView | View own profile with photo carousel |
+| **Profile** | ProfileSetupView | Edit profile (same view as initial setup) |
 
 ---
 
@@ -402,29 +580,24 @@ App Launch
 ### App State (ContentView)
 
 ```swift
-// ContentView.swift
 enum AppState {
-    case auth
-    case profileSetup
-    case home
+    case auth           // Not logged in
+    case profileSetup   // Logged in but profile incomplete
+    case home           // Logged in with complete profile
 }
 
 struct ContentView: View {
     @State private var appState: AppState = .auth
+    @StateObject private var authViewModel = AuthViewModel()
+    @StateObject private var profileViewModel = ProfileViewModel()
+    @State private var userProfile: Profile?
 
     var body: some View {
         switch appState {
         case .auth:
-            AuthFlowView(onAuthenticated: { isNewUser in
-                if isNewUser {
-                    appState = .profileSetup
-                } else {
-                    // Try to load existing profile
-                    loadExistingProfile()
-                }
-            })
+            AuthFlowView(...)
         case .profileSetup:
-            ProfileSetupView(onComplete: { appState = .home })
+            ProfileSetupView(...)
         case .home:
             MainTabView(...)
         }
@@ -432,34 +605,12 @@ struct ContentView: View {
 }
 ```
 
-### ViewModel State Patterns
-
-```swift
-// AuthViewModel - uses enum-based state
-class AuthViewModel: ObservableObject {
-    enum AuthState { case emailEntry, verification, authenticated }
-    @Published var authState: AuthState = .emailEntry
-    @Published var email = ""
-    @Published var verificationCode = ""
-    @Published var errorMessage: String?
-    @Published var isLoading = false
-    @Published var isNewUser = false
-}
-
-// ProfileViewModel - manages multi-step form
-class ProfileViewModel: ObservableObject {
-    @Published var currentStep = 0
-    @Published var name = ""
-    @Published var age: Double = 20
-    @Published var city = ""
-    @Published var state = ""
-    @Published var bio = ""
-    @Published var selectedInterests: Set<String> = []
-    // ... personality sliders, social preferences, photos
-    @Published var isLoading = false
-    @Published var errorMessage: String?
-}
-```
+**State Transitions:**
+- `.auth` → `.profileSetup`: On successful auth with `isNewUser = true`
+- `.auth` → `.home`: On successful auth with existing complete profile
+- `.profileSetup` → `.home`: On successful profile save
+- `.home` → `.profileSetup`: When user taps Edit on ProfileDisplayView
+- Any → `.auth`: On logout
 
 ---
 
@@ -473,12 +624,23 @@ enum NetworkError: Error, LocalizedError {
     case noData
     case decodingError
     case serverError(String)    // Server-provided error message
-    case unauthorized
+    case unauthorized           // 401 response
     case networkError(Error)    // Underlying URLSession error
+
+    var errorDescription: String? {
+        switch self {
+        case .invalidURL: return "Invalid URL"
+        case .noData: return "No data received"
+        case .decodingError: return "Failed to decode response"
+        case .serverError(let message): return message
+        case .unauthorized: return "Please log in again"
+        case .networkError(let error): return error.localizedDescription
+        }
+    }
 }
 ```
 
-### Standard ViewModel Pattern
+### Standard ViewModel Error Pattern
 
 ```swift
 func saveProfile() async {
@@ -515,6 +677,7 @@ enum Constants {
             static let logout = "/auth/logout"
             static let me = "/users/me"
             static let uploadPhoto = "/users/me/photo"
+            static let discoverUsers = "/discover/users"
         }
     }
 
@@ -535,15 +698,40 @@ enum Constants {
 }
 ```
 
-### KeychainHelper
+---
+
+## UI Components
+
+### FlowLayout
+
+A custom layout for wrapping content (used for interest tags and time chips):
 
 ```swift
-class KeychainHelper {
-    static let shared = KeychainHelper()
-    private let service = "com.orbit.app"
+struct FlowLayout: Layout {
+    var spacing: CGFloat = 8
 
-    func save(_ string: String, forKey key: String) -> Bool
-    func readString(forKey key: String) -> String?
-    func delete(forKey key: String) -> Bool
+    // Arranges subviews in rows, wrapping to next line when needed
 }
 ```
+
+### InfoChip
+
+Small labeled badge for displaying social preferences:
+
+```swift
+struct InfoChip: View {
+    let label: String
+    let icon: String  // SF Symbol name
+}
+```
+
+---
+
+## Future Considerations
+
+1. **Connection System** - The "Connect" button in ProfileDetailSheet needs backend implementation
+2. **Real-time Updates** - Consider WebSocket for live discovery updates
+3. **Matching Algorithm** - Backend should rank planets by compatibility (closer = more compatible)
+4. **Notifications** - Push notifications for new connections
+5. **Messaging** - In-app messaging between connected users
+6. **Crews & Missions** - Group features as described in overview.md
