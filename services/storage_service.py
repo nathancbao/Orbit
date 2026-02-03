@@ -15,6 +15,6 @@ def upload_file(file, folder='photos'):
     blob = bucket.blob(blob_name)
 
     blob.upload_from_file(file, content_type=file.content_type)
-    blob.make_public()
+    # blob.make_public()
 
-    return blob.public_url
+    return f"https://storage.googleapis.com/{GCS_BUCKET_NAME}/{blob_name}"                                                

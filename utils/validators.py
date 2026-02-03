@@ -15,19 +15,25 @@ def validate_edu_email(email):
 def validate_profile_data(data):
     errors = []
     allowed_fields = {
-        'display_name', 'bio', 'major', 'graduation_year',
-        'interests', 'photo_url'
+        'name', 'age', 'location', 'bio', 'photos', 'interests',
+        'personality', 'social_preferences', 'friendship_goals',
     }
+
     for key in data:
         if key not in allowed_fields:
             errors.append(f"Unknown field: {key}")
 
-    if 'display_name' in data:
-        name = data['display_name']
+    if 'name' in data:
+        name = data['name']
         if not isinstance(name, str) or len(name.strip()) < 1:
-            errors.append("display_name must be a non-empty string")
+            errors.append("name must be a non-empty string")
         elif len(name) > 100:
-            errors.append("display_name must be 100 characters or fewer")
+            errors.append("name must be 100 characters or fewer")
+
+    if 'age' in data:
+        age = data['age']
+        if not isinstance(age, (int, float)) or int(age) < 18 or int(age) > 100:
+            errors.append("age must be a number between 18 and 100")
 
     if 'bio' in data:
         if not isinstance(data['bio'], str):
@@ -38,8 +44,30 @@ def validate_profile_data(data):
     if 'interests' in data:
         if not isinstance(data['interests'], list):
             errors.append("interests must be a list")
-        elif len(data['interests']) > 20:
-            errors.append("Maximum 20 interests allowed")
+        elif len(data['interests']) > 10:
+            errors.append("Maximum 10 interests allowed")
+
+    if 'photos' in data:
+        if not isinstance(data['photos'], list):
+            errors.append("photos must be a list")
+        elif len(data['photos']) > 6:
+            errors.append("Maximum 6 photos allowed")
+
+    if 'location' in data:
+        if not isinstance(data['location'], dict):
+            errors.append("location must be an object")
+
+    if 'personality' in data:
+        if not isinstance(data['personality'], dict):
+            errors.append("personality must be an object")
+
+    if 'social_preferences' in data:
+        if not isinstance(data['social_preferences'], dict):
+            errors.append("social_preferences must be an object")
+
+    if 'friendship_goals' in data:
+        if not isinstance(data['friendship_goals'], list):
+            errors.append("friendship_goals must be a list")
 
     if errors:
         return False, errors
