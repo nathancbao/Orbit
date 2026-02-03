@@ -49,14 +49,32 @@ Users create rich profiles that go far beyond a simple bio and a few photos. Orb
 
 This depth allows Orbit to understand not just *what* you're interested in, but *how* you like to socialize—so we can match you with people who complement your style.
 
-#### 2. AI-Powered Matching
+#### 2. Solar System Discovery
+Orbit's discovery experience is built around a unique, immersive **solar system metaphor**. Instead of endless swiping or scrolling through lists of profiles, you explore a personalized universe of potential friends.
+
+**How it works:**
+- **You are the sun** - Your profile sits at the center of your solar system, represented as a glowing planet
+- **Others orbit around you** - Potential friends appear as colorful planets orbiting in concentric rings around you
+- **Tap to explore** - Click on any planet to view that person's full profile, see their interests, personality traits, and social preferences
+- **Distance reflects compatibility** - Planets closer to you represent higher compatibility matches, while those in outer orbits are still interesting but may have fewer overlapping traits
+- **A living universe** - The solar system is animated with twinkling stars and gentle orbital movements, making discovery feel like exploration rather than a chore
+
+**Why a solar system?**
+- **It's not a dating app** - The cosmic theme immediately distinguishes Orbit from swipe-based dating apps. You're not judging people in 2 seconds—you're exploring a universe of possibilities
+- **Reduces decision fatigue** - Instead of an overwhelming feed, you see a curated set of potential connections in a visually digestible format
+- **Encourages curiosity** - The playful interface invites users to tap and explore, lowering the barrier to checking out new profiles
+- **Reflects the app's philosophy** - Just like real friendships, the people in your orbit are connected to you but each on their own unique path
+
+This discovery method transforms friend-finding from a tedious task into an engaging experience that users actually want to return to.
+
+#### 3. AI-Powered Matching
 Our matching algorithm considers:
 - **Interest overlap** - Shared hobbies and passions
 - **Personality compatibility** - Complementary social styles
 - **Logistics** - Geographic proximity and schedule alignment
 - **Friendship goals** - Whether users seek casual hangouts or deeper connections
 
-#### 3. Crews
+#### 4. Crews
 Crews are small friend groups (3-15 people) formed around shared interests. Unlike one-on-one matching:
 - Users can create their own Crews and add friends to it!
 - Groups reduce social pressure and awkwardness
@@ -66,7 +84,7 @@ Crews are small friend groups (3-15 people) formed around shared interests. Unli
 
 The AI suggests Crew formations and facilitates initial introductions, but users organically build relationships from there.
 
-#### 4. Missions
+#### 5. Missions
 Missions are one-time events or activities that users can propose or join. They serve as low-commitment entry points:
 - Try an activity with a group before committing to a Crew
 - Meet people outside your usual circles
