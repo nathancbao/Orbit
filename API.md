@@ -44,7 +44,7 @@ All endpoints return responses in this structure:
 }
 ```
 
-Note: The error field is a plain string, not a nested object.
+Note: The error field is usually a plain string. For validation errors (profile, crew, mission), it may be an array of error strings.
 
 ### Common HTTP Status Codes
 
@@ -208,6 +208,11 @@ POST /api/auth/logout
 }
 ```
 
+**Errors:**
+| HTTP Status | Error Message |
+|-------------|---------------|
+| 400 | "refresh_token is required" |
+
 ---
 
 ## Users & Profiles
@@ -320,13 +325,11 @@ PUT /api/users/me
 }
 ```
 
-**Validation Errors (400):** Returns a list of error strings, e.g.:
-```json
-{
-  "success": false,
-  "error": ["name must be a non-empty string", "age must be a number between 18 and 100"]
-}
-```
+**Errors:**
+| HTTP Status | Error Message |
+|-------------|---------------|
+| 400 | "No data provided" |
+| 400 | Validation error list (e.g. `["name must be a non-empty string", "age must be a number between 18 and 100"]`) |
 
 ---
 
@@ -352,6 +355,12 @@ POST /api/users/me/photo
   }
 }
 ```
+
+**Errors:**
+| HTTP Status | Error Message |
+|-------------|---------------|
+| 400 | "No photo file provided" |
+| 400 | "No file selected" |
 
 ---
 
@@ -429,6 +438,11 @@ POST /api/crews/
   }
 }
 ```
+
+**Errors:**
+| HTTP Status | Error Message |
+|-------------|---------------|
+| 400 | Validation error list (e.g. `["name is required"]`) |
 
 ---
 
@@ -572,6 +586,11 @@ POST /api/missions/
   }
 }
 ```
+
+**Errors:**
+| HTTP Status | Error Message |
+|-------------|---------------|
+| 400 | Validation error list (e.g. `["title is required", "description is required"]`) |
 
 ---
 
