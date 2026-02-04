@@ -18,7 +18,6 @@
 //
 
 import SwiftUI
-import Combine
 
 // MARK: - App State
 // Controls which screen is currently displayed
@@ -40,7 +39,7 @@ struct ContentView: View {
     @State private var profilePhotos: [UIImage] = []
 
     var body: some View {
-        SwiftUI.Group {
+        Group {
             switch appState {
             // MARK: Auth State
             case .auth:
@@ -77,13 +76,6 @@ struct ContentView: View {
                         profilePhotos: profilePhotos,
                         onEditProfile: {
                             appState = .profileSetup
-                        },
-                        onLogout: {
-                            // Logout and clear all state
-                            AuthenticationService.shared.logout()
-                            completedProfile = nil
-                            profilePhotos = []
-                            appState = .auth
                         }
                     )
                 } else {
@@ -92,42 +84,14 @@ struct ContentView: View {
                 }
             }
         }
-        .onAppear {
-            // Check for existing valid session on app launch (auto-login)
-            if AuthenticationService.shared.hasValidSession() {
-                // User has valid session, try to load their profile
-                Task {
-                    await loadExistingProfile()
-                }
-            }
-        }
-        .onReceive(NotificationCenter.default.publisher(for: .sessionExpired)) { _ in
-            // Session expired notification from API layer
-            AuthenticationService.shared.logout()
-            completedProfile = nil
-            profilePhotos = []
-            appState = .auth
-        }
     }
 
     // Load profile for returning users
     private func loadExistingProfile() async {
         do {
             let profile = try await ProfileService.shared.getProfile()
-
-            // Download photos from URLs
-            var downloadedPhotos: [UIImage] = []
-            for urlString in profile.photos {
-                if let url = URL(string: urlString),
-                   let (data, _) = try? await URLSession.shared.data(from: url),
-                   let image = UIImage(data: data) {
-                    downloadedPhotos.append(image)
-                }
-            }
-
             await MainActor.run {
                 completedProfile = profile
-                profilePhotos = downloadedPhotos
                 appState = .home
             }
         } catch {
