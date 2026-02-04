@@ -61,6 +61,11 @@ enum NetworkError: Error, LocalizedError {
 // Ensures only one token refresh happens at a time.
 // When multiple requests get 401 simultaneously, only the first
 // triggers a refresh; the rest await the same result.
+//
+// NOTE: With client-side SendGrid authentication, we don't have
+// server-issued JWT tokens. This coordinator now checks if we have
+// a valid local session and returns a placeholder token, or throws
+// if the session is invalid (requiring re-authentication).
 actor TokenRefreshCoordinator {
     static let shared = TokenRefreshCoordinator()
 
@@ -72,10 +77,19 @@ actor TokenRefreshCoordinator {
             return try await existingTask.value
         }
 
-        // Start a new refresh
+        // Start a new refresh check
         let task = Task<String, Error> {
             defer { self.refreshTask = nil }
-            return try await AuthService.shared.refreshToken()
+
+            // With client-side auth, check if we have a valid session
+            // If valid, return the session token; otherwise throw to trigger re-auth
+            if AuthenticationService.shared.hasValidSession(),
+               let session = AuthenticationService.shared.getCurrentSession() {
+                return session.userID.uuidString
+            }
+
+            // No valid session - user needs to re-authenticate
+            throw NetworkError.unauthorized
         }
 
         refreshTask = task

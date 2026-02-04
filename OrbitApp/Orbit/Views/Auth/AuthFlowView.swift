@@ -2,8 +2,8 @@
 //  AuthFlowView.swift
 //  Orbit
 //
-//  Email verification flow for .edu emails.
-//  Use code "123456" for demo bypass.
+//  Email verification flow via SendGrid.
+//  Sends actual verification emails to users.
 //
 
 import SwiftUI
@@ -71,11 +71,23 @@ struct AuthFlowView: View {
 
                 Spacer()
 
-                // Demo hint
-                Text("Demo: Use code 123456")
-                    .font(.caption)
-                    .foregroundColor(.white.opacity(0.5))
-                    .padding(.bottom)
+                // Demo hint and bypass
+                VStack(spacing: 12) {
+                    Text("Check your email for verification code")
+                        .font(.caption)
+                        .foregroundColor(.white.opacity(0.5))
+
+                    Button(action: {
+                        // Skip auth entirely for demo/testing
+                        onAuthComplete(true) // true = new user, goes to profile setup
+                    }) {
+                        Text("Skip Auth (Demo)")
+                            .font(.caption)
+                            .fontWeight(.medium)
+                            .foregroundColor(.orange)
+                    }
+                }
+                .padding(.bottom)
             }
         }
     }
@@ -84,11 +96,11 @@ struct AuthFlowView: View {
 
     private var emailEntrySection: some View {
         VStack(spacing: 16) {
-            Text("Enter your .edu email")
+            Text("Enter your email")
                 .font(.headline)
                 .foregroundColor(.white)
 
-            TextField("you@university.edu", text: $viewModel.email)
+            TextField("you@example.com", text: $viewModel.email)
                 .textFieldStyle(.plain)
                 .keyboardType(.emailAddress)
                 .textInputAutocapitalization(.never)

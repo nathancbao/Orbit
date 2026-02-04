@@ -3,7 +3,7 @@
 	archiveVersion = 1;
 	classes = {
 	};
-	objectVersion = 56;
+	objectVersion = 70;
 	objects = {
 
 /* Begin PBXBuildFile section */
@@ -12,19 +12,10 @@
 		A1000001233300003 /* EventSuggester.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000001133300003 /* EventSuggester.swift */; };
 		A1000001233300004 /* GroupManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000001133300004 /* GroupManager.swift */; };
 		A1000001233300005 /* MLEventRecommender.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000001133300005 /* MLEventRecommender.swift */; };
-		A1000001233300006 /* AuthModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000001133300006 /* AuthModels.swift */; };
-		A1000001233300007 /* AuthenticationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000001133300007 /* AuthenticationService.swift */; };
 		A1000001233300008 /* OrbitApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000001133300008 /* OrbitApp.swift */; };
-		A1000001233300009 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000001133300009 /* ContentView.swift */; };
 		A1000001233300010 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A1000001133300010 /* Assets.xcassets */; };
 		A1000001233300020 /* AuthenticationServiceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000001133300011 /* AuthenticationServiceTests.swift */; };
-		A1000001233300021 /* AuthModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000001133300006 /* AuthModels.swift */; };
-		A1000001233300022 /* AuthenticationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000001133300007 /* AuthenticationService.swift */; };
 		A1000001233300023 /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000001133300001 /* Models.swift */; };
-		A1000001233300030 /* Config.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000001133300012 /* Config.swift */; };
-		A1000001233300031 /* EmailService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000001133300013 /* EmailService.swift */; };
-		A1000001233300032 /* Config.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000001133300012 /* Config.swift */; };
-		A1000001233300033 /* EmailService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000001133300013 /* EmailService.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -43,17 +34,16 @@
 		A1000001133300003 /* EventSuggester.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EventSuggester.swift; sourceTree = "<group>"; };
 		A1000001133300004 /* GroupManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GroupManager.swift; sourceTree = "<group>"; };
 		A1000001133300005 /* MLEventRecommender.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MLEventRecommender.swift; sourceTree = "<group>"; };
-		A1000001133300006 /* AuthModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthModels.swift; sourceTree = "<group>"; };
-		A1000001133300007 /* AuthenticationService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthenticationService.swift; sourceTree = "<group>"; };
 		A1000001133300008 /* OrbitApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OrbitApp.swift; sourceTree = "<group>"; };
-		A1000001133300009 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 		A1000001133300010 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		A1000001133300011 /* AuthenticationServiceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthenticationServiceTests.swift; sourceTree = "<group>"; };
-		A1000001133300012 /* Config.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Config.swift; sourceTree = "<group>"; };
-		A1000001133300013 /* EmailService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EmailService.swift; sourceTree = "<group>"; };
 		A1000001533300001 /* OrbitApp.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = OrbitApp.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		A1000001533300002 /* OrbitAppTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = OrbitAppTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
+
+/* Begin PBXFileSystemSynchronizedRootGroup section */
+		AB6C88002F32970000CFEE62 /* Orbit */ = {isa = PBXFileSystemSynchronizedRootGroup; explicitFileTypes = {}; explicitFolders = (); path = Orbit; sourceTree = "<group>"; };
+/* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
 		A1000001633300001 /* Frameworks */ = {
@@ -87,8 +77,8 @@
 			isa = PBXGroup;
 			children = (
 				A1000001133300008 /* OrbitApp.swift */,
-				A1000001133300009 /* ContentView.swift */,
 				A1000001133300010 /* Assets.xcassets */,
+				AB6C88002F32970000CFEE62 /* Orbit */,
 			);
 			path = OrbitApp;
 			sourceTree = "<group>";
@@ -101,10 +91,6 @@
 				A1000001133300003 /* EventSuggester.swift */,
 				A1000001133300004 /* GroupManager.swift */,
 				A1000001133300005 /* MLEventRecommender.swift */,
-				A1000001133300006 /* AuthModels.swift */,
-				A1000001133300007 /* AuthenticationService.swift */,
-				A1000001133300012 /* Config.swift */,
-				A1000001133300013 /* EmailService.swift */,
 			);
 			path = Orbit_AI_Features;
 			sourceTree = "<group>";
@@ -140,6 +126,9 @@
 			buildRules = (
 			);
 			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				AB6C88002F32970000CFEE62 /* Orbit */,
 			);
 			name = OrbitApp;
 			productName = OrbitApp;
@@ -222,12 +211,7 @@
 				A1000001233300003 /* EventSuggester.swift in Sources */,
 				A1000001233300004 /* GroupManager.swift in Sources */,
 				A1000001233300005 /* MLEventRecommender.swift in Sources */,
-				A1000001233300006 /* AuthModels.swift in Sources */,
-				A1000001233300007 /* AuthenticationService.swift in Sources */,
-				A1000001233300030 /* Config.swift in Sources */,
-				A1000001233300031 /* EmailService.swift in Sources */,
 				A1000001233300008 /* OrbitApp.swift in Sources */,
-				A1000001233300009 /* ContentView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -236,11 +220,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				A1000001233300020 /* AuthenticationServiceTests.swift in Sources */,
-				A1000001233300021 /* AuthModels.swift in Sources */,
-				A1000001233300022 /* AuthenticationService.swift in Sources */,
 				A1000001233300023 /* Models.swift in Sources */,
-				A1000001233300032 /* Config.swift in Sources */,
-				A1000001233300033 /* EmailService.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

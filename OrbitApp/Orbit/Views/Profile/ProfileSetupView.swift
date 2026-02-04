@@ -62,7 +62,7 @@ struct ProfileSetupView: View {
             .padding(.horizontal)
 
             // Step content - using Group instead of TabView to prevent swipe bypassing validation
-            Group {
+            SwiftUI.Group {
                 switch currentStep {
                 case 0:
                     BasicInfoStep(viewModel: viewModel)

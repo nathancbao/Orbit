@@ -1,7 +1,9 @@
 // AuthenticationServiceTests.swift
 // XCTest unit tests for the AuthenticationService and EmailService.
+// Updated for client-side email-only authentication (no password required).
 
 import XCTest
+@testable import OrbitApp
 
 final class AuthenticationServiceTests: XCTestCase {
 
@@ -268,9 +270,9 @@ final class AuthenticationServiceTests: XCTestCase {
         XCTAssertEqual(authService.pendingVerificationCount, 0)
     }
 
-    // MARK: - Account Creation Tests
+    // MARK: - Account Creation Tests (Email-only auth)
 
-    func testCreateAccountWithValidEmailAndPassword() {
+    func testCreateAccountWithValidEmail() {
         // First verify email
         let sendResult = authService.sendVerificationCode(to: "new@example.com")
         guard case .success(let code) = sendResult else {
@@ -279,8 +281,8 @@ final class AuthenticationServiceTests: XCTestCase {
         }
         _ = authService.verifyCode(code.code, for: "new@example.com")
 
-        // Then create account
-        let createResult = authService.createAccount(email: "new@example.com", password: "password123")
+        // Then create account (no password needed in email-only auth)
+        let createResult = authService.createAccount(email: "new@example.com")
         switch createResult {
         case .success(let account):
             XCTAssertEqual(account.email, "new@example.com")
@@ -291,117 +293,108 @@ final class AuthenticationServiceTests: XCTestCase {
         }
     }
 
-    func testCreateAccountWithShortPasswordFails() {
-        let createResult = authService.createAccount(email: "test@example.com", password: "short")
-        switch createResult {
-        case .success:
-            XCTFail("Should fail with short password")
-        case .failure(let error):
-            XCTAssertEqual(error, AuthError.passwordTooShort)
-        }
-    }
+    func testCreateAccountReturnsExistingAccount() {
+        // Create first account
+        _ = authService.createAccount(email: "test@example.com")
 
-    func testCreateAccountWithDuplicateEmailFails() {
-        _ = authService.createAccount(email: "test@example.com", password: "password123")
-        let createResult = authService.createAccount(email: "test@example.com", password: "password456")
+        // Try creating again - should return existing account, not fail
+        let createResult = authService.createAccount(email: "test@example.com")
         switch createResult {
-        case .success:
-            XCTFail("Should fail with duplicate email")
-        case .failure(let error):
-            XCTAssertEqual(error, AuthError.userAlreadyExists)
+        case .success(let account):
+            XCTAssertEqual(account.email, "test@example.com")
+            XCTAssertEqual(authService.accountCount, 1) // Still just 1 account
+        case .failure:
+            XCTFail("Should return existing account")
         }
     }
 
     func testAccountExistsCheck() {
-        _ = authService.createAccount(email: "existing@example.com", password: "password123")
+        _ = authService.createAccount(email: "existing@example.com")
         XCTAssertTrue(authService.accountExists(email: "existing@example.com"))
         XCTAssertFalse(authService.accountExists(email: "nonexistent@example.com"))
     }
 
-    // MARK: - Login Tests
+    // MARK: - Session Creation Tests (Email-only auth)
 
-    func testLoginWithCorrectCredentials() {
-        // Create verified account
+    func testCreateSessionAfterVerification() {
+        // Verify email
         let sendResult = authService.sendVerificationCode(to: "user@example.com")
         guard case .success(let code) = sendResult else {
             XCTFail("Should send code")
             return
         }
         _ = authService.verifyCode(code.code, for: "user@example.com")
-        _ = authService.createAccount(email: "user@example.com", password: "password123")
 
-        // Login
-        let loginResult = authService.login(email: "user@example.com", password: "password123")
-        switch loginResult {
+        // Create session
+        let sessionResult = authService.createSession(email: "user@example.com")
+        switch sessionResult {
         case .success(let session):
             XCTAssertEqual(session.email, "user@example.com")
             XCTAssertEqual(authService.currentState, .authenticated)
             XCTAssertNotNil(authService.currentSession)
+            XCTAssertTrue(authService.hasValidSession())
         case .failure:
-            XCTFail("Should login with correct credentials")
+            XCTFail("Should create session")
         }
     }
 
-    func testLoginWithWrongPasswordFails() {
+    func testGetCurrentUserAfterSessionCreation() {
         let sendResult = authService.sendVerificationCode(to: "user@example.com")
         guard case .success(let code) = sendResult else {
             XCTFail("Should send code")
             return
         }
         _ = authService.verifyCode(code.code, for: "user@example.com")
-        _ = authService.createAccount(email: "user@example.com", password: "password123")
-
-        let loginResult = authService.login(email: "user@example.com", password: "wrongpassword")
-        switch loginResult {
-        case .success:
-            XCTFail("Should fail with wrong password")
-        case .failure(let error):
-            XCTAssertEqual(error, AuthError.invalidPassword)
-        }
-    }
-
-    func testLoginWithNonexistentUserFails() {
-        let loginResult = authService.login(email: "nobody@example.com", password: "password123")
-        switch loginResult {
-        case .success:
-            XCTFail("Should fail with nonexistent user")
-        case .failure(let error):
-            XCTAssertEqual(error, AuthError.userNotFound)
-        }
-    }
-
-    func testGetCurrentUserAfterLogin() {
-        let sendResult = authService.sendVerificationCode(to: "user@example.com")
-        guard case .success(let code) = sendResult else {
-            XCTFail("Should send code")
-            return
-        }
-        _ = authService.verifyCode(code.code, for: "user@example.com")
-        _ = authService.createAccount(email: "user@example.com", password: "password123")
-        _ = authService.login(email: "user@example.com", password: "password123")
+        _ = authService.createSession(email: "user@example.com")
 
         let currentUser = authService.getCurrentUser()
         XCTAssertNotNil(currentUser)
         XCTAssertEqual(currentUser?.email, "user@example.com")
     }
 
-    // MARK: - Logout Tests
-
-    func testLogoutSuccessfully() {
-        // Setup: create and login
+    func testGetCurrentEmail() {
         let sendResult = authService.sendVerificationCode(to: "user@example.com")
         guard case .success(let code) = sendResult else {
             XCTFail("Should send code")
             return
         }
         _ = authService.verifyCode(code.code, for: "user@example.com")
-        _ = authService.createAccount(email: "user@example.com", password: "password123")
-        _ = authService.login(email: "user@example.com", password: "password123")
+        _ = authService.createSession(email: "user@example.com")
+
+        XCTAssertEqual(authService.getCurrentEmail(), "user@example.com")
+    }
+
+    func testGetCurrentSession() {
+        let sendResult = authService.sendVerificationCode(to: "user@example.com")
+        guard case .success(let code) = sendResult else {
+            XCTFail("Should send code")
+            return
+        }
+        _ = authService.verifyCode(code.code, for: "user@example.com")
+        _ = authService.createSession(email: "user@example.com")
+
+        let session = authService.getCurrentSession()
+        XCTAssertNotNil(session)
+        XCTAssertEqual(session?.email, "user@example.com")
+    }
+
+    // MARK: - Logout Tests
+
+    func testLogoutSuccessfully() {
+        // Setup: create session
+        let sendResult = authService.sendVerificationCode(to: "user@example.com")
+        guard case .success(let code) = sendResult else {
+            XCTFail("Should send code")
+            return
+        }
+        _ = authService.verifyCode(code.code, for: "user@example.com")
+        _ = authService.createSession(email: "user@example.com")
 
         // Logout
         authService.logout()
         XCTAssertNil(authService.currentSession)
         XCTAssertEqual(authService.currentState, .unauthenticated)
+        XCTAssertFalse(authService.hasValidSession())
     }
 
     func testCurrentUserNilAfterLogout() {
@@ -411,23 +404,23 @@ final class AuthenticationServiceTests: XCTestCase {
             return
         }
         _ = authService.verifyCode(code.code, for: "user@example.com")
-        _ = authService.createAccount(email: "user@example.com", password: "password123")
-        _ = authService.login(email: "user@example.com", password: "password123")
+        _ = authService.createSession(email: "user@example.com")
         authService.logout()
 
         XCTAssertNil(authService.getCurrentUser())
     }
 
-    // MARK: - Password Reset Tests
+    // MARK: - Password Reset Tests (Kept for compatibility, but not used in email-only auth)
 
     func testInitiatePasswordResetForExistingUser() {
+        // Create account first
         let sendResult = authService.sendVerificationCode(to: "user@example.com")
         guard case .success(let code) = sendResult else {
             XCTFail("Should send code")
             return
         }
         _ = authService.verifyCode(code.code, for: "user@example.com")
-        _ = authService.createAccount(email: "user@example.com", password: "oldpassword1")
+        _ = authService.createSession(email: "user@example.com")
 
         let resetResult = authService.initiatePasswordReset(email: "user@example.com")
         switch resetResult {
@@ -448,35 +441,6 @@ final class AuthenticationServiceTests: XCTestCase {
         }
     }
 
-    func testCompletePasswordResetAndLogin() {
-        // Create account
-        let sendResult = authService.sendVerificationCode(to: "user@example.com")
-        guard case .success(let code) = sendResult else {
-            XCTFail("Should send code")
-            return
-        }
-        _ = authService.verifyCode(code.code, for: "user@example.com")
-        _ = authService.createAccount(email: "user@example.com", password: "oldpassword1")
-
-        // Reset password
-        let resetResult = authService.initiatePasswordReset(email: "user@example.com")
-        guard case .success(let resetCode) = resetResult else {
-            XCTFail("Should initiate reset")
-            return
-        }
-        _ = authService.verifyCode(resetCode.code, for: "user@example.com")
-        _ = authService.completePasswordReset(email: "user@example.com", newPassword: "newpassword1")
-
-        // Try login with new password
-        let loginResult = authService.login(email: "user@example.com", password: "newpassword1")
-        switch loginResult {
-        case .success:
-            break // Test passed
-        case .failure:
-            XCTFail("Should login with new password")
-        }
-    }
-
     // MARK: - Session Tests
 
     func testNewSessionIsValid() {
@@ -491,11 +455,10 @@ final class AuthenticationServiceTests: XCTestCase {
             return
         }
         _ = authService.verifyCode(code.code, for: "user@example.com")
-        _ = authService.createAccount(email: "user@example.com", password: "password123")
-        let loginResult = authService.login(email: "user@example.com", password: "password123")
+        let sessionResult = authService.createSession(email: "user@example.com")
 
-        guard case .success(let session) = loginResult else {
-            XCTFail("Should login")
+        guard case .success(let session) = sessionResult else {
+            XCTFail("Should create session")
             return
         }
         XCTAssertTrue(authService.isSessionValid(session.id))
@@ -522,22 +485,16 @@ final class AuthenticationServiceTests: XCTestCase {
             return
         }
 
-        // 3. Create account
-        let createResult = authService.createAccount(email: "newuser@example.com", password: "mypassword123")
-        guard case .success(_) = createResult else {
-            XCTFail("Should create account")
-            return
-        }
-
-        // 4. Login
-        let loginResult = authService.login(email: "newuser@example.com", password: "mypassword123")
-        guard case .success(_) = loginResult else {
-            XCTFail("Should login")
+        // 3. Create session (this also creates account)
+        let sessionResult = authService.createSession(email: "newuser@example.com")
+        guard case .success(_) = sessionResult else {
+            XCTFail("Should create session")
             return
         }
 
         XCTAssertEqual(authService.currentState, .authenticated)
         XCTAssertNotNil(authService.getCurrentUser())
+        XCTAssertTrue(authService.hasValidSession())
     }
 
     func testFullSignupFlowWithAsyncEmail() async {
@@ -561,22 +518,16 @@ final class AuthenticationServiceTests: XCTestCase {
             return
         }
 
-        // 3. Create account
-        let createResult = authService.createAccount(email: "newuser@example.com", password: "mypassword123")
-        guard case .success(_) = createResult else {
-            XCTFail("Should create account")
-            return
-        }
-
-        // 4. Login
-        let loginResult = authService.login(email: "newuser@example.com", password: "mypassword123")
-        guard case .success(_) = loginResult else {
-            XCTFail("Should login")
+        // 3. Create session
+        let sessionResult = authService.createSession(email: "newuser@example.com")
+        guard case .success(_) = sessionResult else {
+            XCTFail("Should create session")
             return
         }
 
         XCTAssertEqual(authService.currentState, .authenticated)
         XCTAssertNotNil(authService.getCurrentUser())
+        XCTAssertTrue(authService.hasValidSession())
     }
 
     func testLinkStudentProfileWorks() {
@@ -586,7 +537,7 @@ final class AuthenticationServiceTests: XCTestCase {
             return
         }
         _ = authService.verifyCode(code.code, for: "student@example.com")
-        _ = authService.createAccount(email: "student@example.com", password: "password123")
+        _ = authService.createSession(email: "student@example.com")
 
         let studentID = UUID()
         let linked = authService.linkStudentProfile(studentID: studentID, to: "student@example.com")
@@ -601,8 +552,7 @@ final class AuthenticationServiceTests: XCTestCase {
             return
         }
         _ = authService.verifyCode(code.code, for: "user@example.com")
-        _ = authService.createAccount(email: "user@example.com", password: "password123")
-        _ = authService.login(email: "user@example.com", password: "password123")
+        _ = authService.createSession(email: "user@example.com")
 
         authService.reset()
 
@@ -610,6 +560,39 @@ final class AuthenticationServiceTests: XCTestCase {
         XCTAssertEqual(authService.pendingVerificationCount, 0)
         XCTAssertEqual(authService.activeSessionCount, 0)
         XCTAssertEqual(authService.currentState, .unauthenticated)
+        XCTAssertFalse(authService.hasValidSession())
+    }
+
+    // MARK: - User Flow Tests (Authentication is first screen)
+
+    func testInitialStateIsUnauthenticated() {
+        // Fresh service should be unauthenticated
+        XCTAssertEqual(authService.currentState, .unauthenticated)
+        XCTAssertFalse(authService.hasValidSession())
+        XCTAssertNil(authService.currentSession)
+        XCTAssertNil(authService.getCurrentUser())
+    }
+
+    func testStateProgressesThroughFlow() {
+        // Initial state
+        XCTAssertEqual(authService.currentState, .unauthenticated)
+
+        // After sending code
+        _ = authService.sendVerificationCode(to: "user@example.com")
+        XCTAssertEqual(authService.currentState, .verificationSent)
+
+        // Get the code and verify it
+        let sendResult = authService.sendVerificationCode(to: "user@example.com")
+        guard case .success(let code) = sendResult else {
+            XCTFail("Should send code")
+            return
+        }
+        _ = authService.verifyCode(code.code, for: "user@example.com")
+        XCTAssertEqual(authService.currentState, .verified)
+
+        // After creating session
+        _ = authService.createSession(email: "user@example.com")
+        XCTAssertEqual(authService.currentState, .authenticated)
     }
 }
 
@@ -696,5 +679,104 @@ final class EmailServiceTests: XCTestCase {
         XCTAssertNotNil(Config.sendGridAPIKey)
         XCTAssertNotNil(Config.senderEmail)
         XCTAssertNotNil(Config.senderName)
+    }
+}
+
+// MARK: - Auth Flow View Model Tests
+
+final class AuthViewModelTests: XCTestCase {
+
+    @MainActor
+    func testInitialState() {
+        let viewModel = AuthViewModel()
+
+        XCTAssertEqual(viewModel.email, "")
+        XCTAssertEqual(viewModel.verificationCode, "")
+        XCTAssertFalse(viewModel.isLoading)
+        XCTAssertNil(viewModel.errorMessage)
+        XCTAssertEqual(viewModel.authState, .emailEntry)
+        XCTAssertTrue(viewModel.isNewUser)
+    }
+
+    @MainActor
+    func testEmailValidation() {
+        let viewModel = AuthViewModel()
+
+        // Invalid email
+        viewModel.email = "invalid"
+        XCTAssertFalse(viewModel.isEmailValid)
+
+        // Valid email
+        viewModel.email = "test@example.com"
+        XCTAssertTrue(viewModel.isEmailValid)
+
+        // Empty email
+        viewModel.email = ""
+        XCTAssertFalse(viewModel.isEmailValid)
+    }
+
+    @MainActor
+    func testCodeValidation() {
+        let viewModel = AuthViewModel()
+
+        // Invalid code - too short
+        viewModel.verificationCode = "123"
+        XCTAssertFalse(viewModel.isCodeValid)
+
+        // Invalid code - empty
+        viewModel.verificationCode = ""
+        XCTAssertFalse(viewModel.isCodeValid)
+
+        // Valid code - 6 digits
+        viewModel.verificationCode = "123456"
+        XCTAssertTrue(viewModel.isCodeValid)
+    }
+
+    @MainActor
+    func testResetToEmailEntry() {
+        let viewModel = AuthViewModel()
+
+        // Move to verification state
+        viewModel.authState = .verification
+        viewModel.verificationCode = "123456"
+        viewModel.errorMessage = "Some error"
+
+        // Reset to email entry
+        viewModel.resetToEmailEntry()
+
+        // Should reset appropriately
+        XCTAssertEqual(viewModel.authState, .emailEntry)
+        XCTAssertEqual(viewModel.verificationCode, "")
+        XCTAssertNil(viewModel.errorMessage)
+    }
+
+    @MainActor
+    func testLogout() {
+        let viewModel = AuthViewModel()
+
+        // Set some state
+        viewModel.email = "test@example.com"
+        viewModel.verificationCode = "123456"
+        viewModel.authState = .authenticated
+        viewModel.errorMessage = "Error"
+        viewModel.isNewUser = false
+
+        // Logout
+        viewModel.logout()
+
+        // Should be back to initial state
+        XCTAssertEqual(viewModel.email, "")
+        XCTAssertEqual(viewModel.verificationCode, "")
+        XCTAssertEqual(viewModel.authState, .emailEntry)
+        XCTAssertNil(viewModel.errorMessage)
+        XCTAssertTrue(viewModel.isNewUser)
+    }
+
+    @MainActor
+    func testCheckExistingAuth() {
+        let viewModel = AuthViewModel()
+
+        // Should return false for fresh state
+        XCTAssertFalse(viewModel.checkExistingAuth())
     }
 }

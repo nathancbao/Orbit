@@ -40,7 +40,7 @@ struct ContentView: View {
     @State private var profilePhotos: [UIImage] = []
 
     var body: some View {
-        Group {
+        SwiftUI.Group {
             switch appState {
             // MARK: Auth State
             case .auth:
@@ -77,6 +77,13 @@ struct ContentView: View {
                         profilePhotos: profilePhotos,
                         onEditProfile: {
                             appState = .profileSetup
+                        },
+                        onLogout: {
+                            // Logout and clear all state
+                            AuthenticationService.shared.logout()
+                            completedProfile = nil
+                            profilePhotos = []
+                            appState = .auth
                         }
                     )
                 } else {
@@ -85,9 +92,18 @@ struct ContentView: View {
                 }
             }
         }
+        .onAppear {
+            // Check for existing valid session on app launch (auto-login)
+            if AuthenticationService.shared.hasValidSession() {
+                // User has valid session, try to load their profile
+                Task {
+                    await loadExistingProfile()
+                }
+            }
+        }
         .onReceive(NotificationCenter.default.publisher(for: .sessionExpired)) { _ in
-            KeychainHelper.shared.delete(forKey: Constants.Keychain.accessToken)
-            KeychainHelper.shared.delete(forKey: Constants.Keychain.refreshToken)
+            // Session expired notification from API layer
+            AuthenticationService.shared.logout()
             completedProfile = nil
             profilePhotos = []
             appState = .auth
