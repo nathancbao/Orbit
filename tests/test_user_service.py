@@ -1,6 +1,6 @@
 """Tests for services/user_service.py — pure business logic, no mocking needed."""
 
-from services.user_service import _format_profile, _is_profile_complete, DEFAULT_PROFILE
+from OrbitServer.services.user_service import _format_profile, _is_profile_complete, DEFAULT_PROFILE
 
 
 # ── _format_profile ─────────────────────────────────────────────────────────
@@ -43,7 +43,7 @@ class TestFormatProfile:
         assert result["personality"]["introvert_extrovert"] == 0.8
 
     def test_output_has_exactly_profile_fields(self):
-        from services.user_service import PROFILE_FIELDS
+        from OrbitServer.services.user_service import PROFILE_FIELDS
         result = _format_profile({"name": "Test"})
         assert set(result.keys()) == set(PROFILE_FIELDS)
 

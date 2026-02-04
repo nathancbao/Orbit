@@ -1,7 +1,7 @@
 """Tests for utils/responses.py — uses Flask test request context."""
 
 import json
-from utils.responses import success, error
+from OrbitServer.utils.responses import success, error
 
 
 class TestSuccessResponse:

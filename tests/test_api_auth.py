@@ -6,7 +6,7 @@ from unittest.mock import patch, MagicMock
 
 class TestSendCode:
     def test_valid_edu_email(self, client):
-        with patch('services.auth_service.store_verification_code'):
+        with patch('OrbitServer.services.auth_service.store_verification_code'):
             resp = client.post('/api/auth/send-code',
                                json={"email": "test@university.edu"})
             body = json.loads(resp.data)
@@ -50,9 +50,9 @@ class TestVerifyCode:
                            json={"code": "123456"})
         assert resp.status_code == 400
 
-    @patch('services.auth_service.get_user_by_email')
-    @patch('services.auth_service.create_user')
-    @patch('services.auth_service.store_refresh_token')
+    @patch('OrbitServer.services.auth_service.get_user_by_email')
+    @patch('OrbitServer.services.auth_service.create_user')
+    @patch('OrbitServer.services.auth_service.store_refresh_token')
     def test_demo_bypass_new_user(self, mock_store_rt, mock_create, mock_get_user, client):
         mock_get_user.return_value = None
         mock_create.return_value = {'id': 1, 'email': 'test@university.edu'}
@@ -66,8 +66,8 @@ class TestVerifyCode:
         assert "refresh_token" in body["data"]
         assert body["data"]["is_new_user"] is True
 
-    @patch('services.auth_service.get_user_by_email')
-    @patch('services.auth_service.store_refresh_token')
+    @patch('OrbitServer.services.auth_service.get_user_by_email')
+    @patch('OrbitServer.services.auth_service.store_refresh_token')
     def test_demo_bypass_existing_user(self, mock_store_rt, mock_get_user, client):
         mock_get_user.return_value = {'id': 5, 'email': 'test@university.edu'}
 
@@ -86,7 +86,7 @@ class TestRefresh:
         assert resp.status_code == 400
         assert body["success"] is False
 
-    @patch('services.auth_service.get_refresh_token')
+    @patch('OrbitServer.services.auth_service.get_refresh_token')
     def test_rejects_invalid_refresh_token(self, mock_get_rt, client):
         mock_get_rt.return_value = None
         resp = client.post('/api/auth/refresh',
@@ -99,7 +99,7 @@ class TestLogout:
         resp = client.post('/api/auth/logout', json={})
         assert resp.status_code == 400
 
-    @patch('services.auth_service.delete_refresh_token')
+    @patch('OrbitServer.services.auth_service.delete_refresh_token')
     def test_logout_success(self, mock_delete_rt, client):
         resp = client.post('/api/auth/logout',
                            json={"refresh_token": "some-token"})

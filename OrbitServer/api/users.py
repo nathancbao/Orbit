@@ -1,9 +1,9 @@
 from flask import Blueprint, request, g
 
-from utils.responses import success, error
-from utils.auth import require_auth
-from utils.validators import validate_profile_data
-from services.user_service import get_user_profile, update_user_profile, upload_photo
+from OrbitServer.utils.responses import success, error
+from OrbitServer.utils.auth import require_auth
+from OrbitServer.utils.validators import validate_profile_data
+from OrbitServer.services.user_service import get_user_profile, update_user_profile, upload_photo
 
 users_bp = Blueprint('users', __name__, url_prefix='/api/users')
 

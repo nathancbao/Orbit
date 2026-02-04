@@ -2,7 +2,7 @@
 
 import json
 from unittest.mock import patch
-from utils.auth import create_access_token
+from OrbitServer.utils.auth import create_access_token
 
 
 def auth_header(user_id=1):
@@ -21,7 +21,7 @@ class TestGetMe:
                           headers={"Authorization": "Bearer bad-token"})
         assert resp.status_code == 401
 
-    @patch('api.users.get_user_profile')
+    @patch('OrbitServer.api.users.get_user_profile')
     def test_returns_profile(self, mock_get_profile, client):
         mock_get_profile.return_value = (
             {"profile": {"name": "Test"}, "profile_complete": True},
@@ -32,7 +32,7 @@ class TestGetMe:
         assert resp.status_code == 200
         assert body["success"] is True
 
-    @patch('api.users.get_user_profile')
+    @patch('OrbitServer.api.users.get_user_profile')
     def test_returns_404_when_missing(self, mock_get_profile, client):
         mock_get_profile.return_value = (None, "Profile not found")
         resp = client.get('/api/users/me', headers=auth_header(1))
@@ -51,14 +51,14 @@ class TestUpdateMe:
                           data='{}')
         assert resp.status_code == 400
 
-    @patch('api.users.update_user_profile')
+    @patch('OrbitServer.api.users.update_user_profile')
     def test_rejects_invalid_profile_data(self, mock_update, client):
         resp = client.put('/api/users/me',
                           headers=auth_header(),
                           json={"age": 5})  # Too young
         assert resp.status_code == 400
 
-    @patch('api.users.update_user_profile')
+    @patch('OrbitServer.api.users.update_user_profile')
     def test_updates_valid_profile(self, mock_update, client):
         mock_update.return_value = (
             {"profile": {"name": "Updated"}, "profile_complete": True},
@@ -73,7 +73,7 @@ class TestUpdateMe:
 
 
 class TestGetPublicUser:
-    @patch('api.users.get_user_profile')
+    @patch('OrbitServer.api.users.get_user_profile')
     def test_returns_public_profile(self, mock_get_profile, client):
         mock_get_profile.return_value = (
             {"profile": {"name": "Public User"}, "profile_complete": True},
@@ -84,7 +84,7 @@ class TestGetPublicUser:
         assert resp.status_code == 200
         assert body["success"] is True
 
-    @patch('api.users.get_user_profile')
+    @patch('OrbitServer.api.users.get_user_profile')
     def test_returns_404_for_missing_user(self, mock_get_profile, client):
         mock_get_profile.return_value = (None, "User not found")
         resp = client.get('/api/users/999')

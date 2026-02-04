@@ -5,12 +5,12 @@ import datetime
 # from sendgrid import SendGridAPIClient
 # from sendgrid.helpers.mail import Mail
 
-from models.models import (
+from OrbitServer.models.models import (
     get_user_by_email, create_user,
     store_verification_code, get_verification_code, delete_verification_code,
     store_refresh_token, get_refresh_token, delete_refresh_token,
 )
-from utils.auth import create_access_token, create_refresh_token, decode_token
+from OrbitServer.utils.auth import create_access_token, create_refresh_token, decode_token
 
 SENDGRID_API_KEY = os.environ.get('SENDGRID_API_KEY', '')
 FROM_EMAIL = os.environ.get('FROM_EMAIL', 'noreply@orbitapp.com')

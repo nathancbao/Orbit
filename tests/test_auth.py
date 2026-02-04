@@ -7,7 +7,7 @@ import datetime
 # Ensure test secret is set before importing
 os.environ['JWT_SECRET'] = 'test-secret-key'
 
-from utils.auth import create_access_token, create_refresh_token, decode_token
+from OrbitServer.utils.auth import create_access_token, create_refresh_token, decode_token
 
 
 class TestCreateAccessToken:

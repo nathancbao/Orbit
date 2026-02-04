@@ -1,10 +1,10 @@
 from flask import Flask, jsonify
 
-from api.auth import auth_bp
-from api.users import users_bp
-from api.crews import crews_bp
-from api.missions import missions_bp
-from api.discover import discover_bp
+from OrbitServer.api.auth import auth_bp
+from OrbitServer.api.users import users_bp
+from OrbitServer.api.crews import crews_bp
+from OrbitServer.api.missions import missions_bp
+from OrbitServer.api.discover import discover_bp
 
 app = Flask(__name__)
 

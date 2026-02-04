@@ -4,19 +4,19 @@ from unittest.mock import patch
 
 
 class TestRsvpMission:
-    @patch('services.mission_service.get_mission')
+    @patch('OrbitServer.services.mission_service.get_mission')
     def test_mission_not_found(self, mock_get):
-        from services.mission_service import rsvp_mission
+        from OrbitServer.services.mission_service import rsvp_mission
         mock_get.return_value = None
 
         result, err = rsvp_mission(999, 1)
         assert result is None
         assert "not found" in err.lower()
 
-    @patch('services.mission_service.get_mission_rsvp')
-    @patch('services.mission_service.get_mission')
+    @patch('OrbitServer.services.mission_service.get_mission_rsvp')
+    @patch('OrbitServer.services.mission_service.get_mission')
     def test_already_rsvped(self, mock_get_mission, mock_get_rsvp):
-        from services.mission_service import rsvp_mission
+        from OrbitServer.services.mission_service import rsvp_mission
         mock_get_mission.return_value = {'id': 1, 'title': 'Hike'}
         mock_get_rsvp.return_value = {'mission_id': 1, 'user_id': 5}
 
@@ -24,13 +24,13 @@ class TestRsvpMission:
         assert result is None
         assert "Already" in err
 
-    @patch('services.mission_service.update_mission_rsvp_count')
-    @patch('services.mission_service.add_mission_rsvp')
-    @patch('services.mission_service.get_mission_rsvp')
-    @patch('services.mission_service.get_mission')
+    @patch('OrbitServer.services.mission_service.update_mission_rsvp_count')
+    @patch('OrbitServer.services.mission_service.add_mission_rsvp')
+    @patch('OrbitServer.services.mission_service.get_mission_rsvp')
+    @patch('OrbitServer.services.mission_service.get_mission')
     def test_successful_rsvp(self, mock_get_mission, mock_get_rsvp,
                               mock_add, mock_update_count):
-        from services.mission_service import rsvp_mission
+        from OrbitServer.services.mission_service import rsvp_mission
         mock_get_mission.return_value = {'id': 1, 'title': 'Hike'}
         mock_get_rsvp.return_value = None
 

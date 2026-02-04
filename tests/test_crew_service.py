@@ -4,19 +4,19 @@ from unittest.mock import patch, MagicMock
 
 
 class TestJoinCrew:
-    @patch('services.crew_service.get_crew')
+    @patch('OrbitServer.services.crew_service.get_crew')
     def test_crew_not_found(self, mock_get):
-        from services.crew_service import join_crew
+        from OrbitServer.services.crew_service import join_crew
         mock_get.return_value = None
 
         result, err = join_crew(999, 1)
         assert result is None
         assert "not found" in err.lower()
 
-    @patch('services.crew_service.get_crew_member')
-    @patch('services.crew_service.get_crew')
+    @patch('OrbitServer.services.crew_service.get_crew_member')
+    @patch('OrbitServer.services.crew_service.get_crew')
     def test_already_a_member(self, mock_get_crew, mock_get_member):
-        from services.crew_service import join_crew
+        from OrbitServer.services.crew_service import join_crew
         mock_get_crew.return_value = {'id': 1, 'name': 'Test'}
         mock_get_member.return_value = {'crew_id': 1, 'user_id': 5}
 
@@ -24,13 +24,13 @@ class TestJoinCrew:
         assert result is None
         assert "Already" in err
 
-    @patch('services.crew_service.update_crew_member_count')
-    @patch('services.crew_service.add_crew_member')
-    @patch('services.crew_service.get_crew_member')
-    @patch('services.crew_service.get_crew')
+    @patch('OrbitServer.services.crew_service.update_crew_member_count')
+    @patch('OrbitServer.services.crew_service.add_crew_member')
+    @patch('OrbitServer.services.crew_service.get_crew_member')
+    @patch('OrbitServer.services.crew_service.get_crew')
     def test_successful_join(self, mock_get_crew, mock_get_member,
                               mock_add, mock_update_count):
-        from services.crew_service import join_crew
+        from OrbitServer.services.crew_service import join_crew
         mock_get_crew.return_value = {'id': 1, 'name': 'Test'}
         mock_get_member.return_value = None  # not yet a member
 
@@ -42,19 +42,19 @@ class TestJoinCrew:
 
 
 class TestLeaveCrew:
-    @patch('services.crew_service.get_crew')
+    @patch('OrbitServer.services.crew_service.get_crew')
     def test_crew_not_found(self, mock_get):
-        from services.crew_service import leave_crew
+        from OrbitServer.services.crew_service import leave_crew
         mock_get.return_value = None
 
         result, err = leave_crew(999, 1)
         assert result is None
         assert "not found" in err.lower()
 
-    @patch('services.crew_service.get_crew_member')
-    @patch('services.crew_service.get_crew')
+    @patch('OrbitServer.services.crew_service.get_crew_member')
+    @patch('OrbitServer.services.crew_service.get_crew')
     def test_not_a_member(self, mock_get_crew, mock_get_member):
-        from services.crew_service import leave_crew
+        from OrbitServer.services.crew_service import leave_crew
         mock_get_crew.return_value = {'id': 1, 'name': 'Test'}
         mock_get_member.return_value = None
 
@@ -62,13 +62,13 @@ class TestLeaveCrew:
         assert result is None
         assert "Not a member" in err
 
-    @patch('services.crew_service.update_crew_member_count')
-    @patch('services.crew_service.remove_crew_member')
-    @patch('services.crew_service.get_crew_member')
-    @patch('services.crew_service.get_crew')
+    @patch('OrbitServer.services.crew_service.update_crew_member_count')
+    @patch('OrbitServer.services.crew_service.remove_crew_member')
+    @patch('OrbitServer.services.crew_service.get_crew_member')
+    @patch('OrbitServer.services.crew_service.get_crew')
     def test_successful_leave(self, mock_get_crew, mock_get_member,
                                mock_remove, mock_update_count):
-        from services.crew_service import leave_crew
+        from OrbitServer.services.crew_service import leave_crew
         mock_get_crew.return_value = {'id': 1, 'name': 'Test'}
         mock_get_member.return_value = {'crew_id': 1, 'user_id': 5}
 

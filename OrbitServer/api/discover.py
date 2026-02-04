@@ -1,8 +1,8 @@
 from flask import Blueprint, g
 
-from utils.responses import success, error
-from utils.auth import require_auth
-from services.matching_service import (
+from OrbitServer.utils.responses import success, error
+from OrbitServer.utils.auth import require_auth
+from OrbitServer.services.matching_service import (
     suggested_users,
     suggested_crews,
     suggested_missions,

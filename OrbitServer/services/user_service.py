@@ -1,5 +1,5 @@
-from models.models import get_profile, upsert_profile, get_user
-from services.storage_service import upload_file
+from OrbitServer.models.models import get_profile, upsert_profile, get_user
+from OrbitServer.services.storage_service import upload_file
 
 
 # Fields that match the Swift Profile struct

@@ -1,6 +1,6 @@
 """Tests for utils/validators.py — no mocking needed, pure logic."""
 
-from utils.validators import validate_edu_email, validate_profile_data, validate_crew_data, validate_mission_data
+from OrbitServer.utils.validators import validate_edu_email, validate_profile_data, validate_crew_data, validate_mission_data
 
 
 # ── Email Validation ────────────────────────────────────────────────────────

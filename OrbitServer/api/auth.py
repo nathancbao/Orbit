@@ -1,8 +1,8 @@
 from flask import Blueprint, request
 
-from utils.responses import success, error
-from utils.validators import validate_edu_email
-from services.auth_service import (
+from OrbitServer.utils.responses import success, error
+from OrbitServer.utils.validators import validate_edu_email
+from OrbitServer.services.auth_service import (
     send_verification_code,
     verify_code,
     refresh_access_token,

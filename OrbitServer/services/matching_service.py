@@ -1,4 +1,4 @@
-from models.models import get_profile, _entity_to_dict, list_crews, list_missions
+from OrbitServer.models.models import get_profile, _entity_to_dict, list_crews, list_missions
 
 
 # Fields that match the Swift Profile struct

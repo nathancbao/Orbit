@@ -5,7 +5,7 @@ from functools import wraps
 import jwt
 from flask import request, g
 
-from utils.responses import error
+from OrbitServer.utils.responses import error
 
 JWT_SECRET = os.environ.get('JWT_SECRET', 'dev-secret-change-me')
 ACCESS_TOKEN_EXPIRY = datetime.timedelta(minutes=15)
