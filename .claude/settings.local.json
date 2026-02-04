@@ -4,7 +4,9 @@
       "Bash(tree:*)",
       "Bash(git pull:*)",
       "Bash(git stash:*)",
-      "Bash(python3 -m pytest:*)"
+      "Bash(python3 -m pytest:*)",
+      "Bash(find:*)",
+      "Bash(wc:*)"
     ]
   }
 }
