@@ -20,6 +20,10 @@ def send_verification_code(email):
     code = str(random.randint(100000, 999999))
     store_verification_code(email, code)
 
+    print(f"[DEBUG] Sending verification code {code} to {email}")
+    print(f"[DEBUG] FROM_EMAIL: {FROM_EMAIL}")
+    print(f"[DEBUG] API Key present: {bool(SENDGRID_API_KEY)}")
+
     message = Mail(
         from_email=FROM_EMAIL,
         to_emails=email,
@@ -27,7 +31,11 @@ def send_verification_code(email):
         plain_text_content=f'Your Orbit verification code is: {code}\n\nThis code expires in 10 minutes.',
     )
     sg = SendGridAPIClient(SENDGRID_API_KEY)
-    sg.send(message)
+    response = sg.send(message)
+
+    print(f"[DEBUG] SendGrid response status: {response.status_code}")
+    print(f"[DEBUG] SendGrid response body: {response.body}")
+    print(f"[DEBUG] SendGrid response headers: {response.headers}")
 
     return True    
 

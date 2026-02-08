@@ -516,6 +516,8 @@ struct PhotoUploadStep: View {
     @ObservedObject var viewModel: ProfileViewModel
     @State private var selectedItems: [PhotosPickerItem] = []
     @State private var showingFileImporter = false
+    @State private var imagesToCrop: [UIImage] = []
+    @State private var showCropCoordinator = false
 
     let columns = [
         GridItem(.flexible()),
@@ -572,6 +574,26 @@ struct PhotoUploadStep: View {
                     .font(.caption)
                     .foregroundColor(.secondary)
                     .padding(.top, 8)
+
+                // Clear photos button
+                if !viewModel.selectedPhotos.isEmpty {
+                    Button {
+                        Task {
+                            try? await ProfileService.shared.clearPhotos()
+                            viewModel.selectedPhotos.removeAll()
+                        }
+                    } label: {
+                        Text("Clear All Photos")
+                            .font(.subheadline)
+                            .fontWeight(.medium)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 12)
+                            .background(Color.blue)
+                            .foregroundColor(.white)
+                            .cornerRadius(10)
+                    }
+                    .padding(.top, 16)
+                }
             }
             .padding()
         }
@@ -587,33 +609,49 @@ struct PhotoUploadStep: View {
                 print("File import error: \(error)")
             }
         }
+        .fullScreenCover(isPresented: $showCropCoordinator) {
+            ImageCropCoordinator(
+                images: imagesToCrop,
+                onComplete: { croppedImages in
+                    addCroppedPhotos(croppedImages)
+                    showCropCoordinator = false
+                    imagesToCrop = []
+                },
+                onCancel: {
+                    showCropCoordinator = false
+                    imagesToCrop = []
+                }
+            )
+        }
     }
 
     private func loadPhotos(from items: [PhotosPickerItem]) async {
+        var loadedImages: [UIImage] = []
+
         for item in items {
-            if viewModel.selectedPhotos.count >= Constants.Validation.maxPhotos {
+            if loadedImages.count + viewModel.selectedPhotos.count >= Constants.Validation.maxPhotos {
                 break
             }
 
-            var photoItem = PhotoItem()
-            photoItem.isLoading = true
-            viewModel.selectedPhotos.append(photoItem)
-            let index = viewModel.selectedPhotos.count - 1
-
             if let data = try? await item.loadTransferable(type: Data.self),
                let image = UIImage(data: data) {
-                viewModel.selectedPhotos[index].image = image
-                viewModel.selectedPhotos[index].isLoading = false
-            } else {
-                // Remove failed photo
-                viewModel.selectedPhotos.remove(at: index)
+                loadedImages.append(image)
+            }
+        }
+
+        if !loadedImages.isEmpty {
+            await MainActor.run {
+                imagesToCrop = loadedImages
+                showCropCoordinator = true
             }
         }
     }
 
     private func loadPhotosFromFiles(urls: [URL]) {
+        var loadedImages: [UIImage] = []
+
         for url in urls {
-            if viewModel.selectedPhotos.count >= Constants.Validation.maxPhotos {
+            if loadedImages.count + viewModel.selectedPhotos.count >= Constants.Validation.maxPhotos {
                 break
             }
 
@@ -628,6 +666,19 @@ struct PhotoUploadStep: View {
 
             if let data = try? Data(contentsOf: url),
                let image = UIImage(data: data) {
+                loadedImages.append(image)
+            }
+        }
+
+        if !loadedImages.isEmpty {
+            imagesToCrop = loadedImages
+            showCropCoordinator = true
+        }
+    }
+
+    private func addCroppedPhotos(_ images: [UIImage]) {
+        for image in images {
+            if viewModel.selectedPhotos.count < Constants.Validation.maxPhotos {
                 var photoItem = PhotoItem()
                 photoItem.image = image
                 viewModel.selectedPhotos.append(photoItem)

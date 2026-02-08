@@ -72,6 +72,22 @@ class ProfileService {
         return response.profile
     }
 
+    // Clear all photos from profile
+    func clearPhotos() async throws {
+        if useMockData {
+            try await Task.sleep(nanoseconds: 200_000_000)
+            return
+        }
+
+        let body: [String: Any] = ["photos": []]
+        let _: ProfileResponseData = try await APIService.shared.request(
+            endpoint: Constants.API.Endpoints.me,
+            method: "PUT",
+            body: body,
+            authenticated: true
+        )
+    }
+
     // Upload a photo
     func uploadPhoto(_ image: UIImage) async throws -> ProfileResponseData {
         if useMockData {
