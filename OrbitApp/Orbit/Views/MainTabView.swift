@@ -24,7 +24,7 @@ struct MainTabView: View {
     var body: some View {
         TabView(selection: $selectedTab) {
             // Discover Tab
-            DiscoverView()
+            DiscoverView(userProfile: profile)
                 .tabItem {
                     Label("Discover", systemImage: "sparkles")
                 }

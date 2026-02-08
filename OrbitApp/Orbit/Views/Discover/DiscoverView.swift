@@ -9,6 +9,7 @@
 import SwiftUI
 
 struct DiscoverView: View {
+    let userProfile: Profile?
     @State private var profiles: [Profile] = []
     @State private var isLoading: Bool = true
     @State private var selectedProfile: Profile? = nil
@@ -93,9 +94,11 @@ struct DiscoverView: View {
                         .position(center)
                 }
 
-                // Other user planets
+                // Other user planets — size scales with match score
                 ForEach(Array(profiles.enumerated()), id: \.element.name) { index, profile in
-                    UserPlanet(profile: profile, size: 70)
+                    let score = profile.matchScore ?? 0
+                    let planetSize: CGFloat = 60 + CGFloat(score) * 30 // 60–90 based on match
+                    UserPlanet(profile: profile, size: planetSize)
                         .position(getOrCreatePosition(for: profile, index: index, total: profiles.count, center: center, radius: min(geometry.size.width, geometry.size.height) * 0.35))
                         .onTapGesture {
                             selectedProfile = profile
@@ -152,7 +155,13 @@ struct DiscoverView: View {
 
     private func loadProfiles() async {
         do {
-            profiles = try await DiscoverService.shared.getDiscoverProfiles()
+            var loaded = try await DiscoverService.shared.getDiscoverProfiles()
+            // If we have the user's profile, compute match scores client-side
+            // for any profiles that don't already have one from the backend
+            if let user = userProfile {
+                loaded = MatchingService.shared.rankProfiles(loaded, against: user)
+            }
+            profiles = loaded
         } catch {
             print("Failed to load profiles: \(error)")
         }
@@ -247,6 +256,13 @@ struct UserPlanet: View {
         return Double(abs(profile.name.hashValue) % 50) / 50.0
     }
 
+    // Badge color based on match strength
+    private func matchBadgeColor(score: Double) -> Color {
+        if score >= 0.5 { return .green }
+        if score >= 0.25 { return .orange }
+        return .gray
+    }
+
     var body: some View {
         VStack(spacing: 4) {
             ZStack {
@@ -282,6 +298,18 @@ struct UserPlanet: View {
                     .shadow(color: planetColor.opacity(0.5), radius: 5)
             }
             .scaleEffect(isAnimating ? 1.05 : 1.0)
+
+            // Match score badge
+            if let score = profile.matchScore, score > 0 {
+                Text("\(Int(score * 100))%")
+                    .font(.system(size: 9, weight: .bold))
+                    .foregroundColor(.white)
+                    .padding(.horizontal, 5)
+                    .padding(.vertical, 2)
+                    .background(matchBadgeColor(score: score))
+                    .cornerRadius(6)
+                    .offset(x: size * 0.35, y: -size * 0.35)
+            }
 
             // Name label
             Text(profile.name.split(separator: " ").first ?? "")
@@ -332,6 +360,34 @@ struct ProfileDetailSheet: View {
 
                     // Profile details
                     VStack(spacing: 20) {
+                        // Match score
+                        if let score = profile.matchScore, score > 0 {
+                            HStack(spacing: 12) {
+                                Image(systemName: "sparkles")
+                                    .foregroundColor(.yellow)
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text("\(Int(score * 100))% Match")
+                                        .font(.headline)
+                                    GeometryReader { geo in
+                                        ZStack(alignment: .leading) {
+                                            Capsule()
+                                                .fill(Color(.systemGray5))
+                                                .frame(height: 6)
+                                            Capsule()
+                                                .fill(score >= 0.5 ? Color.green : score >= 0.25 ? Color.orange : Color.gray)
+                                                .frame(width: geo.size.width * score, height: 6)
+                                        }
+                                    }
+                                    .frame(height: 6)
+                                }
+                            }
+                            .padding()
+                            .background(Color(.systemGray6))
+                            .cornerRadius(12)
+
+                            Divider()
+                        }
+
                         // Bio
                         if !profile.bio.isEmpty {
                             VStack(alignment: .leading, spacing: 8) {
@@ -484,5 +540,5 @@ struct InfoChip: View {
 }
 
 #Preview {
-    DiscoverView()
+    DiscoverView(userProfile: nil)
 }
