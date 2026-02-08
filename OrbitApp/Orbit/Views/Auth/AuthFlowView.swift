@@ -2,8 +2,7 @@
 //  AuthFlowView.swift
 //  Orbit
 //
-//  Email verification flow via SendGrid.
-//  Sends actual verification emails to users.
+//  Email verification flow for .edu emails.
 //
 
 import SwiftUI
@@ -70,24 +69,6 @@ struct AuthFlowView: View {
                 .padding(.horizontal, 24)
 
                 Spacer()
-
-                // Demo hint and bypass
-                VStack(spacing: 12) {
-                    Text("Check your email for verification code")
-                        .font(.caption)
-                        .foregroundColor(.white.opacity(0.5))
-
-                    Button(action: {
-                        // Skip auth entirely for demo/testing
-                        onAuthComplete(true) // true = new user, goes to profile setup
-                    }) {
-                        Text("Skip Auth (Demo)")
-                            .font(.caption)
-                            .fontWeight(.medium)
-                            .foregroundColor(.orange)
-                    }
-                }
-                .padding(.bottom)
             }
         }
     }
@@ -96,11 +77,11 @@ struct AuthFlowView: View {
 
     private var emailEntrySection: some View {
         VStack(spacing: 16) {
-            Text("Enter your email")
+            Text("Enter your .edu email")
                 .font(.headline)
                 .foregroundColor(.white)
 
-            TextField("you@example.com", text: $viewModel.email)
+            TextField("you@university.edu", text: $viewModel.email)
                 .textFieldStyle(.plain)
                 .keyboardType(.emailAddress)
                 .textInputAutocapitalization(.never)
@@ -146,7 +127,7 @@ struct AuthFlowView: View {
                 .font(.caption)
                 .foregroundColor(.white.opacity(0.7))
 
-            TextField("123456", text: $viewModel.verificationCode)
+            TextField("000000", text: $viewModel.verificationCode)
                 .textFieldStyle(.plain)
                 .keyboardType(.numberPad)
                 .multilineTextAlignment(.center)

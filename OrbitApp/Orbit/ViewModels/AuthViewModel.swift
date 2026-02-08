@@ -3,7 +3,7 @@
 //  Orbit
 //
 //  Manages authentication state and logic.
-//  Uses client-side email verification via SendGrid.
+//  Uses .edu email verification.
 //
 
 import Foundation
@@ -22,46 +22,42 @@ class AuthViewModel: ObservableObject {
     @Published var isLoading: Bool = false
     @Published var errorMessage: String?
     @Published var authState: AuthState = .emailEntry
-    @Published var isNewUser: Bool = true
+    @Published var isNewUser: Bool = false
+    @Published var userId: Int?
 
-    private let authService = AuthenticationService.shared
-
-    // Validate email format
+    // Validate .edu email
     var isEmailValid: Bool {
-        let trimmed = email.trimmingCharacters(in: .whitespacesAndNewlines)
-        return trimmed.isValidEmail
+        let trimmed = email.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        return trimmed.contains("@") && trimmed.hasSuffix(".edu")
     }
 
     // Validate 6-digit code
     var isCodeValid: Bool {
         let digits = verificationCode.filter { $0.isNumber }
-        return digits.count == 6
+        return digits.count == Constants.Validation.verificationCodeLength
     }
 
-    // Send verification code to email via SendGrid
+    // Send verification code to email
     func sendVerificationCode() async {
         guard isEmailValid else {
-            errorMessage = "Please enter a valid email"
+            errorMessage = "Please enter a valid .edu email"
             return
         }
 
         isLoading = true
         errorMessage = nil
 
-        let normalizedEmail = email.lowercased().trimmingCharacters(in: .whitespaces)
-        let result = await authService.sendVerificationCodeAsync(to: normalizedEmail)
-
-        switch result {
-        case .success:
+        do {
+            let _ = try await AuthService.shared.sendVerificationCode(email: email.lowercased().trimmingCharacters(in: .whitespaces))
             authState = .verification
-        case .failure(let error):
+        } catch {
             errorMessage = error.localizedDescription
         }
 
         isLoading = false
     }
 
-    // Verify the code entered by user
+    // Verify the code
     func verifyCode() async {
         guard isCodeValid else {
             errorMessage = "Please enter a valid 6-digit code"
@@ -71,57 +67,30 @@ class AuthViewModel: ObservableObject {
         isLoading = true
         errorMessage = nil
 
-        let normalizedEmail = email.lowercased().trimmingCharacters(in: .whitespaces)
-
-        // First verify the code
-        let verifyResult = authService.verifyCode(verificationCode, for: normalizedEmail)
-
-        switch verifyResult {
-        case .success:
-            // Check if this is a new user (no existing account)
-            isNewUser = !authService.accountExists(email: normalizedEmail)
-
-            // Create session (which also creates account if needed)
-            let sessionResult = authService.createSession(email: normalizedEmail)
-
-            switch sessionResult {
-            case .success:
-                authState = .authenticated
-            case .failure(let error):
-                errorMessage = error.localizedDescription
-            }
-
-        case .failure(let error):
+        do {
+            let response = try await AuthService.shared.verifyCode(
+                email: email.lowercased().trimmingCharacters(in: .whitespaces),
+                code: verificationCode
+            )
+            isNewUser = response.isNewUser
+            userId = response.userId
+            authState = .authenticated
+        } catch {
             errorMessage = error.localizedDescription
         }
 
         isLoading = false
     }
 
-    // Reset to email entry state
+    // Reset to email entry
     func resetToEmailEntry() {
         authState = .emailEntry
         verificationCode = ""
         errorMessage = nil
     }
 
-    // Check if user has valid session (for auto-login)
+    // Check if already logged in
     func checkExistingAuth() -> Bool {
-        return authService.hasValidSession()
-    }
-
-    // Logout the current user
-    func logout() {
-        authService.logout()
-        authState = .emailEntry
-        email = ""
-        verificationCode = ""
-        errorMessage = nil
-        isNewUser = true
-    }
-
-    // Get current user's email
-    func getCurrentEmail() -> String? {
-        return authService.getCurrentEmail()
+        return AuthService.shared.isLoggedIn()
     }
 }

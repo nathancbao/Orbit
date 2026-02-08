@@ -4,10 +4,8 @@ struct ProfileDisplayView: View {
     let profile: Profile
     let photos: [UIImage]
     var onEdit: (() -> Void)? = nil
-    var onLogout: (() -> Void)? = nil
 
     @State private var currentPhotoIndex = 0
-    @State private var showingLogoutAlert = false
 
     var body: some View {
         NavigationStack {
@@ -15,31 +13,11 @@ struct ProfileDisplayView: View {
                 .navigationTitle("Profile")
                 .navigationBarTitleDisplayMode(.inline)
                 .toolbar {
-                    // Logout button on left
-                    ToolbarItem(placement: .navigationBarLeading) {
-                        if onLogout != nil {
-                            Button(action: {
-                                showingLogoutAlert = true
-                            }) {
-                                Image(systemName: "rectangle.portrait.and.arrow.right")
-                                    .foregroundColor(.red)
-                            }
-                        }
-                    }
-                    // Edit button on right
                     if let onEdit = onEdit {
                         ToolbarItem(placement: .navigationBarTrailing) {
                             Button("Edit", action: onEdit)
                         }
                     }
-                }
-                .alert("Logout", isPresented: $showingLogoutAlert) {
-                    Button("Cancel", role: .cancel) { }
-                    Button("Logout", role: .destructive) {
-                        onLogout?()
-                    }
-                } message: {
-                    Text("Are you sure you want to logout?")
                 }
         }
     }

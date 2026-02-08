@@ -12,7 +12,6 @@ struct MainTabView: View {
     let profile: Profile
     let profilePhotos: [UIImage]
     let onEditProfile: () -> Void
-    let onLogout: () -> Void
 
     @State private var selectedTab: Tab = .discover
 
@@ -34,8 +33,7 @@ struct MainTabView: View {
             ProfileDisplayView(
                 profile: profile,
                 photos: profilePhotos,
-                onEdit: onEditProfile,
-                onLogout: onLogout
+                onEdit: onEditProfile
             )
             .tabItem {
                 Label("Profile", systemImage: "person.circle")

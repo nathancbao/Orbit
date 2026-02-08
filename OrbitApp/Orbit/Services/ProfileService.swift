@@ -72,6 +72,22 @@ class ProfileService {
         return response.profile
     }
 
+    // Clear all photos from profile
+    func clearPhotos() async throws {
+        if useMockData {
+            try await Task.sleep(nanoseconds: 200_000_000)
+            return
+        }
+
+        let body: [String: Any] = ["photos": []]
+        let _: ProfileResponseData = try await APIService.shared.request(
+            endpoint: Constants.API.Endpoints.me,
+            method: "PUT",
+            body: body,
+            authenticated: true
+        )
+    }
+
     // Upload a photo
     func uploadPhoto(_ image: UIImage) async throws -> ProfileResponseData {
         if useMockData {
@@ -113,31 +129,10 @@ class ProfileService {
 
         request.httpBody = body
 
-        var (data, response) = try await URLSession.shared.data(for: request)
+        let (data, response) = try await URLSession.shared.data(for: request)
 
-        guard var httpResponse = response as? HTTPURLResponse else {
+        guard let httpResponse = response as? HTTPURLResponse else {
             throw NetworkError.noData
-        }
-
-        // Handle 401 with token refresh
-        if httpResponse.statusCode == 401 {
-            let newToken: String
-            do {
-                newToken = try await TokenRefreshCoordinator.shared.refreshIfNeeded()
-            } catch {
-                NotificationCenter.default.post(name: .sessionExpired, object: nil)
-                throw NetworkError.unauthorized
-            }
-            request.setValue("Bearer \(newToken)", forHTTPHeaderField: "Authorization")
-            (data, response) = try await URLSession.shared.data(for: request)
-            guard let retryHttpResponse = response as? HTTPURLResponse else {
-                throw NetworkError.noData
-            }
-            httpResponse = retryHttpResponse
-            if httpResponse.statusCode == 401 {
-                NotificationCenter.default.post(name: .sessionExpired, object: nil)
-                throw NetworkError.unauthorized
-            }
         }
 
         if httpResponse.statusCode >= 400 {

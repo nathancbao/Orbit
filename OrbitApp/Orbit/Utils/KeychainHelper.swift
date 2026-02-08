@@ -7,6 +7,7 @@ class KeychainHelper {
 
     private let service = "com.orbit.app"
 
+    @discardableResult
     func save(_ data: Data, forKey key: String) -> Bool {
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
@@ -21,6 +22,7 @@ class KeychainHelper {
         return status == errSecSuccess
     }
 
+    @discardableResult
     func save(_ string: String, forKey key: String) -> Bool {
         guard let data = string.data(using: .utf8) else { return false }
         return save(data, forKey: key)
@@ -47,6 +49,7 @@ class KeychainHelper {
         return String(data: data, encoding: .utf8)
     }
 
+    @discardableResult
     func delete(forKey key: String) -> Bool {
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
