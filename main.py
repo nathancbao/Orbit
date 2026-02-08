@@ -1,4 +1,7 @@
 from flask import Flask, jsonify
+from dotenv import load_dotenv
+
+load_dotenv()
 
 from api.auth import auth_bp
 from api.users import users_bp

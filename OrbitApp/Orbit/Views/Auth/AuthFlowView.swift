@@ -3,7 +3,6 @@
 //  Orbit
 //
 //  Email verification flow for .edu emails.
-//  Use code "123456" for demo bypass.
 //
 
 import SwiftUI
@@ -70,12 +69,6 @@ struct AuthFlowView: View {
                 .padding(.horizontal, 24)
 
                 Spacer()
-
-                // Demo hint
-                Text("Demo: Use code 123456")
-                    .font(.caption)
-                    .foregroundColor(.white.opacity(0.5))
-                    .padding(.bottom)
             }
         }
     }
@@ -134,7 +127,7 @@ struct AuthFlowView: View {
                 .font(.caption)
                 .foregroundColor(.white.opacity(0.7))
 
-            TextField("123456", text: $viewModel.verificationCode)
+            TextField("000000", text: $viewModel.verificationCode)
                 .textFieldStyle(.plain)
                 .keyboardType(.numberPad)
                 .multilineTextAlignment(.center)
