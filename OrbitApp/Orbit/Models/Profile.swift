@@ -11,11 +11,13 @@ struct Profile: Codable, Identifiable {
     var personality: Personality
     var socialPreferences: SocialPreferences
     var friendshipGoals: [String]
+    var matchScore: Double?
 
     enum CodingKeys: String, CodingKey {
         case name, age, location, bio, photos, interests, personality
         case socialPreferences = "social_preferences"
         case friendshipGoals = "friendship_goals"
+        case matchScore = "match_score"
     }
 }
 

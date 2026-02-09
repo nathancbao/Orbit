@@ -57,9 +57,12 @@ def suggested_users(user_id):
         if not p_dict.get('name'):
             continue
         other_interests = set(p_dict.get('interests', []))
-        overlap = len(user_interests & other_interests)
+        # Jaccard similarity: |A ∩ B| / |A ∪ B|
+        union = user_interests | other_interests
+        score = len(user_interests & other_interests) / len(union) if union else 0.0
         formatted = _format_profile(p_dict)
-        suggestions.append((overlap, formatted))
+        formatted['match_score'] = round(score, 4)
+        suggestions.append((score, formatted))
 
     suggestions.sort(key=lambda x: x[0], reverse=True)
     return [s[1] for s in suggestions[:20]]
