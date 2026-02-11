@@ -328,7 +328,7 @@ struct UserPlanet: View {
                         color: shouldGlow 
                             ? matchBadgeColor(score:score).opacity(glow ? 0.9: 0.3) 
                             : .clear,
-                        radius: shouldGlow ? (glow ? 10 : 5) : 0`
+                        radius: shouldGlow ? (glow ? 10 : 5) : 0
                         )
                     .animation(
                         shouldGlow
