@@ -16,6 +16,8 @@ struct DiscoverView: View {
     @State private var selectedProfile: Profile? = nil
     @State private var stars: [Star] = []
     @State private var planetPositions: [String: CGPoint] = [:] // Cache positions by name
+    @State private var glow = false
+
 
     var body: some View {
         NavigationView {
@@ -312,7 +314,37 @@ struct UserPlanet: View {
                     .cornerRadius(6)
                     .offset(x: size * 0.35, y: -size * 0.35)
             }
-
+            if let score = profile.matchScore, score>0 
+            {
+                let shouldGlow = score > 0.3
+                Text("\(Int(score * 100))%")
+                    .font(.system(size: 9, weight: .bold))
+                    .foregroundColor(.white)
+                    .padding(.vertical,3)
+                    .padding(.horizontal,6)
+                    .background(matchBadgeColor(score:score))
+                    .cornerRadius(6)
+                    .shadow(
+                        color: shouldGlow 
+                            ? matchBadgeColor(score:score).opacity(glow ? 0.9: 0.3) 
+                            : .clear,
+                        radius: shouldGlow ? (glow ? 10 : 5) : 0`
+                        )
+                    .animation(
+                        shouldGlow
+                        ? .easeInOut(duration: 1.5)
+                            .repeatForever(autoreverses:true)
+                        : .default,
+                        value: glow
+                    )
+                    .onAppear{
+                        if shouldGlow {
+                            glow = true
+                        }
+                    }
+                    .offset(x: size* 0.35, y: -size*0.35)
+            }
+            
             // Name label
             Text(profile.name.split(separator: " ").first ?? "")
                 .font(.caption2)
