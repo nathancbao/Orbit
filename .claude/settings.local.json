@@ -7,7 +7,8 @@
       "Bash(python3 -m pytest:*)",
       "Bash(git checkout:*)",
       "Bash(git add:*)",
-      "Bash(git commit -m \"$\\(cat <<''EOF''\nMerge branch ''leo'' — integrate AI matching features\n\nAdds Jaccard similarity matching to the discover flow:\n- Backend: matching_service.py computes match_score per profile\n- iOS: new MatchingService.swift for client-side scoring\n- iOS: DiscoverView shows match badges, scaled planets, score bars\n- Cleanup: removed stale Orbit_AI_Features/ directory\n\nCo-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>\nEOF\n\\)\")"
+      "Bash(git commit -m \"$\\(cat <<''EOF''\nMerge branch ''leo'' — integrate AI matching features\n\nAdds Jaccard similarity matching to the discover flow:\n- Backend: matching_service.py computes match_score per profile\n- iOS: new MatchingService.swift for client-side scoring\n- iOS: DiscoverView shows match badges, scaled planets, score bars\n- Cleanup: removed stale Orbit_AI_Features/ directory\n\nCo-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>\nEOF\n\\)\")",
+      "Bash(tree:*)"
     ]
   }
 }

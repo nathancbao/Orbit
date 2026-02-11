@@ -3,7 +3,7 @@
 //  Orbit
 //
 //  Main tab navigation after user has created their profile.
-//  Shows Discover and Profile tabs.
+//  Shows Discover, Friends, Requests, and Profile tabs.
 //
 
 import SwiftUI
@@ -14,9 +14,12 @@ struct MainTabView: View {
     let onEditProfile: () -> Void
 
     @State private var selectedTab: Tab = .discover
+    @StateObject private var friendsViewModel = FriendsViewModel()
 
     enum Tab {
         case discover
+        case friends
+        case requests
         case profile
     }
 
@@ -29,6 +32,21 @@ struct MainTabView: View {
                 }
                 .tag(Tab.discover)
 
+            // Friends Tab
+            FriendsListView()
+                .tabItem {
+                    Label("Friends", systemImage: "person.2")
+                }
+                .tag(Tab.friends)
+
+            // Requests Tab
+            RequestsListView()
+                .tabItem {
+                    Label("Requests", systemImage: "envelope")
+                }
+                .tag(Tab.requests)
+                .badge(friendsViewModel.incomingRequestCount)
+
             // Profile Tab
             ProfileDisplayView(
                 profile: profile,
@@ -39,6 +57,10 @@ struct MainTabView: View {
                 Label("Profile", systemImage: "person.circle")
             }
             .tag(Tab.profile)
+        }
+        .environmentObject(friendsViewModel)
+        .task {
+            await friendsViewModel.loadAll()
         }
     }
 }

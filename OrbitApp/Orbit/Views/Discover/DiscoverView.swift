@@ -10,6 +10,7 @@ import SwiftUI
 
 struct DiscoverView: View {
     let userProfile: Profile?
+    @EnvironmentObject private var friendsViewModel: FriendsViewModel
     @State private var profiles: [Profile] = []
     @State private var isLoading: Bool = true
     @State private var selectedProfile: Profile? = nil
@@ -35,6 +36,7 @@ struct DiscoverView: View {
             .toolbarBackground(.ultraThinMaterial, for: .navigationBar)
             .sheet(item: $selectedProfile) { profile in
                 ProfileDetailSheet(profile: profile)
+                    .environmentObject(friendsViewModel)
             }
         }
         .task {
@@ -335,7 +337,12 @@ struct UserPlanet: View {
 struct ProfileDetailSheet: View {
     let profile: Profile
     @Environment(\.dismiss) private var dismiss
+    @EnvironmentObject private var friendsViewModel: FriendsViewModel
     @State private var currentPhotoIndex = 0
+    @State private var requestStatus: FriendRequestStatus?
+    @State private var isSending = false
+    @State private var showError = false
+    @State private var errorMessage = ""
 
     private var placeholderGradient: some View {
         LinearGradient(
@@ -438,18 +445,7 @@ struct ProfileDetailSheet: View {
                         Spacer(minLength: 40)
 
                         // Connect button
-                        Button(action: {
-                            // TODO: Implement connection
-                            dismiss()
-                        }) {
-                            Label("Connect", systemImage: "link")
-                                .font(.headline)
-                                .frame(maxWidth: .infinity)
-                                .padding()
-                                .background(Color.blue)
-                                .foregroundColor(.white)
-                                .cornerRadius(12)
-                        }
+                        connectButton
                     }
                     .padding()
                 }
@@ -461,7 +457,76 @@ struct ProfileDetailSheet: View {
                     Button("Done") { dismiss() }
                 }
             }
+            .task {
+                requestStatus = FriendService.shared.getRequestStatus(for: profile)
+            }
+            .alert("Error", isPresented: $showError) {
+                Button("OK") { }
+            } message: {
+                Text(errorMessage)
+            }
         }
+    }
+
+    @ViewBuilder
+    private var connectButton: some View {
+        if let status = requestStatus {
+            switch status {
+            case .pending:
+                Label("Request Pending", systemImage: "clock")
+                    .font(.headline)
+                    .frame(maxWidth: .infinity)
+                    .padding()
+                    .background(Color.orange.opacity(0.2))
+                    .foregroundColor(.orange)
+                    .cornerRadius(12)
+            case .accepted:
+                Label("Already Friends", systemImage: "checkmark.circle")
+                    .font(.headline)
+                    .frame(maxWidth: .infinity)
+                    .padding()
+                    .background(Color.green.opacity(0.2))
+                    .foregroundColor(.green)
+                    .cornerRadius(12)
+            case .denied:
+                sendRequestButton
+            }
+        } else {
+            sendRequestButton
+        }
+    }
+
+    private var sendRequestButton: some View {
+        Button(action: {
+            Task {
+                isSending = true
+                let success = await friendsViewModel.sendFriendRequest(to: profile)
+                if success {
+                    requestStatus = .pending
+                } else {
+                    errorMessage = friendsViewModel.errorMessage ?? "Failed to send request"
+                    showError = true
+                }
+                isSending = false
+            }
+        }) {
+            if isSending {
+                ProgressView()
+                    .frame(maxWidth: .infinity)
+                    .padding()
+                    .background(Color.blue)
+                    .cornerRadius(12)
+            } else {
+                Label("Connect", systemImage: "link")
+                    .font(.headline)
+                    .frame(maxWidth: .infinity)
+                    .padding()
+                    .background(Color.blue)
+                    .foregroundColor(.white)
+                    .cornerRadius(12)
+            }
+        }
+        .disabled(isSending)
     }
 
     private var profileHeader: some View {
