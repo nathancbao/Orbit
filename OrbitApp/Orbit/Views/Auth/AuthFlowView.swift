@@ -206,9 +206,9 @@ struct GraduationCapIcon: View {
                         startPoint: .leading,
                         endPoint: .trailing
                     ),
-                    lineWidth: 3.5
+                    lineWidth: 4
                 )
-                .frame(width: 130, height: 130)
+                .frame(width: 150, height: 150)
         }
     }
 }
@@ -296,28 +296,28 @@ struct WavyLinesView: View {
             ZStack {
                 // Bottom line
                 WavyLine(
-                    startPoint: CGPoint(x: -20, y: geo.size.height - 30),
-                    endPoint: CGPoint(x: geo.size.width + 20, y: geo.size.height - 100),
+                    startPoint: CGPoint(x: -20, y: geo.size.height - 20),
+                    endPoint: CGPoint(x: geo.size.width + 20, y: geo.size.height - 90),
                     waveHeight: 20,
                     frequency: 1.5
                 )
                 .stroke(gradient, lineWidth: 2.5)
 
-                // Middle line
+                // Middle line (crosses the top line)
                 WavyLine(
-                    startPoint: CGPoint(x: -20, y: geo.size.height - 60),
-                    endPoint: CGPoint(x: geo.size.width + 20, y: geo.size.height - 140),
-                    waveHeight: 18,
-                    frequency: 1.8
+                    startPoint: CGPoint(x: -20, y: geo.size.height - 55),
+                    endPoint: CGPoint(x: geo.size.width + 20, y: geo.size.height - 170),
+                    waveHeight: 22,
+                    frequency: 1.4
                 )
                 .stroke(gradient, lineWidth: 2.5)
 
                 // Top line
                 WavyLine(
-                    startPoint: CGPoint(x: -20, y: geo.size.height - 90),
-                    endPoint: CGPoint(x: geo.size.width + 20, y: geo.size.height - 170),
-                    waveHeight: 22,
-                    frequency: 1.3
+                    startPoint: CGPoint(x: -20, y: geo.size.height - 105),
+                    endPoint: CGPoint(x: geo.size.width + 20, y: geo.size.height - 160),
+                    waveHeight: 18,
+                    frequency: 1.7
                 )
                 .stroke(gradient, lineWidth: 2.5)
             }

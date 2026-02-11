@@ -23,6 +23,7 @@ import SwiftUI
 // Controls which screen is currently displayed
 // Add more cases here if you need additional screens (e.g., .onboarding, .settings)
 enum AppState {
+    case launch         // Show launch screen with logo
     case auth           // Show login/verification screens
     case profileSetup   // Show profile creation/editing flow
     case home           // Show completed profile
@@ -31,7 +32,7 @@ enum AppState {
 // MARK: - Main Content View
 struct ContentView: View {
     // Current screen state - changing this switches the displayed view
-    @State private var appState: AppState = .auth
+    @State private var appState: AppState = .launch
 
     // Stores the completed profile data (persists during app session)
     // This gets passed back to ProfileSetupView when user taps "Edit"
@@ -41,6 +42,12 @@ struct ContentView: View {
     var body: some View {
         Group {
             switch appState {
+            // MARK: Launch State
+            case .launch:
+                LaunchView {
+                    appState = .auth
+                }
+
             // MARK: Auth State
             case .auth:
                 AuthFlowView { isNewUser in
