@@ -72,6 +72,27 @@ Removed stale/duplicate directories that accumulated from team development:
 
 ---
 
+## Multi-Signal Compatibility Scoring
+
+**File:** `OrbitApp/Orbit/Features/AI/weights.py`
+
+Replaced the single-signal (interests-only) scoring with a weighted multi-signal compatibility function that uses all profile data we already collect.
+
+**Scoring breakdown:**
+
+| Signal | Weight | Method |
+|--------|--------|--------|
+| Interests | 30% | Jaccard similarity (`\|A ∩ B\| / \|A ∪ B\|`) |
+| Personality | 30% | Inverted normalized Euclidean distance across the 3 trait sliders (`introvert_extrovert`, `spontaneous_planner`, `active_relaxed`) |
+| Social Preferences | 20% | Average of: ordinal distance for group size, ordinal distance for meeting frequency, Jaccard overlap on preferred times |
+| Friendship Goals | 20% | Jaccard similarity on goal lists |
+
+- `compatibility(profile_a, profile_b)` now takes two full profile dicts and returns a 0–1 score
+- Gracefully handles missing/sparse profiles by falling back to neutral defaults
+- Removed the old `Level` enum and hardcoded personality stub
+
+---
+
 ## What's NOT Integrated Yet
 
 The following features from the original AI folder are **not yet integrated** (per team decision to defer):
