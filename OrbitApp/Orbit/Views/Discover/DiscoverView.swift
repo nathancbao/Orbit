@@ -16,6 +16,7 @@ struct DiscoverView: View {
     @State private var selectedProfile: Profile? = nil
     @State private var stars: [Star] = []
     @State private var planetPositions: [String: CGPoint] = [:] // Cache positions by name
+    @State private var showSignalSheet = false
 
     var body: some View {
         NavigationView {
@@ -34,6 +35,28 @@ struct DiscoverView: View {
             .navigationTitle("Discover")
             .navigationBarTitleDisplayMode(.inline)
             .toolbarBackground(.ultraThinMaterial, for: .navigationBar)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button {
+                        showSignalSheet = true
+                    } label: {
+                        Image(systemName: "antenna.radiowaves.left.and.right")
+                            .foregroundColor(.white)
+                    }
+                }
+            }
+            .sheet(isPresented: $showSignalSheet) {
+                NavigationView {
+                    SignalView()
+                        .navigationTitle("Signals")
+                        .navigationBarTitleDisplayMode(.inline)
+                        .toolbar {
+                            ToolbarItem(placement: .navigationBarTrailing) {
+                                Button("Done") { showSignalSheet = false }
+                            }
+                        }
+                }
+            }
             .sheet(item: $selectedProfile) { profile in
                 ProfileDetailSheet(profile: profile)
                     .environmentObject(friendsViewModel)

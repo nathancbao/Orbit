@@ -8,9 +8,10 @@
 //  STEPS:
 //  0. Basic Info (name, age, location, bio)
 //  1. Personality (slider traits)
-//  2. Interests (predefined + custom)
-//  3. Social Preferences (group size, frequency, times)
-//  4. Photos (optional, up to 6)
+//  2. Vibe Check Quiz (22 questions + MBTI result)
+//  3. Interests (predefined + custom)
+//  4. Social Preferences (group size, frequency, times)
+//  5. Photos (optional, up to 6)
 //
 //  STRUCTURE:
 //  - ProfileSetupView: Main container with progress bar and navigation
@@ -50,9 +51,9 @@ struct ProfileSetupView: View {
 
     var body: some View {
         VStack(spacing: 24) {
-            // Progress indicator
+            // Progress indicator (6 steps now)
             HStack(spacing: 4) {
-                ForEach(0..<5, id: \.self) { index in
+                ForEach(0..<6, id: \.self) { index in
                     Rectangle()
                         .fill(index <= currentStep ? Color.blue : Color.gray.opacity(0.3))
                         .frame(height: 4)
@@ -69,10 +70,12 @@ struct ProfileSetupView: View {
                 case 1:
                     PersonalityStep(viewModel: viewModel)
                 case 2:
-                    InterestsStep(viewModel: viewModel)
+                    VibeCheckView(viewModel: viewModel)
                 case 3:
-                    SocialPreferencesStep(viewModel: viewModel)
+                    InterestsStep(viewModel: viewModel)
                 case 4:
+                    SocialPreferencesStep(viewModel: viewModel)
+                case 5:
                     PhotoUploadStep(viewModel: viewModel)
                 default:
                     EmptyView()
@@ -102,7 +105,7 @@ struct ProfileSetupView: View {
                 }
 
                 Button {
-                    if currentStep == 4 {
+                    if currentStep == 5 {
                         Task {
                             await viewModel.saveProfile()
                         }
@@ -114,7 +117,7 @@ struct ProfileSetupView: View {
                         ProgressView()
                             .progressViewStyle(CircularProgressViewStyle(tint: .white))
                     } else {
-                        Text(currentStep == 4 ? "Complete" : "Next")
+                        Text(currentStep == 5 ? "Complete" : "Next")
                     }
                 }
                 .frame(maxWidth: .infinity)
@@ -139,9 +142,10 @@ struct ProfileSetupView: View {
         switch currentStep {
         case 0: return viewModel.isBasicInfoValid
         case 1: return true // Personality sliders always have valid values
-        case 2: return viewModel.isInterestsValid
-        case 3: return viewModel.isSocialPreferencesValid
-        case 4: return true // Photos are optional
+        case 2: return viewModel.isVibeCheckComplete // All quiz questions answered
+        case 3: return viewModel.isInterestsValid
+        case 4: return viewModel.isSocialPreferencesValid
+        case 5: return true // Photos are optional
         default: return false
         }
     }
