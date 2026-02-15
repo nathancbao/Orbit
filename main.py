@@ -5,6 +5,7 @@ from OrbitServer.api.users import users_bp
 from OrbitServer.api.crews import crews_bp
 from OrbitServer.api.missions import missions_bp
 from OrbitServer.api.discover import discover_bp
+from OrbitServer.signals.routes import signals_bp
 
 app = Flask(__name__)
 
@@ -13,6 +14,7 @@ app.register_blueprint(users_bp)
 app.register_blueprint(crews_bp)
 app.register_blueprint(missions_bp)
 app.register_blueprint(discover_bp)
+app.register_blueprint(signals_bp)
 
 
 @app.route('/')

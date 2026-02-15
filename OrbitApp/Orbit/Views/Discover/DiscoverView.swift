@@ -17,7 +17,7 @@ struct DiscoverView: View {
     @State private var stars: [Star] = []
     @State private var planetPositions: [String: CGPoint] = [:] // Cache positions by name
     @State private var glow = false
-
+    @State private var showSignalSheet = false
 
     var body: some View {
         NavigationView {
@@ -36,6 +36,28 @@ struct DiscoverView: View {
             .navigationTitle("Discover")
             .navigationBarTitleDisplayMode(.inline)
             .toolbarBackground(.ultraThinMaterial, for: .navigationBar)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button {
+                        showSignalSheet = true
+                    } label: {
+                        Image(systemName: "antenna.radiowaves.left.and.right")
+                            .foregroundColor(.white)
+                    }
+                }
+            }
+            .sheet(isPresented: $showSignalSheet) {
+                NavigationView {
+                    SignalView()
+                        .navigationTitle("Signals")
+                        .navigationBarTitleDisplayMode(.inline)
+                        .toolbar {
+                            ToolbarItem(placement: .navigationBarTrailing) {
+                                Button("Done") { showSignalSheet = false }
+                            }
+                        }
+                }
+            }
             .sheet(item: $selectedProfile) { profile in
                 ProfileDetailSheet(profile: profile)
                     .environmentObject(friendsViewModel)
@@ -303,18 +325,8 @@ struct UserPlanet: View {
             }
             .scaleEffect(isAnimating ? 1.05 : 1.0)
 
-            // Match score badge
-            if let score = profile.matchScore, score > 0 {
-                Text("\(Int(score * 100))%")
-                    .font(.system(size: 9, weight: .bold))
-                    .foregroundColor(.white)
-                    .padding(.horizontal, 5)
-                    .padding(.vertical, 2)
-                    .background(matchBadgeColor(score: score))
-                    .cornerRadius(6)
-                    .offset(x: size * 0.35, y: -size * 0.35)
-            }
-            if let score = profile.matchScore, score>0 
+            // Match score badge with glow animation
+            if let score = profile.matchScore, score>0
             {
                 let shouldGlow = score > 0.3
                 Text("\(Int(score * 100))%")
