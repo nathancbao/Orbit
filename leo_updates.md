@@ -93,6 +93,37 @@ Replaced the single-signal (interests-only) scoring with a weighted multi-signal
 
 ---
 
+## Dynamic Compatibility Weights via Vibe Check Quiz
+
+**File:** `OrbitApp/Orbit/Features/AI/compatibility.py`
+
+The four compatibility weights were previously hardcoded at 0.30/0.30/0.20/0.20. The personality score only compared 3 basic slider traits, ignoring the 8-dimension Vibe Check quiz data entirely. This meant two users who both took the 22-question quiz got the same shallow personality comparison as users who skipped it.
+
+### What Changed
+
+**Conviction score** (`_conviction`): New helper that measures how far from neutral (0.5) a user's quiz answers are across all 8 dimensions. A user who answers strongly (values near 0 or 1) gets a high conviction; someone who answers all-neutral gets ~0.
+
+**Dynamic weight interpolation** (`_get_weights`): When both users have quiz data, the average conviction of both users blends between base and boosted weight tables:
+
+| Category    | Base (no quiz) | Boosted (decisive quiz answers) |
+|-------------|----------------|----------------------------------|
+| Personality | 0.30           | up to 0.40                       |
+| Interest    | 0.30           | down to 0.25                     |
+| Social      | 0.20           | 0.20                             |
+| Goals       | 0.20           | down to 0.15                     |
+
+If either user hasn't taken the quiz, the original base weights are used unchanged.
+
+**8-dimension personality scoring**: `personality_score` now accepts optional `vibe_check_a`/`vibe_check_b` params. When both are present it compares all 8 quiz dimensions (`introvert_extrovert`, `spontaneous_planner`, `active_relaxed`, `adventurous_cautious`, `expressive_reserved`, `independent_collaborative`, `sensing_intuition`, `thinking_feeling`) instead of only the 3 basic slider traits. Uses the same inverted normalized Euclidean distance method, just with `sqrt(8)` as the max distance instead of `sqrt(3)`.
+
+### Reasoning
+
+- Users who invest time in the quiz should get better matches from it — the extra data should actually improve their score accuracy.
+- The weight shift is gradual, not a hard switch. Two users with wishy-washy neutral quiz answers get almost no weight change. Two users with strong, decisive answers get the full personality boost.
+- Backward compatible: no behavior change for users without quiz data.
+
+---
+
 ## What's NOT Integrated Yet
 
 The following features from the original AI folder are **not yet integrated** (per team decision to defer):

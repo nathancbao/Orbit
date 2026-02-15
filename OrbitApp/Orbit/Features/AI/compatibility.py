@@ -1,10 +1,32 @@
 import math
 
-# Weights (must sum to 1.0)
-W_INTEREST = 0.30
-W_PERSONALITY = 0.30
-W_SOCIAL = 0.20
-W_GOALS = 0.20
+# ── Base weights (no vibe-check data — must sum to 1.0) ────────
+_W_BASE = {
+    "interest": 0.30,
+    "personality": 0.30,
+    "social": 0.20,
+    "goals": 0.20,
+}
+
+# ── Boosted weights (both users completed the vibe check) ──────
+_W_VIBE = {
+    "interest": 0.25,
+    "personality": 0.40,
+    "social": 0.20,
+    "goals": 0.15,
+}
+
+# ── Vibe Check 8 dimensions ────────────────────────────────────
+_VIBE_CHECK_DIMS = (
+    "introvert_extrovert",
+    "spontaneous_planner",
+    "active_relaxed",
+    "adventurous_cautious",
+    "expressive_reserved",
+    "independent_collaborative",
+    "sensing_intuition",
+    "thinking_feeling",
+)
 
 # Defaults (mirror DEFAULT_PROFILE in matching_service.py)
 DEFAULT_PERSONALITY = {
@@ -19,6 +41,32 @@ DEFAULT_SOCIAL = {
 }
 
 
+def _conviction(vibe_check):
+    """Average deviation from neutral (0.5) across all quiz dimensions.
+    Returns 0.0 (all neutral) to 1.0 (all extreme answers)."""
+    devs = [abs(vibe_check.get(d, 0.5) - 0.5) for d in _VIBE_CHECK_DIMS]
+    return sum(devs) / (len(devs) * 0.5)
+
+
+def _get_weights(profile_a, profile_b):
+    """Dynamically interpolate between base and vibe-check weights.
+
+    When both users have quiz data, personality weight increases in
+    proportion to how decisive (far from neutral) their answers are.
+    """
+    vc_a = profile_a.get("vibe_check")
+    vc_b = profile_b.get("vibe_check")
+
+    if not vc_a or not vc_b:
+        return _W_BASE
+
+    blend = (_conviction(vc_a) + _conviction(vc_b)) / 2.0
+    return {
+        k: _W_BASE[k] + blend * (_W_VIBE[k] - _W_BASE[k])
+        for k in _W_BASE
+    }
+
+
 # Interest scoring (Jaccard similarity)
 def interest_score(interests_a, interests_b):
     set_a = set(interests_a)
@@ -29,17 +77,28 @@ def interest_score(interests_a, interests_b):
     return len(set_a & set_b) / len(union)
 
 # ── Personality scoring (1 - normalized Euclidean distance) ────
-# Each trait is 0-1, so max distance = sqrt(3). We invert so
-# closer personalities yield a higher score.
-_MAX_PERSONALITY_DIST = math.sqrt(3)
+# Basic: 3 traits (max distance = sqrt(3))
+# Vibe-check: 8 traits (max distance = sqrt(8))
 
-def personality_score(personality_a, personality_b):
-    a = personality_a or DEFAULT_PERSONALITY
-    b = personality_b or DEFAULT_PERSONALITY
-    keys = ("introvert_extrovert", "spontaneous_planner", "active_relaxed")
-    sq_sum = sum((a.get(k, 0.5) - b.get(k, 0.5)) ** 2 for k in keys)
+def personality_score(personality_a, personality_b,
+                      vibe_check_a=None, vibe_check_b=None):
+    """Score personality similarity.
+
+    When both vibe-check dicts are present, uses all 8 quiz dimensions.
+    Otherwise falls back to the 3 basic personality traits.
+    """
+    if vibe_check_a and vibe_check_b:
+        dims = _VIBE_CHECK_DIMS
+        a, b = vibe_check_a, vibe_check_b
+    else:
+        dims = ("introvert_extrovert", "spontaneous_planner", "active_relaxed")
+        a = personality_a or DEFAULT_PERSONALITY
+        b = personality_b or DEFAULT_PERSONALITY
+
+    sq_sum = sum((a.get(k, 0.5) - b.get(k, 0.5)) ** 2 for k in dims)
     dist = math.sqrt(sq_sum)
-    return 1.0 - (dist / _MAX_PERSONALITY_DIST)
+    max_dist = math.sqrt(len(dims))  # each dim is 0-1
+    return 1.0 - (dist / max_dist)
 
 
 # Social preference scoring
@@ -100,7 +159,14 @@ def goals_score(goals_a, goals_b):
 
 # Overall compatibility
 def compatibility(profile_a, profile_b):
-    """Return a 0-1 compatibility score between two profile dicts."""
+    """Return a 0-1 compatibility score between two profile dicts.
+
+    Weights adjust dynamically: when both users have completed the
+    vibe-check quiz and answered decisively, personality weight
+    increases (up to 0.40) and all 8 quiz dimensions are used.
+    """
+    w = _get_weights(profile_a, profile_b)
+
     i = interest_score(
         profile_a.get("interests", []),
         profile_b.get("interests", []),
@@ -108,6 +174,8 @@ def compatibility(profile_a, profile_b):
     p = personality_score(
         profile_a.get("personality"),
         profile_b.get("personality"),
+        vibe_check_a=profile_a.get("vibe_check"),
+        vibe_check_b=profile_b.get("vibe_check"),
     )
     s = social_score(
         profile_a.get("social_preferences"),
@@ -117,4 +185,4 @@ def compatibility(profile_a, profile_b):
         profile_a.get("friendship_goals", []),
         profile_b.get("friendship_goals", []),
     )
-    return (W_INTEREST * i) + (W_PERSONALITY * p) + (W_SOCIAL * s) + (W_GOALS * g)
+    return (w["interest"] * i) + (w["personality"] * p) + (w["social"] * s) + (w["goals"] * g)
