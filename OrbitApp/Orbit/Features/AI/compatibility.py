@@ -28,7 +28,6 @@ def interest_score(interests_a, interests_b):
         return 0.0
     return len(set_a & set_b) / len(union)
 
-
 # ── Personality scoring (1 - normalized Euclidean distance) ────
 # Each trait is 0-1, so max distance = sqrt(3). We invert so
 # closer personalities yield a higher score.
