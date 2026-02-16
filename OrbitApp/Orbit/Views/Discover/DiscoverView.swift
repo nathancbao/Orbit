@@ -108,23 +108,27 @@ struct DiscoverView: View {
             let center = CGPoint(x: geometry.size.width / 2, y: geometry.size.height / 2)
 
             ZStack {
-                // Orbit rings (decorative)
-                ForEach(1..<4) { ring in
+                // Orbit rings (decorative) — inner = high match, outer = low match
+                let minDim = min(geometry.size.width, geometry.size.height)
+                let innerRadius = minDim * 0.10
+                let outerRadius = minDim * 0.48
+                ForEach(0..<3, id: \.self) { ring in
+                    let t = CGFloat(ring) / 2.0 // 0, 0.5, 1.0
+                    let ringRadius = innerRadius + t * (outerRadius - innerRadius)
                     Circle()
                         .stroke(Color.white.opacity(0.1), lineWidth: 1)
-                        .frame(
-                            width: CGFloat(ring) * min(geometry.size.width, geometry.size.height) * 0.3,
-                            height: CGFloat(ring) * min(geometry.size.width, geometry.size.height) * 0.3
-                        )
+                        .frame(width: ringRadius * 2, height: ringRadius * 2)
                         .position(center)
                 }
 
-                // Other user planets — size scales with match score
+                // Other user planets — size, distance, and brightness scale with match score
                 ForEach(Array(profiles.enumerated()), id: \.element.name) { index, profile in
                     let score = profile.matchScore ?? 0
                     let planetSize: CGFloat = 60 + CGFloat(score) * 30 // 60–90 based on match
+                    let planetOpacity: Double = 0.45 + score * 0.55 // 0.45–1.0 based on match
                     UserPlanet(profile: profile, size: planetSize)
-                        .position(getOrCreatePosition(for: profile, index: index, total: profiles.count, center: center, radius: min(geometry.size.width, geometry.size.height) * 0.35))
+                        .opacity(planetOpacity)
+                        .position(getOrCreatePosition(for: profile, index: index, total: profiles.count, center: center, innerRadius: innerRadius, outerRadius: outerRadius, matchScore: score))
                         .onTapGesture {
                             selectedProfile = profile
                         }
@@ -138,11 +142,11 @@ struct DiscoverView: View {
     }
 
     // Get cached position or create one
-    private func getOrCreatePosition(for profile: Profile, index: Int, total: Int, center: CGPoint, radius: CGFloat) -> CGPoint {
+    private func getOrCreatePosition(for profile: Profile, index: Int, total: Int, center: CGPoint, innerRadius: CGFloat, outerRadius: CGFloat, matchScore: Double) -> CGPoint {
         if let cached = planetPositions[profile.name] {
             return cached
         }
-        let position = calculatePlanetPosition(index: index, total: total, center: center, radius: radius)
+        let position = calculatePlanetPosition(index: index, total: total, center: center, innerRadius: innerRadius, outerRadius: outerRadius, matchScore: matchScore)
         DispatchQueue.main.async {
             planetPositions[profile.name] = position
         }
@@ -164,21 +168,32 @@ struct DiscoverView: View {
         }
     }
 
-    private func calculatePlanetPosition(index: Int, total: Int, center: CGPoint, radius: CGFloat) -> CGPoint {
+    private func calculatePlanetPosition(index: Int, total: Int, center: CGPoint, innerRadius: CGFloat, outerRadius: CGFloat, matchScore: Double) -> CGPoint {
         let angle = (2.0 * Double.pi / Double(total)) * Double(index) - Double.pi / 2.0
-        // Use deterministic "jitter" based on index instead of random
-        let jitterX = Double((index * 17) % 40) - 20.0
-        let jitterY = Double((index * 23) % 40) - 20.0
-        let radiusOffset = Double((index * 31) % 60) - 30.0
-        let radiusVariation = Double(radius) + radiusOffset
+        // Steep power curve: only strong matches pull close, everyone else fans out
+        let curved = pow(matchScore, 3.0)
+        let scoreRadius = Double(outerRadius - CGFloat(curved) * (outerRadius - innerRadius))
+        // Small deterministic jitter for visual variety
+        let jitterX = Double((index * 17) % 20) - 10.0
+        let jitterY = Double((index * 23) % 20) - 10.0
+        let radiusJitter = Double((index * 31) % 20) - 10.0
+        let finalRadius = scoreRadius + radiusJitter
 
         return CGPoint(
-            x: center.x + CGFloat(Foundation.cos(angle) * radiusVariation + jitterX),
-            y: center.y + CGFloat(Foundation.sin(angle) * radiusVariation + jitterY)
+            x: center.x + CGFloat(Foundation.cos(angle) * finalRadius + jitterX),
+            y: center.y + CGFloat(Foundation.sin(angle) * finalRadius + jitterY)
         )
     }
 
+    // Toggle this to true to test planet proximity with mock data
+    private static let useMockProfiles = false
+
     private func loadProfiles() async {
+        if Self.useMockProfiles {
+            profiles = Self.mockProfiles
+            isLoading = false
+            return
+        }
         do {
             var loaded = try await DiscoverService.shared.getDiscoverProfiles()
             // If we have the user's profile, compute match scores client-side
@@ -191,6 +206,33 @@ struct DiscoverView: View {
             print("Failed to load profiles: \(error)")
         }
         isLoading = false
+    }
+
+    // Mock profiles with spread of match scores for testing proximity
+    private static let mockProfiles: [Profile] = [
+        makeMock(name: "Alice", score: 0.95),
+        makeMock(name: "Bob", score: 0.80),
+        makeMock(name: "Charlie", score: 0.65),
+        makeMock(name: "Diana", score: 0.50),
+        makeMock(name: "Ethan", score: 0.35),
+        makeMock(name: "Fiona", score: 0.20),
+        makeMock(name: "George", score: 0.10),
+        makeMock(name: "Hannah", score: 0.02),
+    ]
+
+    private static func makeMock(name: String, score: Double) -> Profile {
+        Profile(
+            name: name,
+            age: 21,
+            location: Location(city: "Test", state: "CA", coordinates: nil),
+            bio: "Test user",
+            photos: [],
+            interests: ["coding"],
+            personality: Personality(introvertExtrovert: 0.5, spontaneousPlanner: 0.5, activeRelaxed: 0.5),
+            socialPreferences: SocialPreferences(groupSize: "small", meetingFrequency: "weekly", preferredTimes: ["evening"]),
+            friendshipGoals: ["study"],
+            matchScore: score
+        )
     }
 }
 
