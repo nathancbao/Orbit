@@ -67,13 +67,18 @@ struct ContentView: View {
                 // Passes existing data if user is editing (nil if new user)
                 ProfileSetupView(
                     initialProfile: completedProfile,
-                    initialPhotos: profilePhotos
-                ) { profile, photos in
-                    // Called when user completes profile setup
-                    completedProfile = profile
-                    profilePhotos = photos
-                    appState = .home
-                }
+                    initialPhotos: profilePhotos,
+                    onProfileComplete: { profile, photos in
+                        // Called when user completes profile setup
+                        completedProfile = profile
+                        profilePhotos = photos
+                        appState = .home
+                    },
+                    onCancel: completedProfile != nil ? {
+                        // Return to home without saving changes
+                        appState = .home
+                    } : nil
+                )
 
             // MARK: Home State (Tab View)
             case .home:

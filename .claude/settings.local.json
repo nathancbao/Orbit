@@ -11,7 +11,10 @@
       "Bash(tree:*)",
       "Bash(ls:*)",
       "Bash(git commit:*)",
-      "Bash(python3:*)"
+      "Bash(python3:*)",
+      "Bash(git pull:*)",
+      "Bash(git stash:*)",
+      "mcp__ide__getDiagnostics"
     ]
   }
 }

@@ -464,7 +464,7 @@ class ProfileViewModel: ObservableObject {
     func buildProfile() -> Profile {
         // Build VibeCheck if quiz was completed
         var vibeCheck: VibeCheck? = nil
-        if isVibeCheckComplete && !derivedMBTI.isEmpty {
+        if (isVibeCheckComplete || !vibeCheckPersonality.isEmpty) && !derivedMBTI.isEmpty {
             vibeCheck = VibeCheck(
                 introvertExtrovert: vibeCheckPersonality["introvert_extrovert"] ?? 0.5,
                 spontaneousPlanner: vibeCheckPersonality["spontaneous_planner"] ?? 0.5,
