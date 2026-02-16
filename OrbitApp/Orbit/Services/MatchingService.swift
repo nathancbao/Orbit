@@ -17,8 +17,8 @@ class MatchingService {
     private init() {}
 
     /// Weights for the blended score
-    private let interestWeight = 0.7
-    private let personalityWeight = 0.3
+    private let interestWeight = 0.6
+    private let personalityWeight = 0.4
 
     /// Computes the Jaccard similarity between two profiles' interest sets.
     /// Returns a value from 0.0 (no overlap) to 1.0 (identical interests).

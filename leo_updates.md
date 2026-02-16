@@ -176,8 +176,8 @@ Previously the client-side `MatchingService` only used Jaccard similarity on int
 
 | Signal | Weight | Method |
 |--------|--------|--------|
-| Interests | 70% | Jaccard similarity (unchanged) |
-| Personality | 30% | 1 − avg absolute difference across all 8 vibe check dimensions |
+| Interests | 60% | Jaccard similarity (unchanged) |
+| Personality | 40% | 1 − avg absolute difference across all 8 vibe check dimensions |
 
 When either user lacks vibe check data (e.g. they skipped the quiz), falls back to 100% interest-only matching. This means taking the quiz **visibly shifts** the compatibility percentages — exactly what we need for the demo.
 
@@ -197,7 +197,7 @@ When either user lacks vibe check data (e.g. they skipped the quiz), falls back 
 2. At Vibe Check → tap **"Skip for Now"** → continue with interests, preferences, photos
 3. Go to **Discover tab** → see compatibility % (interest-only, 100% weight)
 4. Go to **Profile tab** → tap **"Take the Vibe Check"** banner → complete the 22 questions
-5. Return to **Discover tab** → scores have changed (now 70% interests + 30% personality blend)
+5. Return to **Discover tab** → scores have changed (now 60% interests + 40% personality blend)
 
 ---
 
