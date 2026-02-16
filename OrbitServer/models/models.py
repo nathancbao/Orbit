@@ -156,9 +156,16 @@ def create_mission(data, creator_id):
         'description': data['description'],
         'tags': data.get('tags', []),
         'location': data.get('location', ''),
-        'time': data.get('time', ''),
+        'start_time': data['start_time'],
+        'end_time': data['end_time'],
+        'latitude': data.get('latitude'),
+        'longitude': data.get('longitude'),
+        'links': data.get('links', []),
+        'images': data.get('images', []),
+        'max_participants': data.get('max_participants', 0),
         'creator_id': int(creator_id),
-        'rsvp_count': 0,
+        'hard_rsvp_count': 0,
+        'soft_rsvp_count': 0,
         'created_at': datetime.datetime.utcnow(),
     })
     client.put(entity)
@@ -171,6 +178,34 @@ def get_mission(mission_id):
     return _entity_to_dict(entity)
 
 
+def update_mission(mission_id, data):
+    key = client.key('Mission', int(mission_id))
+    entity = client.get(key)
+    if not entity:
+        return None
+    allowed = [
+        'title', 'description', 'tags', 'location', 'start_time', 'end_time',
+        'latitude', 'longitude', 'links', 'images', 'max_participants',
+    ]
+    for field in allowed:
+        if field in data:
+            entity[field] = data[field]
+    entity['updated_at'] = datetime.datetime.utcnow()
+    client.put(entity)
+    return _entity_to_dict(entity)
+
+
+def delete_mission(mission_id):
+    key = client.key('Mission', int(mission_id))
+    client.delete(key)
+    # Also delete all RSVPs for this mission
+    query = client.query(kind='MissionRSVP')
+    query.add_filter('mission_id', '=', int(mission_id))
+    rsvps = list(query.fetch())
+    for rsvp in rsvps:
+        client.delete(rsvp.key)
+
+
 def list_missions(filters=None):
     query = client.query(kind='Mission')
     if filters and filters.get('tag'):
@@ -179,23 +214,25 @@ def list_missions(filters=None):
     return [_entity_to_dict(e) for e in results]
 
 
-def update_mission_rsvp_count(mission_id, delta):
+def update_mission_rsvp_count(mission_id, rsvp_type, delta):
     key = client.key('Mission', int(mission_id))
     entity = client.get(key)
     if entity:
-        entity['rsvp_count'] = entity.get('rsvp_count', 0) + delta
+        counter = 'hard_rsvp_count' if rsvp_type == 'hard' else 'soft_rsvp_count'
+        entity[counter] = entity.get(counter, 0) + delta
         client.put(entity)
 
 
 # ── MissionRSVP ──────────────────────────────────────────────────────────────
 
-def add_mission_rsvp(mission_id, user_id):
+def add_mission_rsvp(mission_id, user_id, rsvp_type='hard'):
     rsvp_key = f"{mission_id}_{user_id}"
     key = client.key('MissionRSVP', rsvp_key)
     entity = datastore.Entity(key=key)
     entity.update({
         'mission_id': int(mission_id),
         'user_id': int(user_id),
+        'rsvp_type': rsvp_type,
         'rsvped_at': datetime.datetime.utcnow(),
     })
     client.put(entity)
@@ -207,6 +244,25 @@ def get_mission_rsvp(mission_id, user_id):
     key = client.key('MissionRSVP', rsvp_key)
     entity = client.get(key)
     return _entity_to_dict(entity)
+
+
+def remove_mission_rsvp(mission_id, user_id):
+    """Remove an RSVP and return the rsvp_type for counter adjustment."""
+    rsvp_key = f"{mission_id}_{user_id}"
+    key = client.key('MissionRSVP', rsvp_key)
+    entity = client.get(key)
+    if not entity:
+        return None
+    rsvp_type = entity.get('rsvp_type', 'hard')
+    client.delete(key)
+    return rsvp_type
+
+
+def list_mission_rsvps(mission_id):
+    query = client.query(kind='MissionRSVP')
+    query.add_filter('mission_id', '=', int(mission_id))
+    results = list(query.fetch())
+    return [_entity_to_dict(e) for e in results]
 
 
 # ── RefreshToken ──────────────────────────────────────────────────────────────

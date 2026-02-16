@@ -28,6 +28,13 @@ enum Constants {
             // User/Profile endpoints
             static let me = "/users/me"
             static let uploadPhoto = "/users/me/photo"
+
+            // Mission endpoints
+            static let missions = "/missions/"
+            static let myMissions = "/missions/mine"
+            static func mission(_ id: String) -> String { "/missions/\(id)" }
+            static func missionRsvp(_ id: String) -> String { "/missions/\(id)/rsvp" }
+            static func missionParticipants(_ id: String) -> String { "/missions/\(id)/participants" }
         }
     }
 

@@ -94,16 +94,58 @@ def validate_crew_data(data):
     return True, None
 
 
-def validate_mission_data(data):
+def validate_mission_data(data, is_update=False):
     errors = []
-    required = ['title', 'description']
-    for field in required:
-        if field not in data or not data[field]:
-            errors.append(f"{field} is required")
+
+    if not is_update:
+        required = ['title', 'description', 'start_time', 'end_time']
+        for field in required:
+            if field not in data or not data[field]:
+                errors.append(f"{field} is required")
 
     if 'title' in data and isinstance(data['title'], str):
         if len(data['title']) > 200:
             errors.append("title must be 200 characters or fewer")
+
+    if 'description' in data and isinstance(data['description'], str):
+        if len(data['description']) > 2000:
+            errors.append("description must be 2000 characters or fewer")
+
+    if 'links' in data:
+        if not isinstance(data['links'], list):
+            errors.append("links must be a list")
+        elif len(data['links']) > 3:
+            errors.append("Maximum 3 links allowed")
+
+    if 'images' in data:
+        if not isinstance(data['images'], list):
+            errors.append("images must be a list")
+        elif len(data['images']) > 7:
+            errors.append("Maximum 7 images allowed")
+
+    # Time validation
+    if 'start_time' in data and data.get('start_time'):
+        try:
+            from datetime import datetime, timedelta
+            start = datetime.fromisoformat(data['start_time'].replace('Z', '+00:00'))
+            now = datetime.utcnow().replace(tzinfo=start.tzinfo)
+            one_month = now + timedelta(days=31)
+            if start > one_month:
+                errors.append("start_time must be within 1 month from now")
+        except (ValueError, AttributeError):
+            errors.append("start_time must be a valid ISO 8601 datetime")
+
+    if 'end_time' in data and data.get('end_time') and 'start_time' in data and data.get('start_time'):
+        try:
+            from datetime import datetime, timedelta
+            start = datetime.fromisoformat(data['start_time'].replace('Z', '+00:00'))
+            end = datetime.fromisoformat(data['end_time'].replace('Z', '+00:00'))
+            if end <= start:
+                errors.append("end_time must be after start_time")
+            elif end > start + timedelta(weeks=1):
+                errors.append("end_time must be within 1 week of start_time")
+        except (ValueError, AttributeError):
+            errors.append("end_time must be a valid ISO 8601 datetime")
 
     if errors:
         return False, errors
