@@ -88,6 +88,9 @@ struct ContentView: View {
                         profilePhotos: profilePhotos,
                         onEditProfile: {
                             appState = .profileSetup
+                        },
+                        onVibeCheckComplete: { updatedProfile in
+                            completedProfile = updatedProfile
                         }
                     )
                 } else {
