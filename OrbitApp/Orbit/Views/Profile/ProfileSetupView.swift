@@ -33,14 +33,19 @@ struct ProfileSetupView: View {
     @StateObject private var viewModel: ProfileViewModel
     @State private var currentStep = 0
 
+    let isEditMode: Bool
     let onProfileComplete: (Profile, [UIImage]) -> Void
+    let onCancel: (() -> Void)?
 
     // Initialize with optional existing profile data
     init(
         initialProfile: Profile? = nil,
         initialPhotos: [UIImage] = [],
-        onProfileComplete: @escaping (Profile, [UIImage]) -> Void
+        onProfileComplete: @escaping (Profile, [UIImage]) -> Void,
+        onCancel: (() -> Void)? = nil
     ) {
+        self.isEditMode = initialProfile != nil
+        self.onCancel = onCancel
         if let profile = initialProfile {
             _viewModel = StateObject(wrappedValue: ProfileViewModel(profile: profile, photos: initialPhotos))
         } else {
@@ -51,6 +56,24 @@ struct ProfileSetupView: View {
 
     var body: some View {
         VStack(spacing: 24) {
+            // Cancel button for edit mode
+            if isEditMode, let onCancel = onCancel {
+                HStack {
+                    Button {
+                        onCancel()
+                    } label: {
+                        HStack(spacing: 4) {
+                            Image(systemName: "xmark")
+                            Text("Cancel")
+                        }
+                        .foregroundColor(.primary)
+                    }
+                    Spacer()
+                }
+                .padding(.horizontal)
+                .padding(.top, 8)
+            }
+
             // Progress indicator (6 steps now)
             HStack(spacing: 4) {
                 ForEach(0..<6, id: \.self) { index in

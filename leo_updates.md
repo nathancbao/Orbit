@@ -124,6 +124,37 @@ If either user hasn't taken the quiz, the original base weights are used unchang
 
 ---
 
+## Profile Edit Bug Fixes
+
+### 1. Fix 400 Error When Saving Edited Profile
+
+**File:** `OrbitApp/Orbit/ViewModels/ProfileViewModel.swift`
+
+When editing an existing profile, the Vibe Check quiz data was being silently dropped on save. The `buildProfile()` method only included `vibeCheck` if `isVibeCheckComplete` was true — which checks that all 22 `quizAnswers` are filled. But in edit mode, only the computed results (`vibeCheckPersonality` dictionary and `derivedMBTI`) are loaded from the existing profile; `quizAnswers` stays empty since the user isn't retaking the quiz.
+
+This meant the PUT request sent `vibe_check: null` for a user who previously had quiz data, likely causing the server's 400 response.
+
+**Fix:** Changed the condition in `buildProfile()` to also accept pre-loaded vibe check data:
+```swift
+// Before
+if isVibeCheckComplete && !derivedMBTI.isEmpty {
+// After
+if (isVibeCheckComplete || !vibeCheckPersonality.isEmpty) && !derivedMBTI.isEmpty {
+```
+
+### 2. Add Cancel Button to Profile Edit Screen
+
+**Files:** `OrbitApp/Orbit/Views/Profile/ProfileSetupView.swift`, `OrbitApp/Orbit/ContentView.swift`
+
+Previously, tapping "Edit" on the profile set `appState = .profileSetup` with no way to return without completing all 6 steps again. Users who accidentally tapped Edit were stuck.
+
+- Added `onCancel` callback and `isEditMode` flag to `ProfileSetupView`
+- When in edit mode, an "X Cancel" button appears at the top of the screen
+- `ContentView` passes an `onCancel` handler that returns to `.home` state
+- New users (no existing profile) don't see the cancel button — they must complete setup
+
+---
+
 ## What's NOT Integrated Yet
 
 The following features from the original AI folder are **not yet integrated** (per team decision to defer):
