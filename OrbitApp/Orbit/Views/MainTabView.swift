@@ -15,11 +15,13 @@ struct MainTabView: View {
 
     @State private var selectedTab: Tab = .discover
     @StateObject private var friendsViewModel = FriendsViewModel()
+    @StateObject private var missionsViewModel = MissionsViewModel()
 
     enum Tab {
         case discover
         case friends
         case requests
+        case missions
         case profile
     }
 
@@ -47,6 +49,13 @@ struct MainTabView: View {
                 .tag(Tab.requests)
                 .badge(friendsViewModel.incomingRequestCount)
 
+            // Missions Tab
+            MissionsView()
+                .tabItem {
+                    Label("Missions", systemImage: "flag.fill")
+                }
+                .tag(Tab.missions)
+
             // Profile Tab
             ProfileDisplayView(
                 profile: profile,
@@ -59,8 +68,12 @@ struct MainTabView: View {
             .tag(Tab.profile)
         }
         .environmentObject(friendsViewModel)
+        .environmentObject(missionsViewModel)
         .task {
-            await friendsViewModel.loadAll()
+            await withTaskGroup(of: Void.self) { group in
+                group.addTask { await self.friendsViewModel.loadAll() }
+                group.addTask { await self.missionsViewModel.loadAll() }
+            }
         }
     }
 }
