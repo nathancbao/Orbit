@@ -37,5 +37,5 @@ class TestRsvpMission:
         result, err = rsvp_mission(1, 5)
         assert err is None
         assert "RSVP" in result["message"]
-        mock_add.assert_called_once_with(1, 5)
-        mock_update_count.assert_called_once_with(1, 1)
+        mock_add.assert_called_once_with(1, 5, 'hard')
+        mock_update_count.assert_called_once_with(1, 'hard', 1)

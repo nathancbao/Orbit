@@ -16,27 +16,43 @@ class TestCreateMission:
                            json={"title": "Hike", "description": "Let's hike"})
         assert resp.status_code == 401
 
+    @staticmethod
+    def _valid_data(**overrides):
+        from datetime import datetime, timedelta
+        base = {
+            "title": "Hike",
+            "description": "Trail run",
+            "start_time": (datetime.utcnow() + timedelta(hours=1)).isoformat() + "Z",
+            "end_time": (datetime.utcnow() + timedelta(hours=3)).isoformat() + "Z",
+        }
+        base.update(overrides)
+        return base
+
     def test_rejects_missing_title(self, client):
+        data = self._valid_data()
+        del data["title"]
         resp = client.post('/api/missions/',
                            headers=auth_header(),
-                           json={"description": "something"})
+                           json=data)
         assert resp.status_code == 400
 
     def test_rejects_missing_description(self, client):
+        data = self._valid_data()
+        del data["description"]
         resp = client.post('/api/missions/',
                            headers=auth_header(),
-                           json={"title": "Hike"})
+                           json=data)
         assert resp.status_code == 400
 
     @patch('OrbitServer.api.missions.create_mission')
     def test_creates_mission(self, mock_create, client):
         mock_create.return_value = (
-            {"id": 1, "title": "Hike", "rsvp_count": 0},
+            {"id": 1, "title": "Hike", "hard_rsvp_count": 0, "soft_rsvp_count": 0},
             None
         )
         resp = client.post('/api/missions/',
                            headers=auth_header(),
-                           json={"title": "Hike", "description": "Trail run"})
+                           json=self._valid_data())
         body = json.loads(resp.data)
         assert resp.status_code == 201
         assert body["success"] is True
@@ -44,7 +60,7 @@ class TestCreateMission:
     def test_rejects_long_title(self, client):
         resp = client.post('/api/missions/',
                            headers=auth_header(),
-                           json={"title": "x" * 201, "description": "ok"})
+                           json=self._valid_data(title="x" * 201))
         assert resp.status_code == 400
 
 

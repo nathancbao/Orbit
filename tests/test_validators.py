@@ -144,18 +144,61 @@ class TestValidateCrewData:
 # ── Mission Validation ──────────────────────────────────────────────────────
 
 class TestValidateMissionData:
+    def _valid_mission_data(self, **overrides):
+        from datetime import datetime, timedelta
+        base = {
+            "title": "Hike",
+            "description": "Let's go hiking",
+            "start_time": (datetime.utcnow() + timedelta(hours=1)).isoformat() + "Z",
+            "end_time": (datetime.utcnow() + timedelta(hours=3)).isoformat() + "Z",
+        }
+        base.update(overrides)
+        return base
+
     def test_valid_mission(self):
-        valid, errors = validate_mission_data({"title": "Hike", "description": "Let's go hiking"})
+        valid, errors = validate_mission_data(self._valid_mission_data())
         assert valid is True
 
     def test_rejects_missing_title(self):
-        valid, errors = validate_mission_data({"description": "something"})
+        data = self._valid_mission_data()
+        del data["title"]
+        valid, errors = validate_mission_data(data)
         assert valid is False
 
     def test_rejects_missing_description(self):
-        valid, errors = validate_mission_data({"title": "something"})
+        data = self._valid_mission_data()
+        del data["description"]
+        valid, errors = validate_mission_data(data)
         assert valid is False
 
     def test_rejects_long_title(self):
-        valid, errors = validate_mission_data({"title": "a" * 201, "description": "ok"})
+        valid, errors = validate_mission_data(self._valid_mission_data(title="a" * 201))
         assert valid is False
+
+    def test_rejects_missing_start_time(self):
+        data = self._valid_mission_data()
+        del data["start_time"]
+        valid, errors = validate_mission_data(data)
+        assert valid is False
+
+    def test_rejects_missing_end_time(self):
+        data = self._valid_mission_data()
+        del data["end_time"]
+        valid, errors = validate_mission_data(data)
+        assert valid is False
+
+    def test_rejects_long_description(self):
+        valid, errors = validate_mission_data(self._valid_mission_data(description="x" * 2001))
+        assert valid is False
+
+    def test_rejects_too_many_links(self):
+        valid, errors = validate_mission_data(self._valid_mission_data(links=["a", "b", "c", "d"]))
+        assert valid is False
+
+    def test_rejects_too_many_images(self):
+        valid, errors = validate_mission_data(self._valid_mission_data(images=["a"] * 8))
+        assert valid is False
+
+    def test_update_mode_skips_required_fields(self):
+        valid, errors = validate_mission_data({"title": "Updated"}, is_update=True)
+        assert valid is True
