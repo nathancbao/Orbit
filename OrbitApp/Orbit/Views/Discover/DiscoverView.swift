@@ -16,7 +16,6 @@ struct DiscoverView: View {
     @State private var selectedProfile: Profile? = nil
     @State private var stars: [Star] = []
     @State private var planetPositions: [String: CGPoint] = [:] // Cache positions by name
-    @State private var glow = false
     @State private var showSignalSheet = false
 
     var body: some View {
@@ -264,6 +263,7 @@ struct UserPlanet: View {
     let profile: Profile
     let size: CGFloat
     @State private var isAnimating = false
+    @State private var glow = false
 
     // Generate consistent color based on name
     private var planetColor: Color {
@@ -354,7 +354,7 @@ struct UserPlanet: View {
                             glow = true
                         }
                     }
-                    .offset(x: size* 0.35, y: -size*0.35)
+                    .offset(x: size * 0.35, y: -size * 0.35)
             }
             
             // Name label
