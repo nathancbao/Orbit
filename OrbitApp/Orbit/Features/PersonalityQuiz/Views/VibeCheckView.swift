@@ -12,6 +12,7 @@ import SwiftUI
 // MARK: - Main Vibe Check View
 struct VibeCheckView: View {
     @ObservedObject var viewModel: ProfileViewModel
+    var onSkip: (() -> Void)? = nil
     @State private var currentQuestion = 0
     @State private var showMBTIResult = false
     @State private var slideDirection: Edge = .trailing
@@ -24,6 +25,27 @@ struct VibeCheckView: View {
             spaceBackground
 
             VStack(spacing: 0) {
+                // Skip button (top-right)
+                if let onSkip = onSkip, !showMBTIResult {
+                    HStack {
+                        Spacer()
+                        Button {
+                            viewModel.vibeCheckSkipped = true
+                            onSkip()
+                        } label: {
+                            Text("Skip for Now")
+                                .font(.subheadline)
+                                .foregroundColor(.white.opacity(0.7))
+                                .padding(.horizontal, 16)
+                                .padding(.vertical, 8)
+                                .background(Color.white.opacity(0.1))
+                                .cornerRadius(20)
+                        }
+                    }
+                    .padding(.horizontal, 20)
+                    .padding(.top, 8)
+                }
+
                 // Progress bar
                 progressBar
                     .padding(.horizontal, 20)

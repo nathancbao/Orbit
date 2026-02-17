@@ -4,6 +4,7 @@ struct ProfileDisplayView: View {
     let profile: Profile
     let photos: [UIImage]
     var onEdit: (() -> Void)? = nil
+    var onTakeVibeCheck: (() -> Void)? = nil
 
     @State private var currentPhotoIndex = 0
 
@@ -33,6 +34,11 @@ struct ProfileDisplayView: View {
                     // Name, age, location header
                     nameHeader
                         .padding(.top, 20)
+
+                    // Vibe Check banner (shown when quiz not completed)
+                    if profile.vibeCheck == nil, let onTakeVibeCheck = onTakeVibeCheck {
+                        vibeCheckBanner(action: onTakeVibeCheck)
+                    }
 
                     Divider()
                         .padding(.horizontal)
@@ -262,6 +268,53 @@ struct ProfileDisplayView: View {
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+    }
+}
+
+// MARK: - Vibe Check Banner
+extension ProfileDisplayView {
+    func vibeCheckBanner(action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            HStack(spacing: 12) {
+                Image(systemName: "sparkles")
+                    .font(.title2)
+                    .foregroundStyle(
+                        LinearGradient(
+                            colors: [.purple, .blue],
+                            startPoint: .leading,
+                            endPoint: .trailing
+                        )
+                    )
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Take the Vibe Check")
+                        .font(.headline)
+                        .foregroundColor(.primary)
+                    Text("Unlock personality-based matching")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+                Spacer()
+                Image(systemName: "chevron.right")
+                    .foregroundColor(.secondary)
+            }
+            .padding()
+            .background(
+                RoundedRectangle(cornerRadius: 12)
+                    .fill(Color(.systemGray6))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 12)
+                            .stroke(
+                                LinearGradient(
+                                    colors: [.purple.opacity(0.5), .blue.opacity(0.5)],
+                                    startPoint: .leading,
+                                    endPoint: .trailing
+                                ),
+                                lineWidth: 1
+                            )
+                    )
+            )
+        }
+        .padding(.top, 12)
     }
 }
 

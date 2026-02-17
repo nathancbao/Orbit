@@ -155,6 +155,52 @@ Previously, tapping "Edit" on the profile set `appState = .profileSetup` with no
 
 ---
 
+## Demo Flow: Skip Survey → See Scores → Take Survey → See Scores Change
+
+Added the ability to skip the Vibe Check quiz during onboarding, then take it later from the Profile tab to demonstrate how personality data improves match scores.
+
+### 1. Skippable Vibe Check During Onboarding
+
+**Files:** `OrbitApp/Orbit/Features/PersonalityQuiz/Views/VibeCheckView.swift`, `OrbitApp/Orbit/Views/Profile/ProfileSetupView.swift`, `OrbitApp/Orbit/ViewModels/ProfileViewModel.swift`
+
+- Added `onSkip` callback and "Skip for Now" button (top-right) to `VibeCheckView`
+- Added `vibeCheckSkipped` flag to `ProfileViewModel`
+- Step 2 validation now passes if quiz is complete **or** skipped
+- Skip callback auto-advances to the Interests step
+
+### 2. Weighted Blend Matching (Interests + Personality)
+
+**File:** `OrbitApp/Orbit/Services/MatchingService.swift`
+
+Previously the client-side `MatchingService` only used Jaccard similarity on interests. Now uses a weighted blend:
+
+| Signal | Weight | Method |
+|--------|--------|--------|
+| Interests | 60% | Jaccard similarity (unchanged) |
+| Personality | 40% | 1 − avg absolute difference across all 8 vibe check dimensions |
+
+When either user lacks vibe check data (e.g. they skipped the quiz), falls back to 100% interest-only matching. This means taking the quiz **visibly shifts** the compatibility percentages — exactly what we need for the demo.
+
+### 3. "Take Vibe Check" Banner on Profile Tab
+
+**Files:** `OrbitApp/Orbit/Views/Profile/ProfileDisplayView.swift`, `OrbitApp/Orbit/Views/MainTabView.swift`, `OrbitApp/Orbit/ContentView.swift`
+
+- When `profile.vibeCheck == nil`, a styled banner appears on the Profile tab: "Take the Vibe Check — Unlock personality-based matching"
+- Tapping it opens the full 22-question quiz as a fullscreen cover
+- After completion, the "Done" button saves the updated profile to the server and updates `completedProfile` in `ContentView`
+- Since `completedProfile` is `@State` on `ContentView`, changing it recreates `MainTabView` → `DiscoverView` re-runs `.task` → `rankProfiles()` recomputes scores with the new personality data
+- The banner disappears once vibe check data exists
+
+### Demo Script
+
+1. Create new user → fill basic info, personality sliders
+2. At Vibe Check → tap **"Skip for Now"** → continue with interests, preferences, photos
+3. Go to **Discover tab** → see compatibility % (interest-only, 100% weight)
+4. Go to **Profile tab** → tap **"Take the Vibe Check"** banner → complete the 22 questions
+5. Return to **Discover tab** → scores have changed (now 60% interests + 40% personality blend)
+
+---
+
 ## What's NOT Integrated Yet
 
 The following features from the original AI folder are **not yet integrated** (per team decision to defer):

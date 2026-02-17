@@ -101,6 +101,7 @@ class ProfileViewModel: ObservableObject {
     @Published var quizAnswers: [Int: QuizAnswer] = [:]
     @Published var vibeCheckPersonality: [String: Double] = [:]
     @Published var derivedMBTI: String = ""
+    @Published var vibeCheckSkipped: Bool = false
 
     // ============================================================
     // MARK: - State Properties

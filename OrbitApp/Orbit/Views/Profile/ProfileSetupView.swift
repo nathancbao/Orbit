@@ -93,7 +93,10 @@ struct ProfileSetupView: View {
                 case 1:
                     PersonalityStep(viewModel: viewModel)
                 case 2:
-                    VibeCheckView(viewModel: viewModel)
+                    VibeCheckView(viewModel: viewModel) {
+                        // Skip callback — advance past vibe check
+                        currentStep += 1
+                    }
                 case 3:
                     InterestsStep(viewModel: viewModel)
                 case 4:
@@ -165,7 +168,7 @@ struct ProfileSetupView: View {
         switch currentStep {
         case 0: return viewModel.isBasicInfoValid
         case 1: return true // Personality sliders always have valid values
-        case 2: return viewModel.isVibeCheckComplete // All quiz questions answered
+        case 2: return viewModel.isVibeCheckComplete || viewModel.vibeCheckSkipped
         case 3: return viewModel.isInterestsValid
         case 4: return viewModel.isSocialPreferencesValid
         case 5: return true // Photos are optional
