@@ -1,1 +1,22 @@
+# Summary of Discoveries
+Through our interviews, we learned that finding friends in college is a problem that people have, across different grade levels, majors, genders, and life experiences. 
 
+A common problem that we noticed is that our interviewees were usually the first ones to try to reach out to people when it comes to in-person interactions. And although there were mixed levels of introversion and extroversion between these groups, everyone reported anxiety or fear of rejection, or blatant ignoring. Most of our interviewees were focusing on the fact that other people were usually the problem when it came to making lasting and meaningful connections, such as people not being approachable or interested when they do make the first interaction. However, a minority of users reported qualities in themselves like introversion, anxiety when it comes to social interactions, and being way too engrossed in another activity during social times such as being on their phone for too long. 
+
+Among all of these problems, we also noticed that a lack of compatibility and inital interest seemed to hinder further hangouts, social bonding, and meaningful relationships, so this notion of compatibility seems to be an important point to focus on. 
+
+In addition, another issue for people is that a lot of groups, clubs, and events already have established friend groups of people, and thus joining as an "outsider" gets met with blank stares and a colder type of social response. This further hinders future interactions with other groups, even if there's a chance that they're more welcoming than the groups from before, shattering confidence for future potential interactions 
+
+Overall, we noticed that there was a distinct difference between under and upper classmen when it came to the problom of friends in college. As a freshman, finding people is more of a problem as everyone in your grade level is new to college life, culture, and the people here; problems like introversion and the drive to want to make friends seemed to be the key problem. But then, for upperclassmen, it seems like the problem of keeping friends that you made during freshman year and later is a bigger problem. This includes problems like scheduling time due to conflicting schedules, lack of checking in, which all lead to people forgetting and sticking with whatever is more convenient, faster, and ideal
+
+# Early Solutions
+Some potential solutions to thse problems, that we've already started implementing and will further improve, include the fear of rejection, the efficiency of reaching out and continue to hangout, and make it easier for people to schedule their first hangout in-person; the natural social intreactions of meeting in-person for an activity is the main goal of our mobile app, as our app is only there to guide people towards more meaningful friendships, not replace their IRL activities with virtual ones.
+
+Another idea we have is to have a complete scheduling feature that takes the pain out of finding times and activities that match altogether. We've taken inspiration from [Timeful](https://timeful.app/) for their robust scheduling feature; we'll be sure to integrate this seamlessly into other features so everything is streamlined for our users.
+
+However, it seems like a lot of pain points can stem from issues that Orbit can't solve straight away, or directly, such as the initative to interact. While we have features planned that make interactions easier such as comptability matching, it would benefit to have reminders, in places like a pop-up before hanging out or somewhere during sign up, that Orbit experience is what you make of it; as in, the user will have to put in effort to search, meet, schedule, and continue their friendships with other fellow users on the app. 
+
+# Mindset Changes
+Initally, before conducting interviews, we thought we had nailed down most of the problems and the most effective solutions on Orbit, but we know see there are a diverse host of problems that haven't been addressed, and cautions that we as developers, entrepurneers, and designers, should take. For example, we were surprised to see that a lot of people suffered from self-confidence and that it was a common pattern that scheduling was difficult for people. Conducting these interviews brought us closer to the user's pains, and what the user has to experience on a daily basis when dealing with creating meaningful experiences with friends 
+
+We'll continue conducing inteviews and understanding our potential users and users more!
