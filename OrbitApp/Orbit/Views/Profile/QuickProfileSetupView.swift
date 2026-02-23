@@ -88,21 +88,14 @@ struct QuickProfileSetupView: View {
                                 } else {
                                     Circle()
                                         .fill(
-                                            LinearGradient(
-                                                colors: [
-                                                    Color(red: 0.9, green: 0.6, blue: 0.7).opacity(0.2),
-                                                    Color(red: 0.45, green: 0.55, blue: 0.85).opacity(0.2)
-                                                ],
-                                                startPoint: .topLeading,
-                                                endPoint: .bottomTrailing
-                                            )
+                                            OrbitTheme.gradient.opacity(0.2)
                                         )
                                         .frame(width: 90, height: 90)
                                         .overlay(
                                             VStack(spacing: 4) {
                                                 Image(systemName: "camera")
                                                     .font(.title3)
-                                                    .foregroundStyle(orbitGradient)
+                                                    .foregroundStyle(OrbitTheme.gradient)
                                                 Text("optional")
                                                     .font(.caption2)
                                                     .foregroundColor(.secondary)
@@ -167,7 +160,7 @@ struct QuickProfileSetupView: View {
                             Button(action: addCustomInterest) {
                                 Image(systemName: "plus.circle.fill")
                                     .font(.title3)
-                                    .foregroundStyle(orbitGradient)
+                                    .foregroundStyle(OrbitTheme.gradient)
                             }
                             .disabled(customInterestText.trimmingCharacters(in: .whitespaces).isEmpty)
                         }
@@ -183,7 +176,7 @@ struct QuickProfileSetupView: View {
                     // Disclaimer
                     HStack(alignment: .top, spacing: 8) {
                         Image(systemName: "exclamationmark.shield.fill")
-                            .foregroundStyle(orbitGradient)
+                            .foregroundStyle(OrbitTheme.gradient)
                         Text("Your account is permanently tied to your school email. Choose your profile and behavior wisely.")
                             .font(.caption)
                             .foregroundColor(.secondary)
@@ -214,7 +207,7 @@ struct QuickProfileSetupView: View {
                         .padding(.vertical, 16)
                         .background(
                             isValid
-                            ? AnyShapeStyle(orbitGradient)
+                            ? AnyShapeStyle(OrbitTheme.gradientFill)
                             : AnyShapeStyle(Color.gray.opacity(0.3))
                         )
                         .foregroundColor(.white)
@@ -233,17 +226,6 @@ struct QuickProfileSetupView: View {
         }
     }
 
-    private var orbitGradient: LinearGradient {
-        LinearGradient(
-            colors: [
-                Color(red: 0.9, green: 0.6, blue: 0.7),
-                Color(red: 0.7, green: 0.65, blue: 0.85),
-                Color(red: 0.45, green: 0.55, blue: 0.85)
-            ],
-            startPoint: .leading,
-            endPoint: .trailing
-        )
-    }
 
     private func addCustomInterest() {
         let trimmed = customInterestText.trimmingCharacters(in: .whitespaces)
@@ -312,28 +294,14 @@ struct YearChip: View {
                 .padding(.vertical, 7)
                 .background(
                     isSelected
-                    ? AnyShapeStyle(LinearGradient(
-                        colors: [
-                            Color(red: 0.9, green: 0.6, blue: 0.7).opacity(0.25),
-                            Color(red: 0.45, green: 0.55, blue: 0.85).opacity(0.25)
-                        ],
-                        startPoint: .leading,
-                        endPoint: .trailing
-                    ))
+                    ? AnyShapeStyle(OrbitTheme.gradient.opacity(0.25))
                     : AnyShapeStyle(Color(.systemGray6))
                 )
                 .overlay(
                     Capsule()
                         .stroke(
                             isSelected
-                            ? AnyShapeStyle(LinearGradient(
-                                colors: [
-                                    Color(red: 0.9, green: 0.6, blue: 0.7),
-                                    Color(red: 0.45, green: 0.55, blue: 0.85)
-                                ],
-                                startPoint: .leading,
-                                endPoint: .trailing
-                            ))
+                            ? AnyShapeStyle(OrbitTheme.gradient)
                             : AnyShapeStyle(Color.clear),
                             lineWidth: 1.5
                         )
@@ -370,28 +338,14 @@ struct InterestChipGrid: View {
                         .frame(maxWidth: .infinity)
                         .background(
                             isSelected
-                            ? AnyShapeStyle(LinearGradient(
-                                colors: [
-                                    Color(red: 0.9, green: 0.6, blue: 0.7).opacity(0.2),
-                                    Color(red: 0.45, green: 0.55, blue: 0.85).opacity(0.2)
-                                ],
-                                startPoint: .leading,
-                                endPoint: .trailing
-                            ))
+                            ? AnyShapeStyle(OrbitTheme.gradient.opacity(0.2))
                             : AnyShapeStyle(Color(.systemGray6))
                         )
                         .overlay(
                             RoundedRectangle(cornerRadius: 20)
                                 .stroke(
                                     isSelected
-                                    ? AnyShapeStyle(LinearGradient(
-                                        colors: [
-                                            Color(red: 0.9, green: 0.6, blue: 0.7),
-                                            Color(red: 0.45, green: 0.55, blue: 0.85)
-                                        ],
-                                        startPoint: .leading,
-                                        endPoint: .trailing
-                                    ))
+                                    ? AnyShapeStyle(OrbitTheme.gradient)
                                     : AnyShapeStyle(Color.clear),
                                     lineWidth: 1.5
                                 )

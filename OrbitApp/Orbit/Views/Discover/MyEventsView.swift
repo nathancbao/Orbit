@@ -25,10 +25,7 @@ struct MyEventsView: View {
                     Image(systemName: "person.3")
                         .font(.system(size: 48))
                         .foregroundStyle(
-                            LinearGradient(
-                                colors: [Color(red: 0.9, green: 0.6, blue: 0.7), Color(red: 0.45, green: 0.55, blue: 0.85)],
-                                startPoint: .leading, endPoint: .trailing
-                            )
+                            OrbitTheme.gradient
                         )
                     Text("no pods yet")
                         .font(.headline)
@@ -83,7 +80,7 @@ struct PodRowCard: View {
                 Rectangle()
                     .fill(
                         LinearGradient(
-                            colors: [Color(red: 0.9, green: 0.6, blue: 0.7), Color(red: 0.45, green: 0.55, blue: 0.85)],
+                            colors: [OrbitTheme.pink, OrbitTheme.blue],
                             startPoint: .top, endPoint: .bottom
                         )
                     )
@@ -120,10 +117,7 @@ struct PodRowCard: View {
 
                 Image(systemName: "message.fill")
                     .foregroundStyle(
-                        LinearGradient(
-                            colors: [Color(red: 0.9, green: 0.6, blue: 0.7), Color(red: 0.45, green: 0.55, blue: 0.85)],
-                            startPoint: .leading, endPoint: .trailing
-                        )
+                        OrbitTheme.gradient
                     )
             }
             .padding(16)
@@ -156,7 +150,7 @@ struct PodStatusBadge: View {
     var color: Color {
         switch status {
         case "open": return .orange
-        case "full": return Color(red: 0.45, green: 0.55, blue: 0.85)
+        case "full": return OrbitTheme.blue
         case "meeting_confirmed": return .green
         case "completed": return .secondary
         default: return .secondary

@@ -82,8 +82,8 @@ struct ProfileDisplayView: View {
                                             .font(.subheadline)
                                             .padding(.horizontal, 12)
                                             .padding(.vertical, 8)
-                                            .background(Color(red: 0.45, green: 0.55, blue: 0.85).opacity(0.12))
-                                            .foregroundColor(Color(red: 0.45, green: 0.55, blue: 0.85))
+                                            .background(OrbitTheme.blue.opacity(0.12))
+                                            .foregroundColor(OrbitTheme.blue)
                                             .clipShape(Capsule())
                                     }
                                 }
@@ -112,10 +112,7 @@ struct ProfileDisplayView: View {
         ZStack {
             Circle()
                 .fill(
-                    LinearGradient(
-                        colors: [Color(red: 0.9, green: 0.6, blue: 0.7), Color(red: 0.45, green: 0.55, blue: 0.85)],
-                        startPoint: .topLeading, endPoint: .bottomTrailing
-                    )
+                    OrbitTheme.gradientFill
                 )
                 .frame(width: 110, height: 110)
             Text(String(profile.name.prefix(1)).uppercased())
@@ -140,10 +137,7 @@ struct TrustScoreView: View {
                         .font(.caption)
                         .foregroundStyle(
                             i < stars
-                            ? AnyShapeStyle(LinearGradient(
-                                colors: [Color(red: 0.9, green: 0.6, blue: 0.7), Color(red: 0.45, green: 0.55, blue: 0.85)],
-                                startPoint: .leading, endPoint: .trailing
-                            ))
+                            ? AnyShapeStyle(OrbitTheme.gradient)
                             : AnyShapeStyle(Color(.systemGray4))
                         )
                 }

@@ -22,7 +22,7 @@ struct VoteCardView: View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
                 Image(systemName: vote.voteType == "time" ? "clock" : "mappin")
-                    .foregroundStyle(orbitGradient)
+                    .foregroundStyle(OrbitTheme.gradient)
                 Text("Vote on a \(vote.voteType)")
                     .font(.subheadline)
                     .fontWeight(.semibold)
@@ -59,7 +59,7 @@ struct VoteCardView: View {
                                 // Progress bar background
                                 GeometryReader { geo in
                                     Rectangle()
-                                        .fill(orbitGradient.opacity(0.15))
+                                        .fill(OrbitTheme.gradient.opacity(0.15))
                                         .frame(width: geo.size.width * fraction)
                                         .animation(.easeInOut(duration: 0.3), value: fraction)
                                 }
@@ -70,7 +70,7 @@ struct VoteCardView: View {
                                     if isMyVote {
                                         Image(systemName: "checkmark")
                                             .font(.caption)
-                                            .foregroundStyle(orbitGradient)
+                                            .foregroundStyle(OrbitTheme.gradient)
                                     }
                                     Text(option)
                                         .font(.subheadline)
@@ -87,7 +87,7 @@ struct VoteCardView: View {
                                 RoundedRectangle(cornerRadius: 10)
                                     .stroke(
                                         isMyVote
-                                        ? AnyShapeStyle(orbitGradient)
+                                        ? AnyShapeStyle(OrbitTheme.gradient)
                                         : AnyShapeStyle(Color(.systemGray4)),
                                         lineWidth: isMyVote ? 1.5 : 1
                                     )
@@ -104,10 +104,4 @@ struct VoteCardView: View {
         .cornerRadius(16)
     }
 
-    private var orbitGradient: LinearGradient {
-        LinearGradient(
-            colors: [Color(red: 0.9, green: 0.6, blue: 0.7), Color(red: 0.45, green: 0.55, blue: 0.85)],
-            startPoint: .leading, endPoint: .trailing
-        )
-    }
 }

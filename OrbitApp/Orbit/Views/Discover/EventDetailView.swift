@@ -37,13 +37,13 @@ struct EventDetailView: View {
                         HStack(spacing: 16) {
                             HStack(spacing: 6) {
                                 Image(systemName: "calendar")
-                                    .foregroundStyle(orbitGradient)
+                                    .foregroundStyle(OrbitTheme.gradient)
                                 Text(event.displayDate)
                                     .font(.subheadline)
                             }
                             HStack(spacing: 6) {
                                 Image(systemName: "mappin.and.ellipse")
-                                    .foregroundStyle(orbitGradient)
+                                    .foregroundStyle(OrbitTheme.gradient)
                                 Text(event.location.isEmpty ? "Location TBD" : event.location)
                                     .font(.subheadline)
                                     .lineLimit(1)
@@ -60,9 +60,9 @@ struct EventDetailView: View {
                                             .font(.caption)
                                             .padding(.horizontal, 10)
                                             .padding(.vertical, 5)
-                                            .background(Color(red: 0.45, green: 0.55, blue: 0.85).opacity(0.12))
+                                            .background(OrbitTheme.blue.opacity(0.12))
                                             .clipShape(Capsule())
-                                            .foregroundColor(Color(red: 0.45, green: 0.55, blue: 0.85))
+                                            .foregroundColor(OrbitTheme.blue)
                                     }
                                 }
                             }
@@ -119,7 +119,7 @@ struct EventDetailView: View {
                     Label("open your pod", systemImage: "person.3.fill")
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 16)
-                        .background(orbitGradient)
+                        .background(OrbitTheme.gradientFill)
                         .foregroundColor(.white)
                         .clipShape(Capsule())
                 }
@@ -142,7 +142,7 @@ struct EventDetailView: View {
                 }
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 16)
-                .background(orbitGradient)
+                .background(OrbitTheme.gradientFill)
                 .foregroundColor(.white)
                 .clipShape(Capsule())
             }
@@ -150,12 +150,6 @@ struct EventDetailView: View {
         }
     }
 
-    private var orbitGradient: LinearGradient {
-        LinearGradient(
-            colors: [Color(red: 0.9, green: 0.6, blue: 0.7), Color(red: 0.45, green: 0.55, blue: 0.85)],
-            startPoint: .leading, endPoint: .trailing
-        )
-    }
 
     private func join() {
         isJoining = true

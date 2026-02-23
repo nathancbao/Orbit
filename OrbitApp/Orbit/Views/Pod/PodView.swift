@@ -190,10 +190,7 @@ struct PodView: View {
                 Image(systemName: "arrow.up.circle.fill")
                     .font(.title2)
                     .foregroundStyle(
-                        LinearGradient(
-                            colors: [Color(red: 0.9, green: 0.6, blue: 0.7), Color(red: 0.45, green: 0.55, blue: 0.85)],
-                            startPoint: .leading, endPoint: .trailing
-                        )
+                        OrbitTheme.gradient
                     )
             }
             .disabled(viewModel.messageText.trimmingCharacters(in: .whitespaces).isEmpty || viewModel.isSending)
@@ -266,9 +263,9 @@ struct MemberStripView: View {
 
     private func avatarColor(for name: String) -> Color {
         let colors: [Color] = [
-            Color(red: 0.9, green: 0.6, blue: 0.7),
-            Color(red: 0.7, green: 0.65, blue: 0.85),
-            Color(red: 0.45, green: 0.55, blue: 0.85),
+            OrbitTheme.pink,
+            OrbitTheme.purple,
+            OrbitTheme.blue,
             Color(red: 0.8, green: 0.6, blue: 0.8),
         ]
         let index = abs(name.hashValue) % colors.count
@@ -300,10 +297,7 @@ struct ChatBubble: View {
                     .padding(.vertical, 10)
                     .background(
                         isCurrentUser
-                        ? AnyShapeStyle(LinearGradient(
-                            colors: [Color(red: 0.9, green: 0.6, blue: 0.7), Color(red: 0.45, green: 0.55, blue: 0.85)],
-                            startPoint: .leading, endPoint: .trailing
-                        ))
+                        ? AnyShapeStyle(OrbitTheme.gradient)
                         : AnyShapeStyle(Color(.systemGray5))
                     )
                     .foregroundColor(isCurrentUser ? .white : .primary)
@@ -355,10 +349,7 @@ struct ActionChip: View {
                 Image(systemName: icon)
                     .font(.caption)
                     .foregroundStyle(
-                        LinearGradient(
-                            colors: [Color(red: 0.9, green: 0.6, blue: 0.7), Color(red: 0.45, green: 0.55, blue: 0.85)],
-                            startPoint: .leading, endPoint: .trailing
-                        )
+                        OrbitTheme.gradient
                     )
                 Text(label)
                     .font(.caption)

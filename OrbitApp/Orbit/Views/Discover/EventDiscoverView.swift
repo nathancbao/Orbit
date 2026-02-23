@@ -45,7 +45,7 @@ struct EventDiscoverView: View {
                             .padding(.vertical, 6)
                             .background(
                                 viewModel.showMyYearOnly
-                                ? AnyShapeStyle(orbitGradient.opacity(0.15))
+                                ? AnyShapeStyle(OrbitTheme.gradient.opacity(0.15))
                                 : AnyShapeStyle(Color(.systemGray6))
                             )
                             .clipShape(Capsule())
@@ -130,15 +130,6 @@ struct EventDiscoverView: View {
         .navigationBarHidden(true)
     }
 
-    private var orbitGradient: LinearGradient {
-        LinearGradient(
-            colors: [
-                Color(red: 0.9, green: 0.6, blue: 0.7),
-                Color(red: 0.45, green: 0.55, blue: 0.85)
-            ],
-            startPoint: .leading, endPoint: .trailing
-        )
-    }
 }
 
 // MARK: - Suggested Event Card (horizontal strip)
@@ -154,10 +145,10 @@ struct SuggestedEventCard: View {
                 if let reason = event.suggestionReason {
                     Text(reason)
                         .font(.caption2)
-                        .foregroundStyle(orbitGradient)
+                        .foregroundStyle(OrbitTheme.gradient)
                         .padding(.horizontal, 8)
                         .padding(.vertical, 3)
-                        .background(Color(red: 0.9, green: 0.6, blue: 0.7).opacity(0.1))
+                        .background(OrbitTheme.pink.opacity(0.1))
                         .clipShape(Capsule())
                 }
 
@@ -195,12 +186,6 @@ struct SuggestedEventCard: View {
         .buttonStyle(.plain)
     }
 
-    private var orbitGradient: LinearGradient {
-        LinearGradient(
-            colors: [Color(red: 0.9, green: 0.6, blue: 0.7), Color(red: 0.45, green: 0.55, blue: 0.85)],
-            startPoint: .leading, endPoint: .trailing
-        )
-    }
 }
 
 // MARK: - Event Card (vertical list)
@@ -216,7 +201,7 @@ struct EventCard: View {
                 Rectangle()
                     .fill(
                         LinearGradient(
-                            colors: [Color(red: 0.9, green: 0.6, blue: 0.7), Color(red: 0.45, green: 0.55, blue: 0.85)],
+                            colors: [OrbitTheme.pink, OrbitTheme.blue],
                             startPoint: .top, endPoint: .bottom
                         )
                     )
@@ -255,9 +240,9 @@ struct EventCard: View {
                                         .font(.caption2)
                                         .padding(.horizontal, 8)
                                         .padding(.vertical, 3)
-                                        .background(Color(red: 0.45, green: 0.55, blue: 0.85).opacity(0.12))
+                                        .background(OrbitTheme.blue.opacity(0.12))
                                         .clipShape(Capsule())
-                                        .foregroundColor(Color(red: 0.45, green: 0.55, blue: 0.85))
+                                        .foregroundColor(OrbitTheme.blue)
                                 }
                             }
                         }
@@ -301,10 +286,7 @@ struct PodSpotsLabel: View {
                     if let first = open.first {
                         Label("\(first.spotsLeft) spot\(first.spotsLeft == 1 ? "" : "s") left", systemImage: "person.badge.plus")
                             .foregroundStyle(
-                                LinearGradient(
-                                    colors: [Color(red: 0.9, green: 0.6, blue: 0.7), Color(red: 0.45, green: 0.55, blue: 0.85)],
-                                    startPoint: .leading, endPoint: .trailing
-                                )
+                                OrbitTheme.gradient
                             )
                     } else {
                         Label("join waitlist", systemImage: "person.badge.clock")
@@ -313,10 +295,7 @@ struct PodSpotsLabel: View {
                 } else {
                     Label("be the first to join", systemImage: "star")
                         .foregroundStyle(
-                            LinearGradient(
-                                colors: [Color(red: 0.9, green: 0.6, blue: 0.7), Color(red: 0.45, green: 0.55, blue: 0.85)],
-                                startPoint: .leading, endPoint: .trailing
-                            )
+                            OrbitTheme.gradient
                         )
                 }
             }
@@ -342,23 +321,14 @@ struct TagFilterChip: View {
                 .padding(.vertical, 7)
                 .background(
                     isSelected
-                    ? AnyShapeStyle(LinearGradient(
-                        colors: [
-                            Color(red: 0.9, green: 0.6, blue: 0.7).opacity(0.2),
-                            Color(red: 0.45, green: 0.55, blue: 0.85).opacity(0.2)
-                        ],
-                        startPoint: .leading, endPoint: .trailing
-                    ))
+                    ? AnyShapeStyle(OrbitTheme.gradient.opacity(0.2))
                     : AnyShapeStyle(Color(.systemGray6))
                 )
                 .overlay(
                     Capsule()
                         .stroke(
                             isSelected
-                            ? AnyShapeStyle(LinearGradient(
-                                colors: [Color(red: 0.9, green: 0.6, blue: 0.7), Color(red: 0.45, green: 0.55, blue: 0.85)],
-                                startPoint: .leading, endPoint: .trailing
-                            ))
+                            ? AnyShapeStyle(OrbitTheme.gradient)
                             : AnyShapeStyle(Color.clear),
                             lineWidth: 1.5
                         )
@@ -378,10 +348,7 @@ struct EmptyEventsView: View {
             Image(systemName: "calendar.badge.plus")
                 .font(.system(size: 48))
                 .foregroundStyle(
-                    LinearGradient(
-                        colors: [Color(red: 0.9, green: 0.6, blue: 0.7), Color(red: 0.45, green: 0.55, blue: 0.85)],
-                        startPoint: .leading, endPoint: .trailing
-                    )
+                    OrbitTheme.gradient
                 )
             Text("no events yet")
                 .font(.headline)
