@@ -1,0 +1,120 @@
+import datetime
+
+from OrbitServer.models.models import (
+    get_event_pod, create_chat_message, list_chat_messages,
+    create_vote, get_vote, update_vote, list_votes_for_pod,
+    update_event_pod,
+)
+from OrbitServer.utils.profanity import filter_message
+
+
+def get_messages(pod_id, requesting_user_id):
+    pod = get_event_pod(pod_id)
+    if not pod:
+        return None, "Pod not found"
+    if int(requesting_user_id) not in (pod.get('member_ids') or []):
+        return None, "You are not a member of this pod"
+    messages = list_chat_messages(pod_id)
+    return messages, None
+
+
+def send_message(pod_id, user_id, content):
+    pod = get_event_pod(pod_id)
+    if not pod:
+        return None, "Pod not found"
+    if int(user_id) not in (pod.get('member_ids') or []):
+        return None, "You are not a member of this pod"
+
+    is_clean, reason = filter_message(content)
+    if not is_clean:
+        return None, reason
+
+    msg = create_chat_message(pod_id, user_id, content.strip(), message_type='text')
+    return msg, None
+
+
+def create_poll(pod_id, user_id, vote_type, options):
+    pod = get_event_pod(pod_id)
+    if not pod:
+        return None, "Pod not found"
+    if int(user_id) not in (pod.get('member_ids') or []):
+        return None, "You are not a member of this pod"
+
+    # Only one open vote of each type at a time
+    existing_votes = list_votes_for_pod(pod_id)
+    for v in existing_votes:
+        if v['vote_type'] == vote_type and v['status'] == 'open':
+            return None, f"There is already an open {vote_type} vote for this pod"
+
+    vote = create_vote(pod_id, user_id, vote_type, options)
+
+    # Post a system message announcing the vote
+    create_chat_message(
+        pod_id, user_id,
+        f"📊 New vote: pick a {vote_type}! Vote ID: {vote['id']}",
+        message_type='vote_created',
+    )
+    return vote, None
+
+
+def respond_to_vote(pod_id, vote_id, user_id, option_index):
+    pod = get_event_pod(pod_id)
+    if not pod:
+        return None, "Pod not found"
+    member_ids = pod.get('member_ids') or []
+    if int(user_id) not in member_ids:
+        return None, "You are not a member of this pod"
+
+    vote = get_vote(vote_id)
+    if not vote or vote['pod_id'] != str(pod_id):
+        return None, "Vote not found"
+    if vote['status'] == 'closed':
+        return None, "This vote is already closed"
+
+    options = vote.get('options') or []
+    if not isinstance(option_index, int) or option_index < 0 or option_index >= len(options):
+        return None, "Invalid option index"
+
+    votes_map = dict(vote.get('votes') or {})
+    votes_map[str(user_id)] = option_index
+
+    updates = {'votes': votes_map}
+
+    # Auto-close when all members have voted
+    if len(votes_map) >= len(member_ids):
+        result, result_index = _tally_votes(votes_map, options)
+        updates['status'] = 'closed'
+        updates['result'] = result
+        updates['closed_at'] = datetime.datetime.utcnow()
+
+        # Set the result on the pod
+        pod_field = 'scheduled_time' if vote['vote_type'] == 'time' else 'scheduled_place'
+        update_event_pod(pod_id, {pod_field: result})
+
+        create_chat_message(
+            pod_id, user_id,
+            f"✅ Vote closed! {vote['vote_type'].capitalize()} set to: {result}",
+            message_type='vote_result',
+        )
+
+    vote = update_vote(vote_id, updates)
+    return vote, None
+
+
+def _tally_votes(votes_map, options):
+    """Return (winning_option_string, winning_index) by plurality."""
+    counts = [0] * len(options)
+    for option_index in votes_map.values():
+        if 0 <= option_index < len(options):
+            counts[option_index] += 1
+    winning_index = counts.index(max(counts))
+    return options[winning_index], winning_index
+
+
+def get_votes_for_pod(pod_id, requesting_user_id):
+    pod = get_event_pod(pod_id)
+    if not pod:
+        return None, "Pod not found"
+    if int(requesting_user_id) not in (pod.get('member_ids') or []):
+        return None, "You are not a member of this pod"
+    return list_votes_for_pod(pod_id), None

@@ -1,11 +1,3 @@
-//
-//  Constants.swift
-//  Orbit
-//
-//  APP CONSTANTS
-//  Centralized location for all app configuration values.
-//
-
 import Foundation
 
 enum Constants {
@@ -19,22 +11,35 @@ enum Constants {
         static let baseURL = "https://orbit-app-486204.wl.r.appspot.com/api"
 
         enum Endpoints {
-            // Auth endpoints
+            // Auth
             static let sendCode = "/auth/send-code"
             static let verifyCode = "/auth/verify-code"
             static let refreshToken = "/auth/refresh"
             static let logout = "/auth/logout"
 
-            // User/Profile endpoints
+            // User / Profile
             static let me = "/users/me"
             static let uploadPhoto = "/users/me/photo"
 
-            // Mission endpoints
-            static let missions = "/missions/"
-            static let myMissions = "/missions/mine"
-            static func mission(_ id: String) -> String { "/missions/\(id)" }
-            static func missionRsvp(_ id: String) -> String { "/missions/\(id)/rsvp" }
-            static func missionParticipants(_ id: String) -> String { "/missions/\(id)/participants" }
+            // Events
+            static let events = "/events"
+            static let suggestedEvents = "/events/suggested"
+            static func event(_ id: String) -> String { "/events/\(id)" }
+            static func joinEvent(_ id: String) -> String { "/events/\(id)/join" }
+            static func leaveEvent(_ id: String) -> String { "/events/\(id)/leave" }
+            static func skipEvent(_ id: String) -> String { "/events/\(id)/skip" }
+
+            // Pods
+            static func pod(_ id: String) -> String { "/pods/\(id)" }
+            static func podKick(_ id: String) -> String { "/pods/\(id)/kick" }
+            static func podConfirm(_ id: String) -> String { "/pods/\(id)/confirm-attendance" }
+
+            // Chat
+            static func podMessages(_ id: String) -> String { "/pods/\(id)/messages" }
+            static func podVotes(_ id: String) -> String { "/pods/\(id)/votes" }
+            static func podVoteRespond(_ podId: String, _ voteId: String) -> String {
+                "/pods/\(podId)/votes/\(voteId)/respond"
+            }
         }
     }
 
@@ -47,23 +52,11 @@ enum Constants {
     }
 
     // ============================================================
-    // MARK: - Validation Rules
+    // MARK: - Validation
     // ============================================================
     enum Validation {
-        // Auth - .edu email required
         static let verificationCodeLength = 6
-
-        // Profile - Basic Info
-        static let minAge = 18
-        static let maxAge = 100
-        static let minBioLength = 0
-        static let maxBioLength = 500
-
-        // Profile - Interests
         static let minInterests = 3
         static let maxInterests = 10
-
-        // Profile - Photos
-        static let maxPhotos = 6
     }
 }

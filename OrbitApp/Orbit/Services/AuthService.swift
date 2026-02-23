@@ -39,6 +39,9 @@ class AuthService {
         KeychainHelper.shared.save(response.accessToken, forKey: Constants.Keychain.accessToken)
         KeychainHelper.shared.save(response.refreshToken, forKey: Constants.Keychain.refreshToken)
 
+        // Store userId for use in pod/chat views
+        UserDefaults.standard.set(response.userId, forKey: "orbit_user_id")
+
         return response
     }
 

@@ -14,7 +14,9 @@
       "Bash(python3:*)",
       "Bash(git pull:*)",
       "Bash(git stash:*)",
-      "mcp__ide__getDiagnostics"
+      "mcp__ide__getDiagnostics",
+      "Bash(git -C /home/leo/Orbit log --oneline -10)",
+      "Bash(git -C /home/leo/Orbit diff --stat HEAD)"
     ]
   }
 }

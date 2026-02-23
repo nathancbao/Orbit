@@ -1,84 +1,32 @@
 import Foundation
 
-struct Profile: Codable, Identifiable {
-    var id: String { name } // Use name as unique identifier
+struct Profile: Codable, Identifiable, Equatable {
+    // Use name as a stable identifier within a session; real identity is the user_id from the server.
+    var id: String { name }
+
     var name: String
-    var age: Int
-    var location: Location
-    var bio: String
-    var photos: [String]
+    var collegeYear: String       // freshman | sophomore | junior | senior | grad
     var interests: [String]
-    var personality: Personality
-    var socialPreferences: SocialPreferences
-    var friendshipGoals: [String]
+    var photo: String?            // Optional profile photo URL
+    var trustScore: Double?       // 0.0 – 5.0, server-computed
+    var email: String?
+
+    // Computed in discover flow
     var matchScore: Double?
-    var vibeCheck: VibeCheck?
 
     enum CodingKeys: String, CodingKey {
-        case name, age, location, bio, photos, interests, personality
-        case socialPreferences = "social_preferences"
-        case friendshipGoals = "friendship_goals"
+        case name
+        case collegeYear = "college_year"
+        case interests
+        case photo
+        case trustScore = "trust_score"
+        case email
         case matchScore = "match_score"
-        case vibeCheck = "vibe_check"
     }
-}
 
-struct Location: Codable {
-    var city: String
-    var state: String
-    var coordinates: Coordinates?
-}
+    static let collegeYears = ["freshman", "sophomore", "junior", "senior", "grad"]
 
-struct Coordinates: Codable {
-    var lat: Double
-    var lng: Double
-}
-
-struct Personality: Codable {
-    var introvertExtrovert: Double
-    var spontaneousPlanner: Double
-    var activeRelaxed: Double
-
-    enum CodingKeys: String, CodingKey {
-        case introvertExtrovert = "introvert_extrovert"
-        case spontaneousPlanner = "spontaneous_planner"
-        case activeRelaxed = "active_relaxed"
-    }
-}
-
-// MARK: - Vibe Check (Quiz-based personality — 8 dimensions + MBTI)
-struct VibeCheck: Codable {
-    var introvertExtrovert: Double
-    var spontaneousPlanner: Double
-    var activeRelaxed: Double
-    var adventurousCautious: Double
-    var expressiveReserved: Double
-    var independentCollaborative: Double
-    var sensingIntuition: Double
-    var thinkingFeeling: Double
-    var mbtiType: String
-
-    enum CodingKeys: String, CodingKey {
-        case introvertExtrovert = "introvert_extrovert"
-        case spontaneousPlanner = "spontaneous_planner"
-        case activeRelaxed = "active_relaxed"
-        case adventurousCautious = "adventurous_cautious"
-        case expressiveReserved = "expressive_reserved"
-        case independentCollaborative = "independent_collaborative"
-        case sensingIntuition = "sensing_intuition"
-        case thinkingFeeling = "thinking_feeling"
-        case mbtiType = "mbti_type"
-    }
-}
-
-struct SocialPreferences: Codable {
-    var groupSize: String
-    var meetingFrequency: String
-    var preferredTimes: [String]
-
-    enum CodingKeys: String, CodingKey {
-        case groupSize = "group_size"
-        case meetingFrequency = "meeting_frequency"
-        case preferredTimes = "preferred_times"
+    static func displayYear(_ year: String) -> String {
+        year.prefix(1).uppercased() + year.dropFirst()
     }
 }

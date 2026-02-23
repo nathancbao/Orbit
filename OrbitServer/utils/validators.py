@@ -1,4 +1,7 @@
 import re
+import datetime
+
+from OrbitServer.models.models import COLLEGE_YEARS
 
 
 def validate_edu_email(email):
@@ -14,10 +17,7 @@ def validate_edu_email(email):
 
 def validate_profile_data(data):
     errors = []
-    allowed_fields = {
-        'name', 'age', 'location', 'bio', 'photos', 'interests',
-        'personality', 'social_preferences', 'friendship_goals',
-    }
+    allowed_fields = {'name', 'college_year', 'interests', 'photo'}
 
     for key in data:
         if key not in allowed_fields:
@@ -30,75 +30,33 @@ def validate_profile_data(data):
         elif len(name) > 100:
             errors.append("name must be 100 characters or fewer")
 
-    if 'age' in data:
-        age = data['age']
-        if not isinstance(age, (int, float)) or int(age) < 18 or int(age) > 100:
-            errors.append("age must be a number between 18 and 100")
-
-    if 'bio' in data:
-        if not isinstance(data['bio'], str):
-            errors.append("bio must be a string")
-        elif len(data['bio']) > 500:
-            errors.append("bio must be 500 characters or fewer")
+    if 'college_year' in data:
+        year = data['college_year']
+        if year not in COLLEGE_YEARS:
+            errors.append(f"college_year must be one of: {', '.join(sorted(COLLEGE_YEARS))}")
 
     if 'interests' in data:
         if not isinstance(data['interests'], list):
             errors.append("interests must be a list")
+        elif len(data['interests']) < 3:
+            errors.append("At least 3 interests are required")
         elif len(data['interests']) > 10:
             errors.append("Maximum 10 interests allowed")
 
-    if 'photos' in data:
-        if not isinstance(data['photos'], list):
-            errors.append("photos must be a list")
-        elif len(data['photos']) > 6:
-            errors.append("Maximum 6 photos allowed")
-
-    if 'location' in data:
-        if not isinstance(data['location'], dict):
-            errors.append("location must be an object")
-
-    if 'personality' in data:
-        if not isinstance(data['personality'], dict):
-            errors.append("personality must be an object")
-
-    if 'social_preferences' in data:
-        if not isinstance(data['social_preferences'], dict):
-            errors.append("social_preferences must be an object")
-
-    if 'friendship_goals' in data:
-        if not isinstance(data['friendship_goals'], list):
-            errors.append("friendship_goals must be a list")
+    if 'photo' in data:
+        if data['photo'] is not None and not isinstance(data['photo'], str):
+            errors.append("photo must be a URL string or null")
 
     if errors:
         return False, errors
     return True, None
 
 
-def validate_crew_data(data):
-    errors = []
-    required = ['name']
-    for field in required:
-        if field not in data or not data[field]:
-            errors.append(f"{field} is required")
-
-    if 'name' in data and isinstance(data['name'], str):
-        if len(data['name']) > 100:
-            errors.append("name must be 100 characters or fewer")
-
-    if 'description' in data and isinstance(data['description'], str):
-        if len(data['description']) > 500:
-            errors.append("description must be 500 characters or fewer")
-
-    if errors:
-        return False, errors
-    return True, None
-
-
-def validate_mission_data(data, is_update=False):
+def validate_event_data(data, is_update=False):
     errors = []
 
     if not is_update:
-        required = ['title', 'description', 'start_time', 'end_time']
+        required = ['title', 'description']
         for field in required:
             if field not in data or not data[field]:
                 errors.append(f"{field} is required")
@@ -111,42 +69,54 @@ def validate_mission_data(data, is_update=False):
         if len(data['description']) > 2000:
             errors.append("description must be 2000 characters or fewer")
 
-    if 'links' in data:
-        if not isinstance(data['links'], list):
-            errors.append("links must be a list")
-        elif len(data['links']) > 3:
-            errors.append("Maximum 3 links allowed")
+    if 'tags' in data:
+        if not isinstance(data['tags'], list):
+            errors.append("tags must be a list")
+        elif len(data['tags']) > 10:
+            errors.append("Maximum 10 tags allowed")
 
-    if 'images' in data:
-        if not isinstance(data['images'], list):
-            errors.append("images must be a list")
-        elif len(data['images']) > 7:
-            errors.append("Maximum 7 images allowed")
-
-    # Time validation
-    if 'start_time' in data and data.get('start_time'):
+    if 'max_pod_size' in data:
         try:
-            from datetime import datetime, timedelta
-            start = datetime.fromisoformat(data['start_time'].replace('Z', '+00:00'))
-            now = datetime.utcnow().replace(tzinfo=start.tzinfo)
-            one_month = now + timedelta(days=31)
-            if start > one_month:
-                errors.append("start_time must be within 1 month from now")
-        except (ValueError, AttributeError):
-            errors.append("start_time must be a valid ISO 8601 datetime")
+            size = int(data['max_pod_size'])
+            if size < 2 or size > 10:
+                errors.append("max_pod_size must be between 2 and 10")
+        except (TypeError, ValueError):
+            errors.append("max_pod_size must be an integer")
 
-    if 'end_time' in data and data.get('end_time') and 'start_time' in data and data.get('start_time'):
+    if 'date' in data and data.get('date'):
         try:
-            from datetime import datetime, timedelta
-            start = datetime.fromisoformat(data['start_time'].replace('Z', '+00:00'))
-            end = datetime.fromisoformat(data['end_time'].replace('Z', '+00:00'))
-            if end <= start:
-                errors.append("end_time must be after start_time")
-            elif end > start + timedelta(weeks=1):
-                errors.append("end_time must be within 1 week of start_time")
-        except (ValueError, AttributeError):
-            errors.append("end_time must be a valid ISO 8601 datetime")
+            datetime.date.fromisoformat(data['date'])
+        except ValueError:
+            errors.append("date must be a valid date in YYYY-MM-DD format")
 
+    if errors:
+        return False, errors
+    return True, None
+
+
+def validate_message_data(data):
+    errors = []
+    content = data.get('content', '')
+    if not content or not isinstance(content, str):
+        errors.append("content is required")
+    elif len(content.strip()) == 0:
+        errors.append("content cannot be empty")
+    elif len(content) > 1000:
+        errors.append("content must be 1000 characters or fewer")
+    if errors:
+        return False, errors
+    return True, None
+
+
+def validate_vote_data(data):
+    errors = []
+    if 'vote_type' not in data or data['vote_type'] not in ('time', 'place'):
+        errors.append("vote_type must be 'time' or 'place'")
+    options = data.get('options', [])
+    if not isinstance(options, list) or len(options) < 2:
+        errors.append("options must be a list with at least 2 items")
+    elif len(options) > 4:
+        errors.append("Maximum 4 options allowed")
     if errors:
         return False, errors
     return True, None

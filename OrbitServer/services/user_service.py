@@ -2,40 +2,20 @@ from OrbitServer.models.models import get_profile, upsert_profile, get_user
 from OrbitServer.services.storage_service import upload_file
 
 
-# Fields that match the Swift Profile struct
-PROFILE_FIELDS = [
-    'name', 'age', 'location', 'bio', 'photos', 'interests',
-    'personality', 'social_preferences', 'friendship_goals',
-]
+PROFILE_FIELDS = ['name', 'college_year', 'interests', 'photo', 'trust_score', 'email']
 
-# Default empty profile matching Swift's Profile struct
 DEFAULT_PROFILE = {
     'name': '',
-    'age': 18,
-    'location': {
-        'city': '',
-        'state': '',
-        'coordinates': None,
-    },
-    'bio': '',
-    'photos': [],
+    'college_year': '',
     'interests': [],
-    'personality': {
-        'introvert_extrovert': 0.5,
-        'spontaneous_planner': 0.5,
-        'active_relaxed': 0.5,
-    },
-    'social_preferences': {
-        'group_size': 'Small groups (3-5)',
-        'meeting_frequency': 'Weekly',
-        'preferred_times': [],
-    },
-    'friendship_goals': [],
+    'photo': None,
+    'trust_score': 3.0,
+    'email': '',
 }
 
 
 def _format_profile(raw):
-    """Extract only the Swift Profile fields from a raw Datastore profile dict."""
+    """Extract only the app Profile fields from a raw Datastore profile dict."""
     profile = {}
     for field in PROFILE_FIELDS:
         if field in raw:
@@ -46,18 +26,14 @@ def _format_profile(raw):
 
 
 def _is_profile_complete(profile):
-    """Check if a profile has the minimum required fields filled in."""
+    """A profile is complete when it has a name, college_year, and ≥3 interests."""
     name = profile.get('name', '')
+    college_year = profile.get('college_year', '')
     interests = profile.get('interests', [])
-    social_prefs = profile.get('social_preferences', {})
-    preferred_times = (
-        social_prefs.get('preferred_times', [])
-        if isinstance(social_prefs, dict) else []
-    )
     return (
         bool(name and isinstance(name, str) and name.strip()) and
-        len(interests) >= 3 and
-        bool(preferred_times)
+        bool(college_year) and
+        len(interests) >= 3
     )
 
 
@@ -67,8 +43,6 @@ def get_user_profile(user_id):
         user = get_user(user_id)
         if not user:
             return None, "User not found"
-        # No profile saved yet -- return 404 so the Swift client's
-        # loadExistingProfile() catch block routes to .profileSetup
         return None, "Profile not found"
 
     profile = _format_profile(profile_data)
@@ -79,7 +53,6 @@ def get_user_profile(user_id):
 
 
 def update_user_profile(user_id, data):
-    # Attach the user's email to the Profile entity in Datastore
     user = get_user(user_id)
     if user and user.get('email'):
         data['email'] = user['email']
@@ -94,11 +67,7 @@ def update_user_profile(user_id, data):
 
 def upload_photo(user_id, file):
     url = upload_file(file, folder='profile_photos')
-    # Get existing profile, add photo URL to photos list
-    existing = get_profile(user_id)
-    photos = existing.get('photos', []) if existing else []
-    photos.append(url)
-    profile_data = upsert_profile(user_id, {'photos': photos})
+    profile_data = upsert_profile(user_id, {'photo': url})
     profile = _format_profile(profile_data)
     return {
         'profile': profile,
