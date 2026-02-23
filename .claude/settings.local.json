@@ -23,7 +23,11 @@
       "Bash(git -C /home/leo/Orbit diff main...origin/orbit2.0 -- OrbitApp/Orbit/Utils/Constants.swift)",
       "Bash(git -C /home/leo/Orbit diff main...origin/orbit2.0 -- OrbitApp/Orbit/Services/APIService.swift)",
       "Bash(git -C /home/leo/Orbit diff main...origin/orbit2.0 -- OrbitApp/Orbit/ContentView.swift)",
-      "Bash(echo:*)"
+      "Bash(echo:*)",
+      "Bash(git -C /home/leo/Orbit status)",
+      "Bash(git -C /home/leo/Orbit log --oneline -3)",
+      "Bash(git -C /home/leo/Orbit push origin leo2.0:orbit2.0 --force)",
+      "Bash(pip install:*)"
     ]
   }
 }
