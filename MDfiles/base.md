@@ -253,6 +253,28 @@ Reusable components also in `OrbitTheme.swift`:
 
 ---
 
+## Tests (`tests/`)
+
+Run with: `python3 -m pytest tests/ -v`
+
+Uses `pytest` + `unittest.mock`. Google Cloud is mocked in `conftest.py` so no GCP credentials needed.
+
+| File | What it covers |
+|------|---------------|
+| `test_api_auth.py` | Auth endpoints: send-code, verify-code (demo bypass), refresh, logout |
+| `test_api_events.py` | Events endpoints: list, suggested, create, join, leave, skip |
+| `test_api_pods.py` | Pods endpoints: get pod, kick vote, confirm attendance |
+| `test_api_users.py` | Users endpoints: GET/PUT `/me`, public profile |
+| `test_api_health.py` | Health check endpoints |
+| `test_auth.py` | JWT utils: `create_access_token`, `create_refresh_token`, `decode_token` |
+| `test_auth_service.py` | Auth service: demo bypass, normal verify, refresh token, logout |
+| `test_pod_service.py` | Pod assignment logic: join (open pod / new pod / full cap), leave, confirm attendance |
+| `test_user_service.py` | Profile formatting (`_format_profile`) and completeness check (`_is_profile_complete`) |
+| `test_validators.py` | All validators: email, profile, event, message, vote |
+| `test_responses.py` | `success()` and `error()` response helpers |
+
+---
+
 ## Environment Variables (Backend)
 
 | Var | Description |
