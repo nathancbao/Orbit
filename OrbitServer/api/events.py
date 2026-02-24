@@ -16,6 +16,47 @@ from OrbitServer.models.models import (
 events_bp = Blueprint('events', __name__, url_prefix='/api/events')
 
 
+def _to_str_id(event):
+    """
+    Return a shallow copy of the event dict with 'id' coerced to str.
+
+    Datastore auto-generates numeric IDs for Event entities. Swift's Event
+    model declares  `var id: String`, so JSONDecoder will fail if it receives
+    a JSON integer.  Stringify here so the client always sees a string ID
+    (e.g. "5629499534213120") while all internal logic still uses the raw int.
+    """
+    if event is None:
+        return None
+    return {**event, 'id': str(event['id'])}
+
+
+def _annotate_pod_status(event, user_id):
+    """
+    Mutate *event* in-place with user_pod_status / user_pod_id fields.
+
+    user_pod_status is one of:
+        "in_pod"    – user already joined a pod for this event
+        "not_joined" – user hasn't joined yet and at least one open pod has room
+        "pod_full"   – every pod is full or no pods exist with room
+    """
+    event_id = event['id']
+    user_pod = get_user_pod_for_event(event_id, user_id)
+    if user_pod:
+        event['user_pod_status'] = 'in_pod'
+        event['user_pod_id'] = user_pod['id']
+        return
+
+    pods = list_event_pods(event_id)
+    has_room = any(
+        p['status'] == 'open' and len(p.get('member_ids') or []) < p.get('max_size', 4)
+        for p in pods
+    )
+    event['user_pod_status'] = 'not_joined' if has_room else 'pod_full'
+    event['user_pod_id'] = None
+
+
+# ── GET /events ───────────────────────────────────────────────────────────────
+
 @events_bp.route('', methods=['GET'])
 @require_auth
 def list_all():
@@ -29,32 +70,27 @@ def list_all():
 
     events = get_events_for_user(g.user_id, filters if filters else None)
 
-    # Annotate each event with the requesting user's pod status
     for event in events:
-        pod = get_user_pod_for_event(event['id'], g.user_id)
-        if pod:
-            event['user_pod_status'] = 'in_pod'
-            event['user_pod_id'] = pod['id']
-        else:
-            # Check if any open pod has room
-            pods = list_event_pods(event['id'])
-            max_pod_size = event.get('max_pod_size', 4)
-            has_room = any(
-                p['status'] == 'open' and len(p.get('member_ids') or []) < max_pod_size
-                for p in pods
-            )
-            event['user_pod_status'] = 'not_joined' if has_room else 'pod_full'
+        _annotate_pod_status(event, g.user_id)
 
-    return success(events)
+    return success([_to_str_id(e) for e in events])
 
+
+# ── GET /events/suggested ────────────────────────────────────────────────────
 
 @events_bp.route('/suggested', methods=['GET'])
 @require_auth
 def suggested():
     limit = min(int(request.args.get('limit', 5)), 10)
     events = get_suggested_events(g.user_id, limit=limit)
-    return success(events)
 
+    for event in events:
+        _annotate_pod_status(event, g.user_id)
+
+    return success([_to_str_id(e) for e in events])
+
+
+# ── POST /events ──────────────────────────────────────────────────────────────
 
 @events_bp.route('', methods=['POST'])
 @require_auth
@@ -66,8 +102,10 @@ def create():
         return error(errors, 400)
 
     event = create_new_event(data, g.user_id, creator_type='user')
-    return success(event, 201)
+    return success(_to_str_id(event), 201)
 
+
+# ── GET /events/<id> ─────────────────────────────────────────────────────────
 
 @events_bp.route('/<int:event_id>', methods=['GET'])
 @require_auth
@@ -76,7 +114,7 @@ def get_one(event_id):
     if not event:
         return error("Event not found", 404)
 
-    # Attach pod info
+    # Attach pod summaries (matches Swift Event.pods: [PodSummary]?)
     pods = list_event_pods(event_id)
     pod_summaries = []
     for pod in pods:
@@ -89,12 +127,13 @@ def get_one(event_id):
         })
     event['pods'] = pod_summaries
 
-    # User's pod status
-    user_pod = get_user_pod_for_event(event_id, g.user_id)
-    event['user_pod_id'] = user_pod['id'] if user_pod else None
+    # Annotate user-specific pod status (was missing in original GET /events/<id>)
+    _annotate_pod_status(event, g.user_id)
 
-    return success(event)
+    return success(_to_str_id(event))
 
+
+# ── PUT /events/<id> ─────────────────────────────────────────────────────────
 
 @events_bp.route('/<int:event_id>', methods=['PUT'])
 @require_auth
@@ -109,8 +148,10 @@ def update(event_id):
     if err:
         status = 404 if "not found" in err.lower() else 403
         return error(err, status)
-    return success(event)
+    return success(_to_str_id(event))
 
+
+# ── DELETE /events/<id> ───────────────────────────────────────────────────────
 
 @events_bp.route('/<int:event_id>', methods=['DELETE'])
 @require_auth
@@ -122,6 +163,8 @@ def delete(event_id):
     return success({"message": "Event deleted successfully"})
 
 
+# ── POST /events/<id>/join ────────────────────────────────────────────────────
+
 @events_bp.route('/<int:event_id>/join', methods=['POST'])
 @require_auth
 def join(event_id):
@@ -131,6 +174,8 @@ def join(event_id):
     return success(pod, 201)
 
 
+# ── DELETE /events/<id>/leave ─────────────────────────────────────────────────
+
 @events_bp.route('/<int:event_id>/leave', methods=['DELETE'])
 @require_auth
 def leave(event_id):
@@ -139,6 +184,8 @@ def leave(event_id):
         return error(err, 400)
     return success({"message": "Left event pod successfully"})
 
+
+# ── POST /events/<id>/skip ────────────────────────────────────────────────────
 
 @events_bp.route('/<int:event_id>/skip', methods=['POST'])
 @require_auth

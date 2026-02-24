@@ -365,6 +365,66 @@ def get_history_entry(user_id, event_id):
     return _entity_to_dict(results[0]) if results else None
 
 
+# ── Mission (Activity Request) ────────────────────────────────────────────────
+# Fields: id (UUID string), creator_id, title, description,
+#         activity_category (matches Swift ActivityCategory raw values),
+#         custom_activity_name (string or None),
+#         min_group_size, max_group_size,
+#         availability [{"date": "<ISO8601>", "time_blocks": ["morning", ...]}],
+#         status (pending_match | matched), created_at
+#
+# NOTE: When the Swift MissionsViewModel is wired to this API, AvailabilitySlot
+# will need a CodingKeys mapping for time_blocks ↔ "time_blocks" (snake_case).
+
+def create_mission(data, creator_id):
+    mission_id = str(uuid.uuid4())
+    key = client.key('Mission', mission_id)
+    entity = datastore.Entity(key=key, exclude_from_indexes=['availability'])
+    entity.update({
+        'creator_id': int(creator_id),
+        'title': data.get('title', ''),
+        'description': data.get('description', ''),
+        'activity_category': data.get('activity_category', 'Custom'),
+        'custom_activity_name': data.get('custom_activity_name'),
+        'min_group_size': int(data.get('min_group_size', 2)),
+        'max_group_size': int(data.get('max_group_size', 6)),
+        'availability': data.get('availability', []),
+        'status': 'pending_match',
+        'created_at': datetime.datetime.utcnow(),
+    })
+    client.put(entity)
+    return _entity_to_dict(entity)
+
+
+def get_mission(mission_id):
+    key = client.key('Mission', str(mission_id))
+    entity = client.get(key)
+    return _entity_to_dict(entity)
+
+
+def delete_mission(mission_id):
+    key = client.key('Mission', str(mission_id))
+    client.delete(key)
+
+
+def list_missions_for_user(user_id):
+    query = client.query(kind='Mission')
+    query.add_filter('creator_id', '=', int(user_id))
+    query.order = ['-created_at']
+    results = list(query.fetch())
+    return [_entity_to_dict(e) for e in results]
+
+
+def update_mission_status(mission_id, status):
+    key = client.key('Mission', str(mission_id))
+    entity = client.get(key)
+    if not entity:
+        return None
+    entity['status'] = status
+    client.put(entity)
+    return _entity_to_dict(entity)
+
+
 # ── RefreshToken ──────────────────────────────────────────────────────────────
 
 def store_refresh_token(token, user_id):

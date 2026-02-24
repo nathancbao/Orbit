@@ -94,6 +94,69 @@ def validate_event_data(data, is_update=False):
     return True, None
 
 
+# ── Mission validation ────────────────────────────────────────────────────────
+# Matches Swift ActivityCategory raw values and TimeBlock raw values exactly.
+
+_ACTIVITY_CATEGORIES = {
+    'Pickleball', 'Basketball', 'Cafe Hopping', 'Restaurant',
+    'Study Session', 'Hiking', 'Gym', 'Running', 'Yoga',
+    'Board Games', 'Movies', 'Custom',
+}
+
+_TIME_BLOCKS = {'morning', 'afternoon', 'evening'}
+
+
+def validate_mission_data(data):
+    errors = []
+
+    category = data.get('activity_category')
+    if not category or category not in _ACTIVITY_CATEGORIES:
+        errors.append(f"activity_category must be one of: {', '.join(sorted(_ACTIVITY_CATEGORIES))}")
+
+    if category == 'Custom':
+        name = data.get('custom_activity_name', '')
+        if not name or not isinstance(name, str) or not name.strip():
+            errors.append("custom_activity_name is required for Custom activities")
+        elif len(name) > 100:
+            errors.append("custom_activity_name must be 100 characters or fewer")
+
+    try:
+        min_gs = int(data['min_group_size'])
+        max_gs = int(data['max_group_size'])
+        if min_gs < 2:
+            errors.append("min_group_size must be at least 2")
+        if max_gs > 10:
+            errors.append("max_group_size must be at most 10")
+        if min_gs > max_gs:
+            errors.append("min_group_size cannot exceed max_group_size")
+    except (KeyError, TypeError, ValueError):
+        errors.append("min_group_size and max_group_size must be integers")
+
+    availability = data.get('availability')
+    if not isinstance(availability, list) or len(availability) == 0:
+        errors.append("availability must be a non-empty list of {date, time_blocks} slots")
+    else:
+        for slot in availability:
+            if not isinstance(slot, dict):
+                errors.append("Each availability slot must be an object with 'date' and 'time_blocks'")
+                break
+            if not slot.get('date'):
+                errors.append("Each availability slot must have a 'date' field (ISO 8601 string)")
+                break
+            tbs = slot.get('time_blocks', [])
+            if not isinstance(tbs, list) or len(tbs) == 0:
+                errors.append("Each availability slot must have at least one time_block")
+                break
+            invalid = [tb for tb in tbs if tb not in _TIME_BLOCKS]
+            if invalid:
+                errors.append(f"Invalid time_block(s): {invalid}. Must be morning, afternoon, or evening")
+                break
+
+    if errors:
+        return False, errors
+    return True, None
+
+
 def validate_message_data(data):
     errors = []
     content = data.get('content', '')
