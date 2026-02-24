@@ -9,6 +9,7 @@ struct MainTabView: View {
     enum Tab {
         case discover
         case myEvents
+        case missions
         case profile
     }
 
@@ -28,6 +29,13 @@ struct MainTabView: View {
                     Label("My Events", systemImage: "person.3.fill")
                 }
                 .tag(Tab.myEvents)
+
+            // Missions Tab
+            MissionsView()
+                .tabItem {
+                    Label("Missions", systemImage: "scope")
+                }
+                .tag(Tab.missions)
 
             // Profile Tab
             ProfileDisplayView(profile: profile, onEdit: onEditProfile)

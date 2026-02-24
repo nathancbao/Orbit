@@ -1,4 +1,5 @@
 import Foundation
+import Combine
 import SwiftUI
 
 // ProfileViewModel is now a thin wrapper — the actual form state lives

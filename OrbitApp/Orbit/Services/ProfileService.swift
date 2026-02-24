@@ -10,10 +10,11 @@ class ProfileService {
         encoder.keyEncodingStrategy = .convertToSnakeCase
         let profileData = try encoder.encode(profile)
         var body = (try JSONSerialization.jsonObject(with: profileData) as? [String: Any]) ?? [:]
-        // Remove server-computed fields before sending
+        // Remove server-computed fields and null values before sending
         body.removeValue(forKey: "match_score")
         body.removeValue(forKey: "trust_score")
         body.removeValue(forKey: "email")
+        body = body.filter { !($0.value is NSNull) }
 
         return try await APIService.shared.request(
             endpoint: Constants.API.Endpoints.me,
