@@ -4,9 +4,10 @@ struct MainTabView: View {
     let profile: Profile
     let onEditProfile: () -> Void
 
-    @State private var selectedTab: Tab = .discover
+    @State private var selectedTab: Tab = .discovery
 
     enum Tab {
+        case discovery
         case discover
         case myEvents
         case missions
@@ -16,10 +17,17 @@ struct MainTabView: View {
     var body: some View {
         TabView(selection: $selectedTab) {
 
+            // Discovery Tab (Galaxy View)
+            DiscoveryView(userProfile: profile)
+                .tabItem {
+                    Label("Discovery", systemImage: "moon.stars.fill")
+                }
+                .tag(Tab.discovery)
+
             // Discover Tab
             EventDiscoverView(userProfile: profile)
                 .tabItem {
-                    Label("Discover", systemImage: "sparkles")
+                    Label("Events", systemImage: "sparkles")
                 }
                 .tag(Tab.discover)
 
