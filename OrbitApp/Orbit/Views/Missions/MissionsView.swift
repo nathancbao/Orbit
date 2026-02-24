@@ -58,7 +58,7 @@ struct MissionsView: View {
 
     private var activityGrid: some View {
         VStack(alignment: .leading, spacing: 14) {
-            OrbitSectionHeader(title: "What do you want to do?")
+            OrbitSectionHeader(title: "Pick your mission!")
 
             LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 10), count: 3), spacing: 10) {
                 ForEach(ActivityCategory.allCases) { category in

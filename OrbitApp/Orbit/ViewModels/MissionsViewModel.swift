@@ -36,7 +36,7 @@ class MissionsViewModel: ObservableObject {
         isLoading = true
         Task {
             try? await Task.sleep(for: .milliseconds(300))
-            missions = Self.mockMissions
+            missions = MockData.mockMissions
             isLoading = false
         }
     }
@@ -107,73 +107,4 @@ class MissionsViewModel: ObservableObject {
         }
     }
 
-    // MARK: - Mock Data
-
-    private static var mockMissions: [Mission] {
-        let calendar = Calendar.current
-        let today = calendar.startOfDay(for: Date())
-
-        return [
-            Mission(
-                id: "mock-1",
-                title: "Pickup Basketball",
-                description: "Looking for people to play 5v5 at the ARC",
-                activityCategory: .basketball,
-                customActivityName: nil,
-                minGroupSize: 6,
-                maxGroupSize: 10,
-                availability: [
-                    AvailabilitySlot(date: today.addingDays(1), timeBlocks: [.afternoon, .evening]),
-                    AvailabilitySlot(date: today.addingDays(3), timeBlocks: [.morning, .afternoon]),
-                    AvailabilitySlot(date: today.addingDays(5), timeBlocks: [.evening]),
-                ],
-                status: .pendingMatch,
-                creatorId: 0,
-                createdAt: ISO8601DateFormatter().string(from: today)
-            ),
-            Mission(
-                id: "mock-2",
-                title: "Cafe Study Session",
-                description: "Chill study session, bring your laptop",
-                activityCategory: .studySession,
-                customActivityName: nil,
-                minGroupSize: 2,
-                maxGroupSize: 5,
-                availability: [
-                    AvailabilitySlot(date: today.addingDays(0), timeBlocks: [.afternoon]),
-                    AvailabilitySlot(date: today.addingDays(1), timeBlocks: [.morning, .afternoon]),
-                    AvailabilitySlot(date: today.addingDays(2), timeBlocks: [.afternoon, .evening]),
-                    AvailabilitySlot(date: today.addingDays(4), timeBlocks: [.morning]),
-                ],
-                status: .matched,
-                creatorId: 1,
-                createdAt: ISO8601DateFormatter().string(from: today.addingDays(-1))
-            ),
-            Mission(
-                id: "mock-3",
-                title: "Hiking at Putah Creek",
-                description: "",
-                activityCategory: .hiking,
-                customActivityName: nil,
-                minGroupSize: 3,
-                maxGroupSize: 8,
-                availability: [
-                    AvailabilitySlot(date: today.addingDays(6), timeBlocks: [.morning]),
-                    AvailabilitySlot(date: today.addingDays(7), timeBlocks: [.morning]),
-                    AvailabilitySlot(date: today.addingDays(13), timeBlocks: [.morning, .afternoon]),
-                ],
-                status: .pendingMatch,
-                creatorId: 0,
-                createdAt: ISO8601DateFormatter().string(from: today)
-            ),
-        ]
-    }
-}
-
-// MARK: - Date Helper
-
-private extension Date {
-    func addingDays(_ days: Int) -> Date {
-        Calendar.current.date(byAdding: .day, value: days, to: self) ?? self
-    }
 }

@@ -23,8 +23,19 @@ class EventDiscoverViewModel: ObservableObject {
             year: showMyYearOnly ? userYear : nil
         )
 
-        suggestedEvents = await suggested ?? []
-        allEvents = await all ?? []
+        var fetchedSuggested = await suggested ?? []
+        var fetchedAll = await all ?? []
+
+        // Include mock events for development when API returns empty
+        if fetchedAll.isEmpty {
+            fetchedAll = MockData.mockEvents
+        }
+        if fetchedSuggested.isEmpty {
+            fetchedSuggested = MockData.mockEvents
+        }
+
+        suggestedEvents = fetchedSuggested
+        allEvents = fetchedAll
         isLoading = false
     }
 

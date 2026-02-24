@@ -6,13 +6,13 @@ final class MissionModelTests: XCTestCase {
     // MARK: - ActivityCategory Tests
 
     func testActivityCategoryAllCasesCount() {
-        XCTAssertEqual(ActivityCategory.allCases.count, 12)
+        XCTAssertEqual(ActivityCategory.allCases.count, 6)
     }
 
     func testActivityCategoryDisplayName() {
-        XCTAssertEqual(ActivityCategory.basketball.displayName, "Basketball")
-        XCTAssertEqual(ActivityCategory.cafeHopping.displayName, "Cafe Hopping")
-        XCTAssertEqual(ActivityCategory.studySession.displayName, "Study Session")
+        XCTAssertEqual(ActivityCategory.sports.displayName, "Sports")
+        XCTAssertEqual(ActivityCategory.food.displayName, "Food")
+        XCTAssertEqual(ActivityCategory.study.displayName, "Study")
         XCTAssertEqual(ActivityCategory.custom.displayName, "Custom")
     }
 
@@ -23,8 +23,8 @@ final class MissionModelTests: XCTestCase {
     }
 
     func testActivityCategoryIdentifiable() {
-        let category = ActivityCategory.basketball
-        XCTAssertEqual(category.id, "Basketball")
+        let category = ActivityCategory.sports
+        XCTAssertEqual(category.id, "Sports")
     }
 
     // MARK: - TimeBlock Tests
@@ -132,16 +132,16 @@ final class MissionModelTests: XCTestCase {
     func testDisplayTitleUsesActivityName() {
         let mission = makeMission(
             title: "",
-            activityCategory: .basketball,
+            activityCategory: .sports,
             customActivityName: nil
         )
-        XCTAssertEqual(mission.displayTitle, "Basketball")
+        XCTAssertEqual(mission.displayTitle, "Sports")
     }
 
     func testDisplayTitleUsesTitleWhenSet() {
         let mission = makeMission(
             title: "Pickup Hoops",
-            activityCategory: .basketball,
+            activityCategory: .sports,
             customActivityName: nil
         )
         XCTAssertEqual(mission.displayTitle, "Pickup Hoops")
@@ -170,7 +170,7 @@ final class MissionModelTests: XCTestCase {
     func testMissionCodableRoundTrip() throws {
         let original = makeMission(
             title: "Test Mission",
-            activityCategory: .hiking,
+            activityCategory: .hangout,
             customActivityName: nil,
             minGroupSize: 3,
             maxGroupSize: 8,
@@ -216,7 +216,7 @@ final class MissionModelTests: XCTestCase {
 
     private func makeMission(
         title: String = "Test",
-        activityCategory: ActivityCategory = .basketball,
+        activityCategory: ActivityCategory = .sports,
         customActivityName: String? = nil,
         minGroupSize: Int = 2,
         maxGroupSize: Int = 4,

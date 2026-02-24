@@ -2,7 +2,7 @@
 //  DiscoveryView.swift
 //  Orbit
 //
-//  Galaxy-themed discovery view with solar system layout
+//  Galaxy-themed discovery view showing events and missions as planets
 //
 
 import SwiftUI
@@ -16,11 +16,17 @@ enum DiscoveryTheme {
     static let accentTeal = Color(hex: "2DD4BF")
     static let accentLavender = Color(hex: "A78BFA")
     static let accentAmber = Color(hex: "F59E0B")
+    static let accentPink = Color(hex: "EC4899")
+    static let accentGreen = Color(hex: "10B981")
     static let textPrimary = Color(hex: "E2E8F0")
     static let textMuted = Color(hex: "64748B")
     static let glow = Color(hex: "3B82F6").opacity(0.15)
 
-    static let nodeAccents: [Color] = [accentTeal, accentLavender, accentAmber, accentBlue]
+    // Event planets: cooler tones (blue, teal, green)
+    static let eventColors: [Color] = [accentBlue, accentTeal, accentGreen]
+
+    // Mission planets: warmer tones (amber, pink, lavender)
+    static let missionColors: [Color] = [accentAmber, accentPink, accentLavender]
 }
 
 // MARK: - Color Extension
@@ -60,17 +66,47 @@ struct Star: Identifiable {
     let phaseOffset: Double
 }
 
-// MARK: - Cluster Node Model
+// MARK: - Planet Node Model
 
-struct ClusterNode: Identifiable {
+enum PlanetType {
+    case event(Event)
+    case mission(Mission)
+}
+
+struct PlanetNode: Identifiable {
     let id = UUID()
-    let name: String
-    let imageUrl: String?
-    let angle: Double      // radians
-    let radius: CGFloat    // distance from center
+    let type: PlanetType
+    let angle: Double
+    let radius: CGFloat
     let accentColor: Color
-    let floatPhase: Double // phase offset for floating animation
-    let floatSpeed: Double // speed of floating animation
+    let floatPhase: Double
+    let floatSpeed: Double
+
+    var title: String {
+        switch type {
+        case .event(let event): return event.title
+        case .mission(let mission): return mission.displayTitle
+        }
+    }
+
+    var subtitle: String {
+        switch type {
+        case .event(let event): return event.displayDate
+        case .mission(let mission): return mission.activityCategory.displayName
+        }
+    }
+
+    var icon: String {
+        switch type {
+        case .event: return "calendar.circle.fill"
+        case .mission(let mission): return mission.activityCategory.icon
+        }
+    }
+
+    var isEvent: Bool {
+        if case .event = type { return true }
+        return false
+    }
 }
 
 // MARK: - Star Field View
@@ -190,12 +226,10 @@ struct CenterNodeView: View {
                 appeared = true
             }
 
-            // Pulsing animation
             withAnimation(.easeInOut(duration: 2).repeatForever(autoreverses: true)) {
                 pulseScale = 1.15
             }
 
-            // Rotation animation
             withAnimation(.linear(duration: 20).repeatForever(autoreverses: false)) {
                 rotationAngle = 360
             }
@@ -203,77 +237,117 @@ struct CenterNodeView: View {
     }
 }
 
-// MARK: - Cluster Node View
+// MARK: - Planet Node View
 
-struct ClusterNodeView: View {
-    let node: ClusterNode
+struct PlanetNodeView: View {
+    let planet: PlanetNode
     let isSelected: Bool
     let appearanceDelay: Double
     let onTap: () -> Void
 
     @State private var floatOffset: CGFloat = 0
     @State private var appeared: Bool = false
+    @State private var ringRotation: Double = 0
+
+    private var planetSize: CGFloat { isSelected ? 60 : 52 }
+    private var glowSize: CGFloat { isSelected ? 100 : 80 }
 
     var body: some View {
-        VStack(spacing: 4) {
+        VStack(spacing: 6) {
             ZStack {
-                // Glow background
+                // Outer glow
                 Circle()
                     .fill(
                         RadialGradient(
                             colors: [
-                                node.accentColor.opacity(isSelected ? 0.5 : 0.25),
-                                node.accentColor.opacity(0.05),
+                                planet.accentColor.opacity(isSelected ? 0.5 : 0.3),
+                                planet.accentColor.opacity(0.1),
                                 Color.clear
                             ],
                             center: .center,
-                            startRadius: 20,
-                            endRadius: isSelected ? 50 : 40
+                            startRadius: planetSize / 2,
+                            endRadius: glowSize / 2
                         )
                     )
-                    .frame(width: isSelected ? 90 : 70, height: isSelected ? 90 : 70)
+                    .frame(width: glowSize, height: glowSize)
 
-                // Avatar
+                // Ring for events (Saturn-like)
+                if planet.isEvent {
+                    Ellipse()
+                        .stroke(
+                            LinearGradient(
+                                colors: [
+                                    planet.accentColor.opacity(0.6),
+                                    planet.accentColor.opacity(0.2)
+                                ],
+                                startPoint: .leading,
+                                endPoint: .trailing
+                            ),
+                            lineWidth: 2
+                        )
+                        .frame(width: planetSize + 20, height: 12)
+                        .rotationEffect(.degrees(ringRotation))
+                }
+
+                // Planet body
                 Circle()
-                    .fill(DiscoveryTheme.surface)
-                    .frame(width: isSelected ? 56 : 48, height: isSelected ? 56 : 48)
+                    .fill(
+                        RadialGradient(
+                            colors: [
+                                planet.accentColor.opacity(0.9),
+                                planet.accentColor.opacity(0.6),
+                                planet.accentColor.opacity(0.4)
+                            ],
+                            center: UnitPoint(x: 0.3, y: 0.3),
+                            startRadius: 0,
+                            endRadius: planetSize / 2
+                        )
+                    )
+                    .frame(width: planetSize, height: planetSize)
                     .overlay(
-                        Group {
-                            if let url = node.imageUrl {
-                                AsyncImage(url: URL(string: url)) { image in
-                                    image
-                                        .resizable()
-                                        .scaledToFill()
-                                } placeholder: {
-                                    Image(systemName: "person.fill")
-                                        .font(.system(size: 20))
-                                        .foregroundColor(DiscoveryTheme.textMuted)
-                                }
-                            } else {
-                                Image(systemName: "person.fill")
-                                    .font(.system(size: 20))
-                                    .foregroundColor(DiscoveryTheme.textMuted)
-                            }
-                        }
-                        .clipShape(Circle())
+                        // Surface texture pattern
+                        Circle()
+                            .fill(
+                                RadialGradient(
+                                    colors: [
+                                        Color.white.opacity(0.15),
+                                        Color.clear
+                                    ],
+                                    center: UnitPoint(x: 0.25, y: 0.25),
+                                    startRadius: 0,
+                                    endRadius: planetSize / 3
+                                )
+                            )
                     )
                     .overlay(
                         Circle()
-                            .stroke(node.accentColor.opacity(0.6), lineWidth: 1.5)
+                            .stroke(planet.accentColor.opacity(0.8), lineWidth: 1.5)
                     )
+
+                // Icon overlay
+                Image(systemName: planet.icon)
+                    .font(.system(size: isSelected ? 22 : 18, weight: .semibold))
+                    .foregroundColor(.white.opacity(0.9))
             }
 
-            // Name label (visible on selection)
+            // Info label (visible on selection)
             if isSelected {
-                Text(node.name)
-                    .font(.caption)
-                    .fontWeight(.medium)
-                    .foregroundColor(DiscoveryTheme.textPrimary)
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 4)
-                    .background(DiscoveryTheme.surface.opacity(0.8))
-                    .cornerRadius(8)
-                    .transition(.opacity.combined(with: .scale))
+                VStack(spacing: 2) {
+                    Text(planet.title)
+                        .font(.caption)
+                        .fontWeight(.semibold)
+                        .foregroundColor(DiscoveryTheme.textPrimary)
+                        .lineLimit(1)
+
+                    Text(planet.subtitle)
+                        .font(.caption2)
+                        .foregroundColor(DiscoveryTheme.textMuted)
+                }
+                .padding(.horizontal, 10)
+                .padding(.vertical, 6)
+                .background(DiscoveryTheme.surface.opacity(0.9))
+                .cornerRadius(8)
+                .transition(.opacity.combined(with: .scale))
             }
         }
         .offset(y: floatOffset)
@@ -283,17 +357,21 @@ struct ClusterNodeView: View {
             onTap()
         }
         .onAppear {
-            // Staggered appearance animation
             DispatchQueue.main.asyncAfter(deadline: .now() + appearanceDelay) {
                 withAnimation(.spring(response: 0.5, dampingFraction: 0.7)) {
                     appeared = true
                 }
-                // Start floating animation after appearance
                 withAnimation(
-                    .easeInOut(duration: node.floatSpeed)
+                    .easeInOut(duration: planet.floatSpeed)
                     .repeatForever(autoreverses: true)
                 ) {
                     floatOffset = 6
+                }
+                // Slow ring rotation for events
+                if planet.isEvent {
+                    withAnimation(.linear(duration: 8).repeatForever(autoreverses: false)) {
+                        ringRotation = 360
+                    }
                 }
             }
         }
@@ -304,22 +382,22 @@ struct ClusterNodeView: View {
 
 struct ConnectorLinesView: View {
     let centerPoint: CGPoint
-    let nodes: [ClusterNode]
-    let nodePositions: [UUID: CGPoint]
+    let planets: [PlanetNode]
+    let planetPositions: [UUID: CGPoint]
 
     var body: some View {
         Canvas { context, size in
-            for node in nodes {
-                guard let nodePos = nodePositions[node.id] else { continue }
+            for planet in planets {
+                guard let planetPos = planetPositions[planet.id] else { continue }
 
                 let dashPattern: [CGFloat] = [4, 6]
                 var path = Path()
                 path.move(to: centerPoint)
-                path.addLine(to: nodePos)
+                path.addLine(to: planetPos)
 
                 context.stroke(
                     path,
-                    with: .color(DiscoveryTheme.textMuted.opacity(0.2)),
+                    with: .color(planet.accentColor.opacity(0.15)),
                     style: StrokeStyle(lineWidth: 1, dash: dashPattern)
                 )
             }
@@ -349,13 +427,11 @@ struct VoyageButton: View {
             .padding(.vertical, 14)
             .background(
                 ZStack {
-                    // Glow layer
                     Capsule()
                         .fill(DiscoveryTheme.accentBlue.opacity(0.3))
                         .blur(radius: 8)
                         .scaleEffect(glowPulse)
 
-                    // Main button
                     Capsule()
                         .fill(
                             LinearGradient(
@@ -368,7 +444,6 @@ struct VoyageButton: View {
                             )
                         )
 
-                    // Border
                     Capsule()
                         .stroke(
                             LinearGradient(
@@ -462,10 +537,8 @@ struct DiscoveryNavBar: View {
         .padding(.bottom, 20)
         .background(
             ZStack {
-                // Frosted glass effect
                 DiscoveryTheme.surface.opacity(0.85)
 
-                // Top border glow
                 VStack {
                     Rectangle()
                         .fill(
@@ -488,21 +561,54 @@ struct DiscoveryNavBar: View {
     }
 }
 
+// MARK: - Legend View
+
+struct DiscoveryLegend: View {
+    var body: some View {
+        HStack(spacing: 16) {
+            LegendItem(color: DiscoveryTheme.accentTeal, label: "Events", icon: "calendar.circle.fill")
+            LegendItem(color: DiscoveryTheme.accentAmber, label: "Missions", icon: "star.fill")
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 8)
+        .background(DiscoveryTheme.surface.opacity(0.7))
+        .cornerRadius(12)
+    }
+}
+
+struct LegendItem: View {
+    let color: Color
+    let label: String
+    let icon: String
+
+    var body: some View {
+        HStack(spacing: 6) {
+            Circle()
+                .fill(color)
+                .frame(width: 10, height: 10)
+            Image(systemName: icon)
+                .font(.caption2)
+                .foregroundColor(color)
+            Text(label)
+                .font(.caption2)
+                .foregroundColor(DiscoveryTheme.textMuted)
+        }
+    }
+}
+
 // MARK: - Main Discovery View
 
 struct DiscoveryView: View {
     let userProfile: Profile
 
     @State private var stars: [Star] = []
-    @State private var clusterNodes: [ClusterNode] = []
-    @State private var selectedNodeId: UUID? = nil
-    @State private var nodePositions: [UUID: CGPoint] = [:]
+    @State private var planets: [PlanetNode] = []
+    @State private var selectedPlanetId: UUID? = nil
+    @State private var planetPositions: [UUID: CGPoint] = [:]
     @State private var selectedNavTab: DiscoveryNavBar.DiscoveryNavTab = .discovery
 
-    // Geometry
-    private let centerNodeSize: CGFloat = 90
-    private let minRadius: CGFloat = 100
-    private let maxRadius: CGFloat = 160
+    private let minRadius: CGFloat = 110
+    private let maxRadius: CGFloat = 170
 
     var body: some View {
         GeometryReader { geometry in
@@ -539,41 +645,47 @@ struct DiscoveryView: View {
                 // Connector lines
                 ConnectorLinesView(
                     centerPoint: centerPoint,
-                    nodes: clusterNodes,
-                    nodePositions: nodePositions
+                    planets: planets,
+                    planetPositions: planetPositions
                 )
 
-                // Cluster nodes
-                ForEach(Array(clusterNodes.enumerated()), id: \.element.id) { index, node in
-                    let position = calculateNodePosition(
-                        node: node,
+                // Planet nodes
+                ForEach(Array(planets.enumerated()), id: \.element.id) { index, planet in
+                    let position = calculatePlanetPosition(
+                        planet: planet,
                         center: centerPoint
                     )
-                    let delay = 0.4 + Double(index) * 0.1
+                    let delay = 0.4 + Double(index) * 0.12
 
-                    ClusterNodeView(
-                        node: node,
-                        isSelected: selectedNodeId == node.id,
+                    PlanetNodeView(
+                        planet: planet,
+                        isSelected: selectedPlanetId == planet.id,
                         appearanceDelay: delay,
                         onTap: {
                             withAnimation(.spring(response: 0.3)) {
-                                selectedNodeId = selectedNodeId == node.id ? nil : node.id
+                                selectedPlanetId = selectedPlanetId == planet.id ? nil : planet.id
                             }
                         }
                     )
                     .position(position)
                     .onAppear {
-                        // Store position for connector lines
-                        nodePositions[node.id] = position
+                        planetPositions[planet.id] = position
                     }
                 }
 
-                // Center node
+                // Center node (user)
                 CenterNodeView(
                     imageUrl: userProfile.photo,
                     username: userProfile.name
                 )
                 .position(centerPoint)
+
+                // Legend at top
+                VStack {
+                    DiscoveryLegend()
+                        .padding(.top, 60)
+                    Spacer()
+                }
 
                 // Voyage button and nav bar
                 VStack {
@@ -588,7 +700,7 @@ struct DiscoveryView: View {
             }
             .onAppear {
                 generateStars(in: geometry.size)
-                generateClusterNodes()
+                generatePlanets()
             }
         }
     }
@@ -610,50 +722,63 @@ struct DiscoveryView: View {
         }
     }
 
-    private func generateClusterNodes() {
-        let placeholderNames = [
-            "Alex", "Jordan", "Taylor", "Morgan", "Casey",
-            "Riley", "Quinn", "Avery", "Skyler", "Dakota"
-        ]
-
-        let nodeCount = Int.random(in: 6...10)
+    private func generatePlanets() {
+        var allPlanets: [PlanetNode] = []
         var usedAngles: [Double] = []
-        let minAngleSeparation = 0.5 // radians (~28 degrees)
+        let minAngleSeparation = 0.6
 
-        clusterNodes = (0..<nodeCount).map { index in
-            // Generate angle with some randomness but avoid overlap
-            var angle: Double
-            var attempts = 0
-            let maxAttempts = 50
+        // Add events
+        for (index, event) in MockData.mockEvents.enumerated() {
+            let angle = findAvailableAngle(usedAngles: &usedAngles, minSeparation: minAngleSeparation)
+            let color = DiscoveryTheme.eventColors[index % DiscoveryTheme.eventColors.count]
 
-            repeat {
-                angle = Double.random(in: 0...(Double.pi * 2))
-                attempts += 1
-            } while attempts < maxAttempts && usedAngles.contains(where: {
-                let diff = abs($0 - angle)
-                // Check both direct distance and wrap-around distance
-                return min(diff, Double.pi * 2 - diff) < minAngleSeparation
-            })
-            usedAngles.append(angle)
-
-            let radius = CGFloat.random(in: minRadius...maxRadius)
-            let accentColor = DiscoveryTheme.nodeAccents[index % DiscoveryTheme.nodeAccents.count]
-
-            return ClusterNode(
-                name: placeholderNames[index % placeholderNames.count],
-                imageUrl: nil, // Using placeholder for now
+            allPlanets.append(PlanetNode(
+                type: .event(event),
                 angle: angle,
-                radius: radius,
-                accentColor: accentColor,
+                radius: CGFloat.random(in: minRadius...maxRadius),
+                accentColor: color,
                 floatPhase: Double.random(in: 0...2),
                 floatSpeed: Double.random(in: 2.5...4)
-            )
+            ))
         }
+
+        // Add missions
+        for (index, mission) in MockData.mockMissions.enumerated() {
+            let angle = findAvailableAngle(usedAngles: &usedAngles, minSeparation: minAngleSeparation)
+            let color = DiscoveryTheme.missionColors[index % DiscoveryTheme.missionColors.count]
+
+            allPlanets.append(PlanetNode(
+                type: .mission(mission),
+                angle: angle,
+                radius: CGFloat.random(in: minRadius...maxRadius),
+                accentColor: color,
+                floatPhase: Double.random(in: 0...2),
+                floatSpeed: Double.random(in: 2.5...4)
+            ))
+        }
+
+        planets = allPlanets
     }
 
-    private func calculateNodePosition(node: ClusterNode, center: CGPoint) -> CGPoint {
-        let x = center.x + node.radius * cos(node.angle)
-        let y = center.y + node.radius * sin(node.angle)
+    private func findAvailableAngle(usedAngles: inout [Double], minSeparation: Double) -> Double {
+        var angle: Double
+        var attempts = 0
+
+        repeat {
+            angle = Double.random(in: 0...(Double.pi * 2))
+            attempts += 1
+        } while attempts < 50 && usedAngles.contains(where: {
+            let diff = abs($0 - angle)
+            return min(diff, Double.pi * 2 - diff) < minSeparation
+        })
+
+        usedAngles.append(angle)
+        return angle
+    }
+
+    private func calculatePlanetPosition(planet: PlanetNode, center: CGPoint) -> CGPoint {
+        let x = center.x + planet.radius * cos(planet.angle)
+        let y = center.y + planet.radius * sin(planet.angle)
         return CGPoint(x: x, y: y)
     }
 }

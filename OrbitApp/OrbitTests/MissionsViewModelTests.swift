@@ -76,18 +76,18 @@ final class MissionsViewModelTests: XCTestCase {
         let vm = MissionsViewModel()
 
         vm.createMission(
-            activityCategory: .yoga,
+            activityCategory: .study,
             customActivityName: nil,
             minGroupSize: 2,
             maxGroupSize: 5,
             availability: [
                 AvailabilitySlot(date: Date(), timeBlocks: [.morning]),
             ],
-            description: "Morning yoga"
+            description: "Morning study session"
         )
 
         XCTAssertEqual(vm.missions.count, 1)
-        XCTAssertEqual(vm.missions.first?.activityCategory, .yoga)
+        XCTAssertEqual(vm.missions.first?.activityCategory, .study)
         XCTAssertEqual(vm.missions.first?.status, .pendingMatch)
     }
 
@@ -97,7 +97,7 @@ final class MissionsViewModelTests: XCTestCase {
         try await Task.sleep(for: .milliseconds(500))
 
         vm.createMission(
-            activityCategory: .running,
+            activityCategory: .sports,
             customActivityName: nil,
             minGroupSize: 2,
             maxGroupSize: 3,
@@ -107,7 +107,7 @@ final class MissionsViewModelTests: XCTestCase {
             description: ""
         )
 
-        XCTAssertEqual(vm.missions.first?.activityCategory, .running)
+        XCTAssertEqual(vm.missions.first?.activityCategory, .sports)
     }
 
     func testCreateMissionWithCustomName() {
@@ -133,7 +133,7 @@ final class MissionsViewModelTests: XCTestCase {
         let vm = MissionsViewModel()
 
         vm.createMission(
-            activityCategory: .basketball,
+            activityCategory: .sports,
             customActivityName: nil,
             minGroupSize: 2,
             maxGroupSize: 4,
@@ -153,7 +153,7 @@ final class MissionsViewModelTests: XCTestCase {
         let vm = MissionsViewModel()
 
         vm.createMission(
-            activityCategory: .hiking,
+            activityCategory: .hangout,
             customActivityName: nil,
             minGroupSize: 3,
             maxGroupSize: 6,
@@ -173,7 +173,7 @@ final class MissionsViewModelTests: XCTestCase {
         let vm = MissionsViewModel()
 
         vm.createMission(
-            activityCategory: .gym,
+            activityCategory: .food,
             customActivityName: nil,
             minGroupSize: 2,
             maxGroupSize: 4,

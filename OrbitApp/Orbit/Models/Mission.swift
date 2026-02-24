@@ -4,18 +4,12 @@ import SwiftUI
 // MARK: - Activity Category
 
 enum ActivityCategory: String, Codable, CaseIterable, Identifiable {
-    case pickleball   = "Pickleball"
-    case basketball   = "Basketball"
-    case cafeHopping  = "Cafe Hopping"
-    case restaurant   = "Restaurant"
-    case studySession = "Study Session"
-    case hiking       = "Hiking"
-    case gym          = "Gym"
-    case running      = "Running"
-    case yoga         = "Yoga"
-    case boardGames   = "Board Games"
-    case movies       = "Movies"
-    case custom       = "Custom"
+    case sports  = "Sports"
+    case food    = "Food"
+    case movies  = "Movies"
+    case hangout = "Hangout"
+    case study   = "Study"
+    case custom  = "Custom"
 
     var id: String { rawValue }
 
@@ -23,18 +17,12 @@ enum ActivityCategory: String, Codable, CaseIterable, Identifiable {
 
     var icon: String {
         switch self {
-        case .pickleball:   return "figure.pickleball"
-        case .basketball:   return "figure.basketball"
-        case .cafeHopping:  return "cup.and.saucer.fill"
-        case .restaurant:   return "fork.knife"
-        case .studySession: return "book.fill"
-        case .hiking:       return "figure.hiking"
-        case .gym:          return "dumbbell.fill"
-        case .running:      return "figure.run"
-        case .yoga:         return "figure.mind.and.body"
-        case .boardGames:   return "gamecontroller.fill"
-        case .movies:       return "film"
-        case .custom:       return "star.fill"
+        case .sports:  return "figure.run"
+        case .food:    return "fork.knife"
+        case .movies:  return "film"
+        case .hangout: return "person.2.fill"
+        case .study:   return "book.fill"
+        case .custom:  return "star.fill"
         }
     }
 }
