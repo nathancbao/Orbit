@@ -1,23 +1,21 @@
 import SwiftUI
 
-struct MissionFormView: View {
-    let category: ActivityCategory
-    @EnvironmentObject var viewModel: MissionsViewModel
+// MARK: - Signal Form View
+// Sheet for creating a new spontaneous signal.
+
+struct SignalFormView: View {
+    @EnvironmentObject var viewModel: SignalsViewModel
     @Environment(\.dismiss) private var dismiss
 
-    // Availability grid state
+    @State private var selectedCategory: ActivityCategory = .hangout
     @State private var selectedSlots: Set<SlotKey> = []
-
-    // Group size
     @State private var minGroupSize: Int = 2
     @State private var maxGroupSize: Int = 4
-
-    // Optional details
     @State private var customActivityName: String = ""
     @State private var description: String = ""
 
     private var canSubmit: Bool {
-        if category == .custom && customActivityName.trimmingCharacters(in: .whitespaces).isEmpty {
+        if selectedCategory == .custom && customActivityName.trimmingCharacters(in: .whitespaces).isEmpty {
             return false
         }
         return !selectedSlots.isEmpty
@@ -27,7 +25,10 @@ struct MissionFormView: View {
         NavigationStack {
             ScrollView {
                 VStack(spacing: 28) {
-                    activityHeader
+                    categorySection
+                    if selectedCategory == .custom {
+                        customNameSection
+                    }
                     availabilityGridSection
                     groupSizeSection
                     noteSection
@@ -37,7 +38,7 @@ struct MissionFormView: View {
                 .padding(.vertical, 20)
             }
             .background(Color(.systemBackground))
-            .navigationTitle("New Mission")
+            .navigationTitle("New Signal")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
@@ -47,34 +48,60 @@ struct MissionFormView: View {
         }
     }
 
-    // MARK: - Activity Header
+    // MARK: - Category Picker
 
-    private var activityHeader: some View {
-        VStack(spacing: 12) {
-            ZStack {
-                Circle()
-                    .fill(OrbitTheme.gradientFill)
-                    .frame(width: 64, height: 64)
-                Image(systemName: category.icon)
-                    .font(.title2)
-                    .foregroundColor(.white)
-            }
+    private var categorySection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            OrbitSectionHeader(title: "What do you want to do?")
 
-            if category == .custom {
-                TextField("Name your activity", text: $customActivityName)
-                    .font(.title3)
-                    .fontWeight(.semibold)
-                    .multilineTextAlignment(.center)
-                    .textFieldStyle(.roundedBorder)
-                    .frame(maxWidth: 260)
-            } else {
-                Text(category.displayName)
-                    .font(.title3)
-                    .fontWeight(.semibold)
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 10) {
+                    ForEach(ActivityCategory.allCases) { category in
+                        Button {
+                            selectedCategory = category
+                        } label: {
+                            VStack(spacing: 6) {
+                                Image(systemName: category.icon)
+                                    .font(.title3)
+                                Text(category.displayName)
+                                    .font(.caption)
+                                    .fontWeight(.medium)
+                            }
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 12)
+                            .background(
+                                selectedCategory == category
+                                    ? AnyShapeStyle(OrbitTheme.gradientFill)
+                                    : AnyShapeStyle(Color(.systemGray6))
+                            )
+                            .foregroundColor(selectedCategory == category ? .white : .primary)
+                            .clipShape(RoundedRectangle(cornerRadius: 12))
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 12)
+                                    .stroke(
+                                        selectedCategory == category
+                                            ? Color.clear
+                                            : Color(.systemGray4),
+                                        lineWidth: 1
+                                    )
+                            )
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+                .padding(.horizontal, 2)
             }
         }
-        .frame(maxWidth: .infinity)
-        .padding(.top, 8)
+    }
+
+    // MARK: - Custom Name
+
+    private var customNameSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            OrbitSectionHeader(title: "Activity Name")
+            TextField("Name your activity", text: $customActivityName)
+                .textFieldStyle(.roundedBorder)
+        }
     }
 
     // MARK: - Availability Grid
@@ -170,7 +197,7 @@ struct MissionFormView: View {
                 }
             }
 
-            Text("\(minGroupSize)-\(maxGroupSize) people")
+            Text("\(minGroupSize)–\(maxGroupSize) people")
                 .font(.caption)
                 .foregroundColor(.secondary)
         }
@@ -181,7 +208,6 @@ struct MissionFormView: View {
     private var noteSection: some View {
         VStack(alignment: .leading, spacing: 12) {
             OrbitSectionHeader(title: "Note")
-
             TextField("Add a note (optional)", text: $description, axis: .vertical)
                 .textFieldStyle(.roundedBorder)
                 .lineLimit(2...5)
@@ -192,14 +218,18 @@ struct MissionFormView: View {
 
     private var submitButton: some View {
         Button {
-            submitMission()
+            submitSignal()
         } label: {
-            Text("Launch Mission")
+            Text("Send Signal")
                 .font(.headline)
                 .fontWeight(.semibold)
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 16)
-                .background(canSubmit ? OrbitTheme.gradientFill : LinearGradient(colors: [Color.gray.opacity(0.3)], startPoint: .leading, endPoint: .trailing))
+                .background(
+                    canSubmit
+                        ? OrbitTheme.gradientFill
+                        : LinearGradient(colors: [Color.gray.opacity(0.3)], startPoint: .leading, endPoint: .trailing)
+                )
                 .foregroundColor(canSubmit ? .white : .secondary)
                 .clipShape(RoundedRectangle(cornerRadius: 14))
         }
@@ -222,24 +252,20 @@ struct MissionFormView: View {
     }
 
     private func weekdayLabel(for offset: Int) -> String {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "EEE"
-        return formatter.string(from: dateForOffset(offset))
+        let f = DateFormatter(); f.dateFormat = "EEE"
+        return f.string(from: dateForOffset(offset))
     }
 
     private func dateLabel(for offset: Int) -> String {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "M/d"
-        return formatter.string(from: dateForOffset(offset))
+        let f = DateFormatter(); f.dateFormat = "M/d"
+        return f.string(from: dateForOffset(offset))
     }
 
-    private func submitMission() {
+    private func submitSignal() {
         guard canSubmit else { return }
-
         let calendar = Calendar.current
         let today = calendar.startOfDay(for: Date())
 
-        // Group selected slots by dayOffset, build AvailabilitySlot array
         let grouped = Dictionary(grouping: selectedSlots) { $0.dayOffset }
         let slots: [AvailabilitySlot] = grouped.keys.sorted().compactMap { dayOffset in
             guard let date = calendar.date(byAdding: .day, value: dayOffset, to: today) else { return nil }
@@ -249,9 +275,9 @@ struct MissionFormView: View {
             return AvailabilitySlot(date: date, timeBlocks: blocks)
         }
 
-        viewModel.createMission(
-            activityCategory: category,
-            customActivityName: category == .custom ? customActivityName.trimmingCharacters(in: .whitespaces) : nil,
+        viewModel.createSignal(
+            activityCategory: selectedCategory,
+            customActivityName: selectedCategory == .custom ? customActivityName.trimmingCharacters(in: .whitespaces) : nil,
             minGroupSize: minGroupSize,
             maxGroupSize: maxGroupSize,
             availability: slots,
@@ -264,7 +290,7 @@ struct MissionFormView: View {
 
 // MARK: - Slot Key
 
-private struct SlotKey: Hashable {
+struct SlotKey: Hashable {
     let dayOffset: Int
     let timeBlock: TimeBlock
 }

@@ -8,10 +8,9 @@ struct MainTabView: View {
 
     enum Tab {
         case discovery
-        case discover
-        case myEvents
         case missions
-        case profile
+        case signals
+        case pods
     }
 
     var body: some View {
@@ -24,33 +23,26 @@ struct MainTabView: View {
                 }
                 .tag(Tab.discovery)
 
-            // Discover Tab
-            EventDiscoverView(userProfile: profile)
+            // Missions Tab (fixed-date events discover feed)
+            MissionsView(userProfile: profile)
                 .tabItem {
-                    Label("Events", systemImage: "sparkles")
-                }
-                .tag(Tab.discover)
-
-            // My Events Tab
-            MyEventsView()
-                .tabItem {
-                    Label("My Events", systemImage: "person.3.fill")
-                }
-                .tag(Tab.myEvents)
-
-            // Missions Tab
-            MissionsView()
-                .tabItem {
-                    Label("Missions", systemImage: "scope")
+                    Label("Missions", systemImage: "calendar.circle.fill")
                 }
                 .tag(Tab.missions)
 
-            // Profile Tab
-            ProfileDisplayView(profile: profile, onEdit: onEditProfile)
+            // Signals Tab (spontaneous activity feed + FAB)
+            SignalsView(userProfile: profile)
                 .tabItem {
-                    Label("Profile", systemImage: "person.circle")
+                    Label("Signals", systemImage: "antenna.radiowaves.left.and.right")
                 }
-                .tag(Tab.profile)
+                .tag(Tab.signals)
+
+            // Pods Tab (all joined pods)
+            PodsView(userProfile: profile)
+                .tabItem {
+                    Label("Pods", systemImage: "person.3.fill")
+                }
+                .tag(Tab.pods)
         }
     }
 }

@@ -1,10 +1,17 @@
+//
+//  MissionsViewModel.swift (stored as EventDiscoverViewModel.swift)
+//  Orbit
+//
+//  State management for missions feed (formerly EventDiscoverViewModel).
+//
+
 import Foundation
 import Combine
 
 @MainActor
-class EventDiscoverViewModel: ObservableObject {
-    @Published var suggestedEvents: [Event] = []
-    @Published var allEvents: [Event] = []
+class MissionsViewModel: ObservableObject {
+    @Published var suggestedMissions: [Mission] = []
+    @Published var allMissions: [Mission] = []
     @Published var isLoading = false
     @Published var errorMessage: String?
     @Published var filterTag: String?
@@ -17,8 +24,8 @@ class EventDiscoverViewModel: ObservableObject {
         isLoading = true
         errorMessage = nil
 
-        async let suggested = try? EventService.shared.suggestedEvents()
-        async let all = try? EventService.shared.listEvents(
+        async let suggested = try? MissionService.shared.suggestedMissions()
+        async let all = try? MissionService.shared.listMissions(
             tag: filterTag,
             year: showMyYearOnly ? userYear : nil
         )
@@ -26,16 +33,11 @@ class EventDiscoverViewModel: ObservableObject {
         var fetchedSuggested = await suggested ?? []
         var fetchedAll = await all ?? []
 
-        // Include mock events for development when API returns empty
-        if fetchedAll.isEmpty {
-            fetchedAll = MockData.mockEvents
-        }
-        if fetchedSuggested.isEmpty {
-            fetchedSuggested = MockData.mockEvents
-        }
+        if fetchedAll.isEmpty { fetchedAll = MockData.mockMissions }
+        if fetchedSuggested.isEmpty { fetchedSuggested = MockData.mockMissions }
 
-        suggestedEvents = fetchedSuggested
-        allEvents = fetchedAll
+        suggestedMissions = fetchedSuggested
+        allMissions = fetchedAll
         isLoading = false
     }
 
@@ -53,9 +55,9 @@ class EventDiscoverViewModel: ObservableObject {
         await reload()
     }
 
-    func skipEvent(_ event: Event) async {
-        try? await EventService.shared.skipEvent(id: event.id)
-        allEvents.removeAll { $0.id == event.id }
-        suggestedEvents.removeAll { $0.id == event.id }
+    func skipMission(_ mission: Mission) async {
+        try? await MissionService.shared.skipMission(id: mission.id)
+        allMissions.removeAll { $0.id == mission.id }
+        suggestedMissions.removeAll { $0.id == mission.id }
     }
 }

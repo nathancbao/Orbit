@@ -1,19 +1,22 @@
+//
+//  SignalsViewModel.swift
+//  Orbit
+//
+//  State management for signals (formerly MissionsViewModel).
+//
+
 import Foundation
 import Combine
 import SwiftUI
 
 @MainActor
-class MissionsViewModel: ObservableObject {
+class SignalsViewModel: ObservableObject {
 
-    // MARK: - Published Properties
-
-    @Published var missions: [Mission] = []
+    @Published var signals: [Signal] = []
     @Published var isLoading: Bool = false
     @Published var isSubmitting: Bool = false
-
     @Published var errorMessage: String?
     @Published var showError: Bool = false
-
     @Published var toastMessage: String?
     @Published var showToast: Bool = false
 
@@ -21,29 +24,29 @@ class MissionsViewModel: ObservableObject {
 
     // MARK: - Computed
 
-    var pendingMissions: [Mission] {
-        missions.filter { $0.status == .pendingMatch }
+    var pendingSignals: [Signal] {
+        signals.filter { $0.status == .pending }
     }
 
-    var matchedMissions: [Mission] {
-        missions.filter { $0.status == .matched }
+    var activeSignals: [Signal] {
+        signals.filter { $0.status == .active }
     }
 
-    // MARK: - Load (Mock)
+    // MARK: - Load
 
-    func loadMissions() {
-        guard missions.isEmpty else { return }
+    func loadSignals() {
+        guard signals.isEmpty else { return }
         isLoading = true
         Task {
             try? await Task.sleep(for: .milliseconds(300))
-            missions = MockData.mockMissions
+            signals = MockData.mockSignals
             isLoading = false
         }
     }
 
-    // MARK: - Create Mission
+    // MARK: - Create
 
-    func createMission(
+    func createSignal(
         activityCategory: ActivityCategory,
         customActivityName: String?,
         minGroupSize: Int,
@@ -51,9 +54,6 @@ class MissionsViewModel: ObservableObject {
         availability: [AvailabilitySlot],
         description: String
     ) {
-        isSubmitting = true
-        defer { isSubmitting = false }
-
         let title: String
         if activityCategory == .custom {
             title = customActivityName ?? "Custom Activity"
@@ -61,7 +61,7 @@ class MissionsViewModel: ObservableObject {
             title = activityCategory.displayName
         }
 
-        let mission = Mission(
+        let signal = Signal(
             id: UUID().uuidString,
             title: title,
             description: description,
@@ -70,25 +70,25 @@ class MissionsViewModel: ObservableObject {
             minGroupSize: minGroupSize,
             maxGroupSize: maxGroupSize,
             availability: availability,
-            status: .pendingMatch,
+            status: .pending,
             creatorId: 0,
             createdAt: ISO8601DateFormatter().string(from: Date())
         )
-        missions.insert(mission, at: 0)
-        showToastMessage("Mission created!")
+        signals.insert(signal, at: 0)
+        showToastMessage("Signal sent!")
     }
 
-    // MARK: - Delete Mission
+    // MARK: - Delete
 
-    func deleteMission(id: String) {
-        missions.removeAll { $0.id == id }
-        showToastMessage("Mission deleted")
+    func deleteSignal(id: String) {
+        signals.removeAll { $0.id == id }
+        showToastMessage("Signal removed")
     }
 
-    // MARK: - Private Helpers
+    // MARK: - Helpers
 
     private func handleError(_ error: Error) {
-        if let e = error as? MissionError {
+        if let e = error as? SignalError {
             errorMessage = e.errorDescription
         } else {
             errorMessage = "An unexpected error occurred"
@@ -106,5 +106,4 @@ class MissionsViewModel: ObservableObject {
             withAnimation(.easeOut(duration: 0.3)) { showToast = false }
         }
     }
-
 }

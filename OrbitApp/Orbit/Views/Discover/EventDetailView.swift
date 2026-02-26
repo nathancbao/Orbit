@@ -1,11 +1,11 @@
 import SwiftUI
 
-// MARK: - Event Detail View
-// Shown as a sheet when user taps an event card.
-// Displays full event info and "Join Pod" button.
+// MARK: - Mission Detail View
+// Shown as a sheet when user taps a mission card.
+// Displays full mission info and "Join Pod" button.
 
-struct EventDetailView: View {
-    let event: Event
+struct MissionDetailView: View {
+    let mission: Mission
     let onJoined: () -> Void
 
     @State private var isJoining = false
@@ -28,7 +28,7 @@ struct EventDetailView: View {
                     VStack(alignment: .leading, spacing: 24) {
 
                         // Title
-                        Text(event.title)
+                        Text(mission.title)
                             .font(.largeTitle)
                             .fontWeight(.bold)
                             .padding(.top, 8)
@@ -38,13 +38,13 @@ struct EventDetailView: View {
                             HStack(spacing: 6) {
                                 Image(systemName: "calendar")
                                     .foregroundStyle(OrbitTheme.gradient)
-                                Text(event.displayDate)
+                                Text(mission.displayDate)
                                     .font(.subheadline)
                             }
                             HStack(spacing: 6) {
                                 Image(systemName: "mappin.and.ellipse")
                                     .foregroundStyle(OrbitTheme.gradient)
-                                Text(event.location.isEmpty ? "Location TBD" : event.location)
+                                Text(mission.location.isEmpty ? "Location TBD" : mission.location)
                                     .font(.subheadline)
                                     .lineLimit(1)
                             }
@@ -52,10 +52,10 @@ struct EventDetailView: View {
                         .foregroundColor(.secondary)
 
                         // Tags
-                        if !event.tags.isEmpty {
+                        if !mission.tags.isEmpty {
                             ScrollView(.horizontal, showsIndicators: false) {
                                 HStack(spacing: 8) {
-                                    ForEach(event.tags, id: \.self) { tag in
+                                    ForEach(mission.tags, id: \.self) { tag in
                                         Text(tag)
                                             .font(.caption)
                                             .padding(.horizontal, 10)
@@ -69,7 +69,7 @@ struct EventDetailView: View {
                         }
 
                         // Description
-                        Text(event.description)
+                        Text(mission.description)
                             .font(.body)
                             .foregroundColor(.primary)
                             .lineSpacing(4)
@@ -77,7 +77,7 @@ struct EventDetailView: View {
                         Divider()
 
                         // Pod status section
-                        PodStatusSection(event: event)
+                        MissionPodStatusSection(mission: mission)
 
                         if let error = errorMessage {
                             Text(error)
@@ -102,7 +102,7 @@ struct EventDetailView: View {
             }
         }
         .sheet(item: $joinedPod) { pod in
-            PodView(podId: pod.id, eventTitle: event.title)
+            PodView(podId: pod.id, eventTitle: mission.title)
                 .onDisappear {
                     onJoined()
                     dismiss()
@@ -112,9 +112,9 @@ struct EventDetailView: View {
 
     @ViewBuilder
     private var actionButton: some View {
-        switch event.userPodStatus {
+        switch mission.userPodStatus {
         case "in_pod":
-            if let podId = event.userPodId {
+            if let podId = mission.userPodId {
                 Button(action: { openPod(podId: podId) }) {
                     Label("open your pod", systemImage: "person.3.fill")
                         .frame(maxWidth: .infinity)
@@ -150,13 +150,12 @@ struct EventDetailView: View {
         }
     }
 
-
     private func join() {
         isJoining = true
         errorMessage = nil
         Task {
             do {
-                let pod = try await EventService.shared.joinEvent(id: event.id)
+                let pod = try await MissionService.shared.joinMission(id: mission.id)
                 await MainActor.run {
                     isJoining = false
                     joinedPod = pod
@@ -180,17 +179,17 @@ struct EventDetailView: View {
     }
 }
 
-// MARK: - Pod Status Section
+// MARK: - Mission Pod Status Section
 
-struct PodStatusSection: View {
-    let event: Event
+struct MissionPodStatusSection: View {
+    let mission: Mission
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             Text("pods")
                 .font(.headline)
 
-            if let pods = event.pods, !pods.isEmpty {
+            if let pods = mission.pods, !pods.isEmpty {
                 ForEach(pods, id: \.podId) { pod in
                     HStack {
                         Image(systemName: pod.status == "open" ? "circle.dotted" : "circle.fill")

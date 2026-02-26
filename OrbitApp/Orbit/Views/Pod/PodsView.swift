@@ -1,68 +1,59 @@
 import SwiftUI
 
-// MARK: - My Events View
-// Shows pods the current user has joined.
+// MARK: - Pods View
+// Unified list of all pods the user has joined (missions + signals).
 
-struct MyEventsView: View {
+struct PodsView: View {
+    let userProfile: Profile
     @State private var pods: [EventPod] = []
-    @State private var events: [String: Event] = [:]  // event_id -> Event
     @State private var isLoading = false
 
     var body: some View {
-        ZStack {
-            Color.white.ignoresSafeArea()
+        NavigationStack {
+            ZStack {
+                Color(.systemBackground).ignoresSafeArea()
 
-            VStack {
-                TopWavyLines().frame(height: 120)
-                Spacer()
-            }
-            .ignoresSafeArea()
-
-            if isLoading {
-                ProgressView()
-            } else if pods.isEmpty {
-                VStack(spacing: 16) {
-                    Image(systemName: "person.3")
-                        .font(.system(size: 48))
-                        .foregroundStyle(
-                            OrbitTheme.gradient
-                        )
-                    Text("no pods yet")
-                        .font(.headline)
-                    Text("join an event from Discover to get started!")
-                        .font(.subheadline)
-                        .foregroundColor(.secondary)
-                        .multilineTextAlignment(.center)
-                        .padding(.horizontal, 40)
-                }
-            } else {
-                ScrollView {
-                    VStack(alignment: .leading, spacing: 16) {
-                        Text("my events")
-                            .font(.largeTitle)
-                            .fontWeight(.bold)
-                            .padding(.horizontal, 20)
-                            .padding(.top, 16)
-
-                        ForEach(pods) { pod in
-                            PodRowCard(pod: pod, eventTitle: events[String(pod.eventId)]?.title ?? "Event")
-                                .padding(.horizontal, 20)
-                        }
-
-                        Spacer(minLength: 80)
+                if isLoading {
+                    ProgressView()
+                        .tint(OrbitTheme.purple)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                } else if pods.isEmpty {
+                    VStack(spacing: 16) {
+                        Image(systemName: "person.3")
+                            .font(.system(size: 48))
+                            .foregroundStyle(OrbitTheme.gradient)
+                        Text("no pods yet")
+                            .font(.headline)
+                        Text("join a mission or respond to a signal to form a pod")
+                            .font(.subheadline)
+                            .foregroundColor(.secondary)
+                            .multilineTextAlignment(.center)
+                            .padding(.horizontal, 40)
                     }
+                } else {
+                    ScrollView {
+                        VStack(spacing: 14) {
+                            ForEach(pods) { pod in
+                                PodRowCard(pod: pod, eventTitle: "Mission")
+                                    .padding(.horizontal, 20)
+                            }
+                        }
+                        .padding(.top, 16)
+                        .padding(.bottom, 80)
+                    }
+                    .refreshable { await loadPods() }
                 }
-                .refreshable { await loadPods() }
             }
+            .navigationTitle("Pods")
+            .navigationBarTitleDisplayMode(.large)
         }
         .task { await loadPods() }
-        .navigationBarHidden(true)
     }
 
     private func loadPods() async {
-        // In a real implementation this would call a dedicated /users/me/pods endpoint.
-        // For now we refresh events and check user_pod_status.
         isLoading = true
+        // TODO: call /users/me/pods endpoint when available
+        try? await Task.sleep(for: .milliseconds(300))
         isLoading = false
     }
 }
@@ -116,9 +107,7 @@ struct PodRowCard: View {
                 Spacer()
 
                 Image(systemName: "message.fill")
-                    .foregroundStyle(
-                        OrbitTheme.gradient
-                    )
+                    .foregroundStyle(OrbitTheme.gradient)
             }
             .padding(16)
             .background(Color.white)

@@ -10,11 +10,11 @@ import Foundation
 
 enum MockData {
 
-    // MARK: - Mock Event
+    // MARK: - Mock Mission (fixed-date community event)
 
-    static var mockEvent: Event {
-        Event(
-            id: "mock-event-1",
+    static var mockMission: Mission {
+        Mission(
+            id: "mock-mission-1",
             title: "MMA Club Meeting",
             description: "Weekly MMA club meetup. All skill levels welcome!",
             tags: ["Sports", "Fitness", "MMA"],
@@ -32,19 +32,19 @@ enum MockData {
         )
     }
 
-    static var mockEvents: [Event] {
-        [mockEvent]
+    static var mockMissions: [Mission] {
+        [mockMission]
     }
 
-    // MARK: - Mock Missions
+    // MARK: - Mock Signals (spontaneous activity requests)
 
-    static var mockMissions: [Mission] {
+    static var mockSignals: [Signal] {
         let calendar = Calendar.current
         let today = calendar.startOfDay(for: Date())
 
         return [
-            Mission(
-                id: "mock-mission-1",
+            Signal(
+                id: "mock-signal-1",
                 title: "Pickup Basketball",
                 description: "Looking for people to play 5v5 at the ARC",
                 activityCategory: .sports,
@@ -56,12 +56,12 @@ enum MockData {
                     AvailabilitySlot(date: today.addingDays(3), timeBlocks: [.morning, .afternoon]),
                     AvailabilitySlot(date: today.addingDays(5), timeBlocks: [.evening]),
                 ],
-                status: .pendingMatch,
+                status: .pending,
                 creatorId: 0,
                 createdAt: ISO8601DateFormatter().string(from: today)
             ),
-            Mission(
-                id: "mock-mission-2",
+            Signal(
+                id: "mock-signal-2",
                 title: "Cafe Study Session",
                 description: "Chill study session, bring your laptop",
                 activityCategory: .study,
@@ -74,12 +74,12 @@ enum MockData {
                     AvailabilitySlot(date: today.addingDays(2), timeBlocks: [.afternoon, .evening]),
                     AvailabilitySlot(date: today.addingDays(4), timeBlocks: [.morning]),
                 ],
-                status: .matched,
+                status: .active,
                 creatorId: 1,
                 createdAt: ISO8601DateFormatter().string(from: today.addingDays(-1))
             ),
-            Mission(
-                id: "mock-mission-3",
+            Signal(
+                id: "mock-signal-3",
                 title: "Grab some food",
                 description: "Anyone down to try that new ramen place?",
                 activityCategory: .food,
@@ -91,7 +91,7 @@ enum MockData {
                     AvailabilitySlot(date: today.addingDays(7), timeBlocks: [.evening]),
                     AvailabilitySlot(date: today.addingDays(13), timeBlocks: [.afternoon, .evening]),
                 ],
-                status: .pendingMatch,
+                status: .pending,
                 creatorId: 0,
                 createdAt: ISO8601DateFormatter().string(from: today)
             ),

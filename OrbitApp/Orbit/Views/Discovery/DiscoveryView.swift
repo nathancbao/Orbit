@@ -69,8 +69,8 @@ struct Star: Identifiable {
 // MARK: - Planet Node Model
 
 enum PlanetType {
-    case event(Event)
     case mission(Mission)
+    case signal(Signal)
 }
 
 struct PlanetNode: Identifiable {
@@ -84,27 +84,27 @@ struct PlanetNode: Identifiable {
 
     var title: String {
         switch type {
-        case .event(let event): return event.title
-        case .mission(let mission): return mission.displayTitle
+        case .mission(let mission): return mission.title
+        case .signal(let signal): return signal.displayTitle
         }
     }
 
     var subtitle: String {
         switch type {
-        case .event(let event): return event.displayDate
-        case .mission(let mission): return mission.activityCategory.displayName
+        case .mission(let mission): return mission.displayDate
+        case .signal(let signal): return signal.activityCategory.displayName
         }
     }
 
     var icon: String {
         switch type {
-        case .event: return "calendar.circle.fill"
-        case .mission(let mission): return mission.activityCategory.icon
+        case .mission: return "calendar.circle.fill"
+        case .signal(let signal): return signal.activityCategory.icon
         }
     }
 
-    var isEvent: Bool {
-        if case .event = type { return true }
+    var isMission: Bool {
+        if case .mission = type { return true }
         return false
     }
 }
@@ -271,8 +271,8 @@ struct PlanetNodeView: View {
                     )
                     .frame(width: glowSize, height: glowSize)
 
-                // Ring for events (Saturn-like)
-                if planet.isEvent {
+                // Ring for missions (Saturn-like)
+                if planet.isMission {
                     Ellipse()
                         .stroke(
                             LinearGradient(
@@ -367,8 +367,8 @@ struct PlanetNodeView: View {
                 ) {
                     floatOffset = 6
                 }
-                // Slow ring rotation for events
-                if planet.isEvent {
+                // Slow ring rotation for missions
+                if planet.isMission {
                     withAnimation(.linear(duration: 8).repeatForever(autoreverses: false)) {
                         ringRotation = 360
                     }
@@ -566,8 +566,8 @@ struct DiscoveryNavBar: View {
 struct DiscoveryLegend: View {
     var body: some View {
         HStack(spacing: 16) {
-            LegendItem(color: DiscoveryTheme.accentTeal, label: "Events", icon: "calendar.circle.fill")
-            LegendItem(color: DiscoveryTheme.accentAmber, label: "Missions", icon: "star.fill")
+            LegendItem(color: DiscoveryTheme.accentTeal, label: "Missions", icon: "calendar.circle.fill")
+            LegendItem(color: DiscoveryTheme.accentAmber, label: "Signals", icon: "antenna.radiowaves.left.and.right")
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 8)
@@ -605,7 +605,6 @@ struct DiscoveryView: View {
     @State private var planets: [PlanetNode] = []
     @State private var selectedPlanetId: UUID? = nil
     @State private var planetPositions: [UUID: CGPoint] = [:]
-    @State private var selectedNavTab: DiscoveryNavBar.DiscoveryNavTab = .discovery
 
     private let minRadius: CGFloat = 110
     private let maxRadius: CGFloat = 170
@@ -687,16 +686,12 @@ struct DiscoveryView: View {
                     Spacer()
                 }
 
-                // Voyage button and nav bar
+                // Voyage button
                 VStack {
                     Spacer()
-
                     VoyageButton()
-                        .padding(.bottom, 16)
-
-                    DiscoveryNavBar(selectedTab: $selectedNavTab)
+                        .padding(.bottom, 32)
                 }
-                .ignoresSafeArea(edges: .bottom)
             }
             .onAppear {
                 generateStars(in: geometry.size)
@@ -727,13 +722,13 @@ struct DiscoveryView: View {
         var usedAngles: [Double] = []
         let minAngleSeparation = 0.6
 
-        // Add events
-        for (index, event) in MockData.mockEvents.enumerated() {
+        // Add missions (fixed-date events)
+        for (index, mission) in MockData.mockMissions.enumerated() {
             let angle = findAvailableAngle(usedAngles: &usedAngles, minSeparation: minAngleSeparation)
             let color = DiscoveryTheme.eventColors[index % DiscoveryTheme.eventColors.count]
 
             allPlanets.append(PlanetNode(
-                type: .event(event),
+                type: .mission(mission),
                 angle: angle,
                 radius: CGFloat.random(in: minRadius...maxRadius),
                 accentColor: color,
@@ -742,13 +737,13 @@ struct DiscoveryView: View {
             ))
         }
 
-        // Add missions
-        for (index, mission) in MockData.mockMissions.enumerated() {
+        // Add signals (spontaneous activity requests)
+        for (index, signal) in MockData.mockSignals.enumerated() {
             let angle = findAvailableAngle(usedAngles: &usedAngles, minSeparation: minAngleSeparation)
             let color = DiscoveryTheme.missionColors[index % DiscoveryTheme.missionColors.count]
 
             allPlanets.append(PlanetNode(
-                type: .mission(mission),
+                type: .signal(signal),
                 angle: angle,
                 radius: CGFloat.random(in: minRadius...maxRadius),
                 accentColor: color,
