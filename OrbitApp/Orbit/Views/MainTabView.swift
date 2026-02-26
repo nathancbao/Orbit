@@ -26,7 +26,7 @@ struct MainTabView: View {
             // Missions Tab (fixed-date events discover feed)
             MissionsView(userProfile: profile)
                 .tabItem {
-                    Label("Missions", systemImage: "calendar.circle.fill")
+                    Label("Missions", systemImage: "rocket.fill")
                 }
                 .tag(Tab.missions)
 

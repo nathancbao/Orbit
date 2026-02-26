@@ -58,6 +58,7 @@ struct SignalFormView: View {
                 HStack(spacing: 10) {
                     ForEach(ActivityCategory.allCases) { category in
                         Button {
+                            UIImpactFeedbackGenerator(style: .light).impactOccurred()
                             selectedCategory = category
                         } label: {
                             VStack(spacing: 6) {
@@ -218,6 +219,7 @@ struct SignalFormView: View {
 
     private var submitButton: some View {
         Button {
+            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
             submitSignal()
         } label: {
             Text("Send Signal")

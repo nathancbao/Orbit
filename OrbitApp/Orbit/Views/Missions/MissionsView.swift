@@ -72,7 +72,7 @@ struct MissionsView: View {
                             HStack { Spacer(); ProgressView(); Spacer() }
                                 .padding(.vertical, 40)
                         } else if viewModel.allMissions.isEmpty {
-                            EmptyMissionsView()
+                            EmptyMissionsView(onCreateTap: { showCreate = true })
                                 .padding(.horizontal, 20)
                         } else {
                             VStack(spacing: 14) {
@@ -94,7 +94,10 @@ struct MissionsView: View {
                 }
 
                 // FAB — create mission
-                Button { showCreate = true } label: {
+                Button {
+                    UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                    showCreate = true
+                } label: {
                     Image(systemName: "plus")
                         .font(.system(size: 22, weight: .semibold))
                         .foregroundColor(.white)
@@ -252,7 +255,12 @@ struct MissionListCard: View {
                         }
                     }
 
-                    MissionSpotsLabel(mission: mission)
+                    HStack(spacing: 8) {
+                        MissionSpotsLabel(mission: mission)
+                        if let score = mission.matchScore {
+                            MatchScoreBadge(score: score)
+                        }
+                    }
                 }
 
                 Spacer()
@@ -267,6 +275,27 @@ struct MissionListCard: View {
             .shadow(color: .black.opacity(0.06), radius: 8, x: 0, y: 2)
         }
         .buttonStyle(.plain)
+    }
+}
+
+// MARK: - Match Score Badge
+
+struct MatchScoreBadge: View {
+    let score: Double
+
+    private var color: Color {
+        score >= 0.75 ? .green : score >= 0.45 ? .orange : Color(.systemGray2)
+    }
+
+    var body: some View {
+        Text("\(Int(score * 100))% match")
+            .font(.caption2)
+            .fontWeight(.semibold)
+            .padding(.horizontal, 7)
+            .padding(.vertical, 3)
+            .background(color.opacity(0.12))
+            .foregroundColor(color)
+            .clipShape(Capsule())
     }
 }
 
@@ -316,7 +345,10 @@ struct TagFilterChip: View {
     let action: () -> Void
 
     var body: some View {
-        Button(action: action) {
+        Button(action: {
+            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+            action()
+        }) {
             Text(label)
                 .font(.caption)
                 .fontWeight(isSelected ? .semibold : .regular)
@@ -346,17 +378,32 @@ struct TagFilterChip: View {
 // MARK: - Empty Missions View
 
 struct EmptyMissionsView: View {
+    var onCreateTap: (() -> Void)? = nil
+
     var body: some View {
         VStack(spacing: 16) {
-            Image(systemName: "calendar.badge.plus")
+            Image(systemName: "rocket")
                 .font(.system(size: 48))
                 .foregroundStyle(OrbitTheme.gradient)
             Text("no missions yet")
                 .font(.headline)
-            Text("pull down to refresh, or check back later!")
+            Text("be the first — create a mission for others to join")
                 .font(.subheadline)
                 .foregroundColor(.secondary)
                 .multilineTextAlignment(.center)
+            if let onCreateTap {
+                Button(action: onCreateTap) {
+                    Label("Create a Mission", systemImage: "plus")
+                        .font(.subheadline)
+                        .fontWeight(.semibold)
+                        .padding(.horizontal, 20)
+                        .padding(.vertical, 10)
+                        .background(OrbitTheme.gradientFill)
+                        .foregroundColor(.white)
+                        .clipShape(Capsule())
+                }
+                .padding(.top, 4)
+            }
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 60)

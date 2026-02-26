@@ -43,7 +43,7 @@ struct SignalsView: View {
 
                         if displayed.isEmpty {
                             Spacer()
-                            EmptySignalsView(segment: segment)
+                            EmptySignalsView(segment: segment, onSignalTap: { showForm = true })
                             Spacer()
                         } else {
                             ScrollView {
@@ -64,6 +64,7 @@ struct SignalsView: View {
 
                 // FAB
                 Button {
+                    UIImpactFeedbackGenerator(style: .medium).impactOccurred()
                     showForm = true
                 } label: {
                     Image(systemName: "antenna.radiowaves.left.and.right")
@@ -237,18 +238,34 @@ struct SignalStatusBadge: View {
 
 struct EmptySignalsView: View {
     let segment: SignalsView.SignalSegment
+    var onSignalTap: (() -> Void)? = nil
 
     var body: some View {
         VStack(spacing: 16) {
             Image(systemName: "antenna.radiowaves.left.and.right")
                 .font(.system(size: 48))
                 .foregroundStyle(OrbitTheme.gradient)
-            Text(segment == .discover ? "no signals nearby" : "you haven't sent any signals")
+            Text(segment == .discover ? "no signals out there" : "you haven't sent any signals")
                 .font(.headline)
-            Text(segment == .discover ? "check back soon!" : "tap the antenna button to send one")
+            Text(segment == .discover
+                 ? "check back soon, or be the first to send one"
+                 : "let people know what you're down to do")
                 .font(.subheadline)
                 .foregroundColor(.secondary)
                 .multilineTextAlignment(.center)
+            if let onSignalTap {
+                Button(action: onSignalTap) {
+                    Label("Send a Signal", systemImage: "antenna.radiowaves.left.and.right")
+                        .font(.subheadline)
+                        .fontWeight(.semibold)
+                        .padding(.horizontal, 20)
+                        .padding(.vertical, 10)
+                        .background(OrbitTheme.gradientFill)
+                        .foregroundColor(.white)
+                        .clipShape(Capsule())
+                }
+                .padding(.top, 4)
+            }
         }
         .padding(.horizontal, 40)
     }
