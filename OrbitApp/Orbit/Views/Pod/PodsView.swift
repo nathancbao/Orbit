@@ -7,6 +7,7 @@ struct PodsView: View {
     let userProfile: Profile
     @State private var pods: [EventPod] = []
     @State private var isLoading = false
+    @State private var showProfile = false
 
     var body: some View {
         NavigationStack {
@@ -46,6 +47,23 @@ struct PodsView: View {
             }
             .navigationTitle("Pods")
             .navigationBarTitleDisplayMode(.large)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button { } label: {
+                        Image(systemName: "bell")
+                            .fontWeight(.medium)
+                            .foregroundStyle(Color.primary)
+                    }
+                }
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button { showProfile = true } label: {
+                        ProfileAvatarView(photo: userProfile.photo, size: 30)
+                    }
+                }
+            }
+        }
+        .sheet(isPresented: $showProfile) {
+            ProfileDisplayView(profile: userProfile, onEdit: { showProfile = false })
         }
         .task { await loadPods() }
     }

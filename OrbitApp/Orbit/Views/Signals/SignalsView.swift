@@ -8,6 +8,7 @@ struct SignalsView: View {
     @StateObject private var viewModel = SignalsViewModel()
     @State private var segment: SignalSegment = .discover
     @State private var showForm = false
+    @State private var showProfile = false
 
     enum SignalSegment: String, CaseIterable {
         case discover = "Discover"
@@ -78,6 +79,23 @@ struct SignalsView: View {
             }
             .navigationTitle("Signals")
             .navigationBarTitleDisplayMode(.large)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button { } label: {
+                        Image(systemName: "bell")
+                            .fontWeight(.medium)
+                            .foregroundStyle(Color.primary)
+                    }
+                }
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button { showProfile = true } label: {
+                        ProfileAvatarView(photo: userProfile.photo, size: 30)
+                    }
+                }
+            }
+        }
+        .sheet(isPresented: $showProfile) {
+            ProfileDisplayView(profile: userProfile, onEdit: { showProfile = false })
         }
         .sheet(isPresented: $showForm) {
             SignalFormView()

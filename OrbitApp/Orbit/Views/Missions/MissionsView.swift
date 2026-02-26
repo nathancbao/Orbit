@@ -8,6 +8,7 @@ struct MissionsView: View {
     @StateObject private var viewModel = MissionsViewModel()
     @State private var selectedMission: Mission?
     @State private var showCreate = false
+    @State private var showProfile = false
 
     private let allTags = [
         "Hiking", "Gaming", "Music", "Food", "Sports",
@@ -16,7 +17,7 @@ struct MissionsView: View {
 
     var body: some View {
         NavigationStack {
-            ZStack {
+            ZStack(alignment: .bottomTrailing) {
                 Color(.systemBackground).ignoresSafeArea()
 
                 ScrollView {
@@ -42,11 +43,17 @@ struct MissionsView: View {
                             }
                         }
 
-                        // Tag Filters
+                        // Tag Filters (includes My Year chip)
                         ScrollView(.horizontal, showsIndicators: false) {
                             HStack(spacing: 8) {
-                                TagFilterChip(label: "all", isSelected: viewModel.filterTag == nil) {
-                                    Task { await viewModel.applyTag(nil) }
+                                TagFilterChip(label: "all", isSelected: viewModel.filterTag == nil && !viewModel.showMyYearOnly) {
+                                    Task {
+                                        if viewModel.showMyYearOnly { await viewModel.toggleYearFilter() }
+                                        await viewModel.applyTag(nil)
+                                    }
+                                }
+                                TagFilterChip(label: "my year", isSelected: viewModel.showMyYearOnly) {
+                                    Task { await viewModel.toggleYearFilter() }
                                 }
                                 ForEach(allTags, id: \.self) { tag in
                                     TagFilterChip(
@@ -78,38 +85,40 @@ struct MissionsView: View {
                             }
                         }
 
-                        Spacer(minLength: 80)
+                        Spacer(minLength: 100)
                     }
                     .padding(.top, 16)
                 }
                 .refreshable {
                     await viewModel.reload()
                 }
+
+                // FAB — create mission
+                Button { showCreate = true } label: {
+                    Image(systemName: "plus")
+                        .font(.system(size: 22, weight: .semibold))
+                        .foregroundColor(.white)
+                        .padding(18)
+                        .background(OrbitTheme.gradientFill)
+                        .clipShape(Circle())
+                        .shadow(color: OrbitTheme.purple.opacity(0.4), radius: 12, x: 0, y: 6)
+                }
+                .padding(.trailing, 24)
+                .padding(.bottom, 32)
             }
             .navigationTitle("Missions")
             .navigationBarTitleDisplayMode(.large)
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
-                    Button {
-                        Task { await viewModel.toggleYearFilter() }
-                    } label: {
-                        Label(
-                            viewModel.showMyYearOnly ? "My Year" : "All Years",
-                            systemImage: viewModel.showMyYearOnly ? "person.fill.checkmark" : "person.2"
-                        )
-                        .font(.caption)
-                        .foregroundStyle(
-                            viewModel.showMyYearOnly
-                                ? AnyShapeStyle(OrbitTheme.gradient)
-                                : AnyShapeStyle(Color.secondary)
-                        )
+                    Button { } label: {
+                        Image(systemName: "bell")
+                            .fontWeight(.medium)
+                            .foregroundStyle(Color.primary)
                     }
                 }
                 ToolbarItem(placement: .navigationBarTrailing) {
-                    Button { showCreate = true } label: {
-                        Image(systemName: "plus")
-                            .fontWeight(.semibold)
-                            .foregroundStyle(OrbitTheme.gradient)
+                    Button { showProfile = true } label: {
+                        ProfileAvatarView(photo: userProfile.photo, size: 30)
                     }
                 }
             }
@@ -122,6 +131,11 @@ struct MissionsView: View {
         }
         .sheet(isPresented: $showCreate) {
             MissionCreateView()
+        }
+        .sheet(isPresented: $showProfile) {
+            ProfileDisplayView(profile: userProfile, onEdit: {
+                showProfile = false
+            })
         }
         .task {
             await viewModel.load(userYear: userProfile.collegeYear)
@@ -475,5 +489,31 @@ struct MissionCreateView: View {
                 }
             }
         }
+    }
+}
+
+// MARK: - Profile Avatar View (shared)
+
+struct ProfileAvatarView: View {
+    let photo: String?
+    let size: CGFloat
+
+    var body: some View {
+        Group {
+            if let url = photo, let parsed = URL(string: url) {
+                AsyncImage(url: parsed) { image in
+                    image.resizable().scaledToFill()
+                } placeholder: {
+                    Image(systemName: "person.fill")
+                        .foregroundColor(.secondary)
+                }
+            } else {
+                Image(systemName: "person.fill")
+                    .foregroundColor(.secondary)
+            }
+        }
+        .frame(width: size, height: size)
+        .clipShape(Circle())
+        .overlay(Circle().stroke(Color(.systemGray4), lineWidth: 1))
     }
 }
