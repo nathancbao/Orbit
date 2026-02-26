@@ -151,47 +151,44 @@ struct SuggestedMissionCard: View {
 
     var body: some View {
         Button(action: onTap) {
-            VStack(alignment: .leading, spacing: 8) {
-                if let reason = mission.suggestionReason {
-                    Text(reason)
+            VStack(alignment: .leading, spacing: 10) {
+                // AI reason — the key value-add
+                HStack(spacing: 5) {
+                    Image(systemName: "sparkles")
                         .font(.caption2)
-                        .foregroundStyle(OrbitTheme.gradient)
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 3)
-                        .background(OrbitTheme.pink.opacity(0.1))
-                        .clipShape(Capsule())
+                    Text(mission.suggestionReason ?? "picked for you")
+                        .font(.caption2)
+                        .fontWeight(.medium)
+                        .lineLimit(1)
                 }
+                .foregroundStyle(OrbitTheme.gradient)
 
                 Text(mission.title)
-                    .font(.subheadline)
-                    .fontWeight(.semibold)
+                    .font(.headline)
+                    .fontWeight(.bold)
                     .foregroundColor(.primary)
                     .lineLimit(2)
 
-                HStack(spacing: 4) {
-                    Image(systemName: "calendar")
-                        .font(.caption2)
-                    Text(mission.displayDate)
-                        .font(.caption)
-                }
-                .foregroundColor(.secondary)
-
-                HStack(spacing: 4) {
-                    Image(systemName: "mappin")
-                        .font(.caption2)
-                    Text(mission.location.isEmpty ? "TBD" : mission.location)
-                        .font(.caption)
-                        .lineLimit(1)
-                }
-                .foregroundColor(.secondary)
+                Label(mission.displayDate, systemImage: "calendar")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
 
                 MissionSpotsLabel(mission: mission)
             }
-            .padding(14)
-            .frame(width: 200)
-            .background(Color.white)
+            .padding(16)
+            .frame(width: 190)
+            .background(
+                LinearGradient(
+                    colors: [OrbitTheme.pink.opacity(0.07), OrbitTheme.blue.opacity(0.07)],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+            )
             .cornerRadius(16)
-            .shadow(color: .black.opacity(0.07), radius: 8, x: 0, y: 2)
+            .overlay(
+                RoundedRectangle(cornerRadius: 16)
+                    .stroke(OrbitTheme.purple.opacity(0.15), lineWidth: 1)
+            )
         }
         .buttonStyle(.plain)
     }

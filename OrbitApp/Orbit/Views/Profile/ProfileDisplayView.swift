@@ -4,6 +4,9 @@ struct ProfileDisplayView: View {
     let profile: Profile
     var onEdit: (() -> Void)? = nil
 
+    @Environment(\.dismiss) private var dismiss
+    @State private var showEdit = false
+
     var body: some View {
         NavigationStack {
             ZStack {
@@ -99,11 +102,28 @@ struct ProfileDisplayView: View {
             .navigationTitle("Profile")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                if let onEdit = onEdit {
-                    ToolbarItem(placement: .navigationBarTrailing) {
-                        Button("Edit", action: onEdit)
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button {
+                        dismiss()
+                    } label: {
+                        Image(systemName: "xmark.circle.fill")
+                            .font(.title3)
+                            .foregroundColor(Color(.systemGray3))
                     }
                 }
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button("Edit") {
+                        showEdit = true
+                    }
+                    .foregroundStyle(OrbitTheme.gradient)
+                }
+            }
+            .navigationDestination(isPresented: $showEdit) {
+                QuickProfileSetupView(
+                    onComplete: { _, _ in dismiss() },
+                    onCancel: { showEdit = false },
+                    initialProfile: profile
+                )
             }
         }
     }

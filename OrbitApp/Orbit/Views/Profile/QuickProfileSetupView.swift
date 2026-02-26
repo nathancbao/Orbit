@@ -9,6 +9,7 @@ import PhotosUI
 struct QuickProfileSetupView: View {
     let onComplete: (Profile, UIImage?) -> Void
     let onCancel: (() -> Void)?
+    var initialProfile: Profile? = nil
 
     @State private var name: String = ""
     @State private var selectedYear: String = "freshman"
@@ -18,6 +19,17 @@ struct QuickProfileSetupView: View {
     @State private var showPhotoPicker = false
     @State private var isSaving = false
     @State private var errorMessage: String?
+
+    init(onComplete: @escaping (Profile, UIImage?) -> Void,
+         onCancel: (() -> Void)? = nil,
+         initialProfile: Profile? = nil) {
+        self.onComplete = onComplete
+        self.onCancel = onCancel
+        self.initialProfile = initialProfile
+        _name = State(initialValue: initialProfile?.name ?? "")
+        _selectedYear = State(initialValue: initialProfile?.collegeYear ?? "freshman")
+        _selectedInterests = State(initialValue: Set(initialProfile?.interests ?? []))
+    }
 
     private let availableInterests = [
         "Hiking", "Gaming", "Movies", "Music", "Cooking",
@@ -66,12 +78,14 @@ struct QuickProfileSetupView: View {
                     }
 
                     VStack(alignment: .leading, spacing: 4) {
-                        Text("let's set up your profile")
+                        Text(initialProfile != nil ? "edit your profile" : "let's set up your profile")
                             .font(.title2)
                             .fontWeight(.bold)
-                        Text("takes about 30 seconds ✨")
-                            .font(.subheadline)
-                            .foregroundColor(.secondary)
+                        if initialProfile == nil {
+                            Text("takes about 30 seconds ✨")
+                                .font(.subheadline)
+                                .foregroundColor(.secondary)
+                        }
                     }
 
                     // Photo (optional)
