@@ -382,7 +382,7 @@ struct EmptyMissionsView: View {
 
     var body: some View {
         VStack(spacing: 16) {
-            Image(systemName: "rocket")
+            Image(systemName: "paperplane")
                 .font(.system(size: 48))
                 .foregroundStyle(OrbitTheme.gradient)
             Text("no missions yet")
