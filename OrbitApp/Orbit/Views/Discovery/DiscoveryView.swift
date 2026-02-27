@@ -605,6 +605,8 @@ struct DiscoveryView: View {
     @State private var planets: [PlanetNode] = []
     @State private var selectedPlanetId: UUID? = nil
     @State private var planetPositions: [UUID: CGPoint] = [:]
+    @State private var selectedMission: Mission? = nil
+    @State private var selectedSignal: Signal? = nil
 
     private let minRadius: CGFloat = 110
     private let maxRadius: CGFloat = 170
@@ -620,6 +622,12 @@ struct DiscoveryView: View {
                 // Background
                 DiscoveryTheme.background
                     .ignoresSafeArea()
+                    .onTapGesture {
+                        // Tap on background deselects any selected planet
+                        withAnimation(.spring(response: 0.3)) {
+                            selectedPlanetId = nil
+                        }
+                    }
 
                 // Radial glow from center
                 RadialGradient(
@@ -636,10 +644,12 @@ struct DiscoveryView: View {
                     endRadius: 300
                 )
                 .ignoresSafeArea()
+                .allowsHitTesting(false)
 
                 // Star field
                 StarFieldView(stars: stars)
                     .ignoresSafeArea()
+                    .allowsHitTesting(false)
 
                 // Connector lines
                 ConnectorLinesView(
@@ -647,6 +657,7 @@ struct DiscoveryView: View {
                     planets: planets,
                     planetPositions: planetPositions
                 )
+                .allowsHitTesting(false)
 
                 // Planet nodes
                 ForEach(Array(planets.enumerated()), id: \.element.id) { index, planet in
@@ -661,8 +672,19 @@ struct DiscoveryView: View {
                         isSelected: selectedPlanetId == planet.id,
                         appearanceDelay: delay,
                         onTap: {
-                            withAnimation(.spring(response: 0.3)) {
-                                selectedPlanetId = selectedPlanetId == planet.id ? nil : planet.id
+                            if selectedPlanetId == planet.id {
+                                // Second tap on selected planet → open detail
+                                switch planet.type {
+                                case .mission(let mission):
+                                    selectedMission = mission
+                                case .signal(let signal):
+                                    selectedSignal = signal
+                                }
+                            } else {
+                                // First tap → select planet
+                                withAnimation(.spring(response: 0.3)) {
+                                    selectedPlanetId = planet.id
+                                }
                             }
                         }
                     )
@@ -678,24 +700,32 @@ struct DiscoveryView: View {
                     username: userProfile.name
                 )
                 .position(centerPoint)
+                .onTapGesture {
+                    withAnimation(.spring(response: 0.3)) {
+                        selectedPlanetId = nil
+                    }
+                }
 
+            }
+            .overlay(alignment: .top) {
                 // Legend at top
-                VStack {
-                    DiscoveryLegend()
-                        .padding(.top, 60)
-                    Spacer()
-                }
-
+                DiscoveryLegend()
+                    .padding(.top, 60)
+            }
+            .overlay(alignment: .bottom) {
                 // Voyage button
-                VStack {
-                    Spacer()
-                    VoyageButton()
-                        .padding(.bottom, 32)
-                }
+                VoyageButton()
+                    .padding(.bottom, 32)
             }
             .onAppear {
                 generateStars(in: geometry.size)
                 generatePlanets()
+            }
+            .sheet(item: $selectedMission) { mission in
+                MissionDetailView(mission: mission, onJoined: {})
+            }
+            .sheet(item: $selectedSignal) { signal in
+                SignalDetailView(signal: signal)
             }
         }
     }
