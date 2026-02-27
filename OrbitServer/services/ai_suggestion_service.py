@@ -163,11 +163,11 @@ def _compute_behavioral_score(event_tags: set, behavioral_profile: list) -> floa
 # ── Trust weight ───────────────────────────────────────────────────────────────
 
 def _normalize_trust(trust_score) -> float:
-    """Normalize trust_score [0, 5] to [0, 1]. Default 0.6 (= 3.0/5.0)."""
+    """Normalize trust_score [0, 5] to [0, 1]. Default 0.0."""
     try:
         return min(1.0, max(0.0, float(trust_score) / 5.0))
     except (TypeError, ValueError):
-        return 0.6
+        return 0.0
 
 
 # ── Embedding signal ───────────────────────────────────────────────────────────
@@ -241,7 +241,7 @@ def get_suggested_events(user_id, limit=5) -> list:
     # 1. Profile
     profile = get_profile(user_id) or {}
     interests_list = list(profile.get('interests') or [])
-    trust_weight = _normalize_trust(profile.get('trust_score', 3.0))
+    trust_weight = _normalize_trust(profile.get('trust_score', 0.0))
 
     # 2. History
     history = get_user_event_history(user_id)

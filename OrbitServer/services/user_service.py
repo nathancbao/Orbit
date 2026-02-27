@@ -9,7 +9,7 @@ DEFAULT_PROFILE = {
     'college_year': '',
     'interests': [],
     'photo': None,
-    'trust_score': 3.0,
+    'trust_score': 0.0,
     'email': '',
 }
 

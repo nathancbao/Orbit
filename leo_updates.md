@@ -67,7 +67,7 @@ The final behavioral score is a weighted average of Jaccard similarities across 
 
 ### Signal 4 — Trust Weight (10%)
 
-A flat baseline signal. The user's `trust_score` (0–5, reflects attendance reliability) is normalized to [0, 1] and added in. A trust score of 3.0 (default) contributes 0.06 to the final score. Higher-trust users get a small universal uplift on every candidate.
+A flat baseline signal. The user's `trust_score` (0–5, reflects attendance reliability) is normalized to [0, 1] and added in. New users start at 0 stars and earn trust through confirmed attendance. Higher-trust users get a small universal uplift on every candidate.
 
 ---
 

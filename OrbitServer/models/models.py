@@ -67,7 +67,7 @@ def upsert_profile(user_id, data):
     if entity is None:
         entity = datastore.Entity(key=key)
         entity['user_id'] = int(user_id)
-        entity['trust_score'] = 3.0
+        entity['trust_score'] = 0.0
         entity['created_at'] = datetime.datetime.utcnow()
     entity.update(data)
     entity['updated_at'] = datetime.datetime.utcnow()
@@ -80,7 +80,7 @@ def adjust_trust_score(user_id, delta):
     key = client.key('Profile', int(user_id))
     entity = client.get(key)
     if entity:
-        current = float(entity.get('trust_score', 3.0))
+        current = float(entity.get('trust_score', 0.0))
         entity['trust_score'] = max(0.0, min(5.0, current + delta))
         entity['updated_at'] = datetime.datetime.utcnow()
         client.put(entity)
