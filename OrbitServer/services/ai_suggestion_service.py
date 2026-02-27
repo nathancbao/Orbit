@@ -1,91 +1,293 @@
 """
-AI event suggestion service.
-Scores events for a user based on:
-  1. Tag overlap with user interests (Jaccard similarity)
-  2. Boost from tags matching past events the user engaged with
-  3. Small random shuffle for discovery
+Hybrid multi-signal ML recommendation engine for Orbit events.
+
+Scoring formula (all signals normalized to [0, 1] before weighting):
+    score = 0.4 * tfidf_cosine      — keyword/tag content similarity
+          + 0.3 * embedding_cosine  — semantic similarity via Claude API (cached)
+          + 0.2 * behavioral_decay  — weighted join/skip history with temporal decay
+          + 0.1 * trust_weight      — user reliability signal
+
+Degrades gracefully:
+  - No embedding API key → embedding_cosine = 0.0
+  - No interaction history → behavioral_decay = 0.0
+  - No interests → tfidf_cosine = 0.0
 """
 
+import datetime
+import logging
+import math
 import random
 
-from OrbitServer.models.models import (
-    list_events, get_profile, get_user_event_history, record_event_action,
+import numpy as np
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.metrics.pairwise import cosine_similarity as sk_cosine
+
+from OrbitServer.models.models import list_events, get_profile, get_user_event_history
+from OrbitServer.services.embedding_service import (
+    get_or_create_event_embedding, get_user_embedding, cosine_similarity,
 )
 
+logger = logging.getLogger(__name__)
 
-def _jaccard(set_a, set_b):
+# ── Scoring weights ────────────────────────────────────────────────────────────
+W_TFIDF      = 0.4
+W_EMBEDDING  = 0.3
+W_BEHAVIORAL = 0.2
+W_TRUST      = 0.1
+
+# ── Behavioral decay parameters ────────────────────────────────────────────────
+DECAY_LAMBDA = 0.05   # exp(-0.05 * days), half-life ≈ 14 days
+EPSILON = 1e-8
+
+ACTION_SCORES = {
+    'joined':  0.8,
+    'browsed': 0.3,
+    'skipped': -0.4,
+}
+ATTENDED_BONUS = 0.2  # added to 'joined' score when attended=True
+
+
+# ── TF-IDF helpers ─────────────────────────────────────────────────────────────
+
+def _event_to_doc(event: dict) -> str:
+    title = event.get('title', '')
+    desc = event.get('description', '')
+    tags = event.get('tags') or []
+    tag_str = ' '.join(tags * 2)  # double-weight tags
+    return f"{title} {desc} {tag_str}".strip()
+
+
+def _interests_to_doc(interests: list) -> str:
+    return ' '.join(list(interests) * 2)  # double-weight
+
+
+def _compute_tfidf_scores(user_interests: list, events: list) -> dict:
+    """
+    Build TF-IDF corpus from events, add user interest doc, return
+    {event_id: cosine_similarity_with_user} for each event.
+    """
+    if not events or not user_interests:
+        return {e['id']: 0.0 for e in events}
+
+    user_doc = _interests_to_doc(user_interests)
+    event_docs = [_event_to_doc(e) for e in events]
+    all_docs = event_docs + [user_doc]  # user doc is last
+
+    try:
+        vectorizer = TfidfVectorizer(
+            analyzer='word',
+            ngram_range=(1, 2),
+            min_df=1,
+            max_df=0.95,
+            sublinear_tf=True,
+            stop_words='english',
+        )
+        tfidf_matrix = vectorizer.fit_transform(all_docs)
+        user_vec = tfidf_matrix[-1]
+        event_vecs = tfidf_matrix[:-1]
+        sims = sk_cosine(event_vecs, user_vec).flatten()
+        return {events[i]['id']: float(sims[i]) for i in range(len(events))}
+    except Exception as e:
+        logger.warning(f"TF-IDF computation failed: {e}")
+        return {e['id']: 0.0 for e in events}
+
+
+# ── Behavioral decay signal ────────────────────────────────────────────────────
+
+def _action_score(action: str, attended) -> float:
+    base = ACTION_SCORES.get(action, 0.0)
+    if action == 'joined' and attended is True:
+        base += ATTENDED_BONUS
+    return base
+
+
+def _decay_weight(created_at) -> float:
+    if created_at is None:
+        return 0.0
+    now = datetime.datetime.utcnow()
+    if hasattr(created_at, 'replace'):
+        created_at = created_at.replace(tzinfo=None)
+    age_days = max(0.0, (now - created_at).total_seconds() / 86400.0)
+    return math.exp(-DECAY_LAMBDA * age_days)
+
+
+def _build_behavioral_profile(history: list) -> list:
+    """
+    Convert history to list of (tags_set, effective_weight) for positive-signal entries.
+    Skipped events are excluded (already filtered from candidates).
+    Legacy records without tags_snapshot are skipped silently.
+    """
+    profile = []
+    for h in history:
+        action = h.get('action', '')
+        if action == 'skipped':
+            continue
+        tags_snapshot = h.get('tags_snapshot') or []
+        if not tags_snapshot:
+            continue
+        base = _action_score(action, h.get('attended'))
+        if base <= 0:
+            continue
+        w = _decay_weight(h.get('created_at'))
+        profile.append((set(tags_snapshot), base * w))
+    return profile
+
+
+def _jaccard(set_a: set, set_b: set) -> float:
     if not set_a and not set_b:
         return 0.0
-    intersection = len(set_a & set_b)
     union = len(set_a | set_b)
-    return intersection / union if union else 0.0
+    return len(set_a & set_b) / union if union else 0.0
 
 
-def score_event_for_user(event, user_interests: set, history_tags: set = None) -> float:
+def _compute_behavioral_score(event_tags: set, behavioral_profile: list) -> float:
     """
-    Return a relevance score in [0, 1] for an event given a user's interests.
-    history_tags: union of tags from events the user has previously joined.
+    Weighted-average Jaccard similarity between event tags and history tag profile.
+    Formula: Σ(weight * jaccard(history_tags, event_tags)) / Σ(weights)
+    Clamped to [0, 1].
     """
-    event_tags = set(event.get('tags') or [])
-    base_score = _jaccard(user_interests, event_tags)
+    if not behavioral_profile or not event_tags:
+        return 0.0
 
-    # Boost if event tags match past behaviour
-    if history_tags:
-        history_overlap = _jaccard(history_tags, event_tags)
-        base_score = min(1.0, base_score + history_overlap * 0.2)
+    weighted_sum = 0.0
+    weight_total = 0.0
+    for (hist_tags, weight) in behavioral_profile:
+        weighted_sum += weight * _jaccard(hist_tags, event_tags)
+        weight_total += weight
 
-    # Add a small random noise (10% max) for discovery
-    noise = random.uniform(0, 0.1)
-    return min(1.0, base_score + noise)
+    if weight_total < EPSILON:
+        return 0.0
+    return min(1.0, weighted_sum / weight_total)
 
 
-def get_suggested_events(user_id, limit=5):
+# ── Trust weight ───────────────────────────────────────────────────────────────
+
+def _normalize_trust(trust_score) -> float:
+    """Normalize trust_score [0, 5] to [0, 1]. Default 0.6 (= 3.0/5.0)."""
+    try:
+        return min(1.0, max(0.0, float(trust_score) / 5.0))
+    except (TypeError, ValueError):
+        return 0.6
+
+
+# ── Embedding signal ───────────────────────────────────────────────────────────
+
+def _compute_embedding_scores(user_interests: list, events: list) -> dict:
     """
-    Return up to `limit` AI-suggested events the user hasn't joined or skipped.
-    Each event includes a `suggestion_reason` string.
+    Compute embedding cosine similarity between user and each event.
+    Triggers lazy embedding generation for events that don't have one yet.
+    Returns {event_id: 0.0} for all events if user embedding fails.
     """
-    profile = get_profile(user_id) or {}
-    user_interests = set(profile.get('interests') or [])
+    if not user_interests:
+        return {e['id']: 0.0 for e in events}
 
-    # Build history tags from past joined events
-    history = get_user_event_history(user_id)
-    joined_event_ids = {
-        h['event_id'] for h in history
-        if h.get('action') in ('joined',)
-    }
-    skipped_event_ids = {
-        h['event_id'] for h in history
-        if h.get('action') == 'skipped'
-    }
-    history_tags: set = set()
-    for h in history:
-        if h.get('action') == 'joined':
-            # We don't store tags in history — use a simple interest proxy for now
-            pass
+    user_vec = get_user_embedding(user_interests)
+    if user_vec is None:
+        return {e['id']: 0.0 for e in events}
 
-    # Fetch candidate events (open only, not already acted on)
-    all_events = list_events(filters={'status': 'open'})
-    candidates = [
-        e for e in all_events
-        if e['id'] not in joined_event_ids and e['id'] not in skipped_event_ids
-    ]
-
-    # Score
-    scored = []
-    for event in candidates:
-        score = score_event_for_user(event, user_interests, history_tags)
-        reason = _build_reason(event, user_interests)
-        scored.append({**event, 'match_score': score, 'suggestion_reason': reason})
-
-    scored.sort(key=lambda e: e['match_score'], reverse=True)
-    return scored[:limit]
+    scores = {}
+    for event in events:
+        event_vec = get_or_create_event_embedding(event['id'])
+        if event_vec is None:
+            scores[event['id']] = 0.0
+        else:
+            scores[event['id']] = max(0.0, cosine_similarity(user_vec, event_vec))
+    return scores
 
 
-def _build_reason(event, user_interests: set) -> str:
-    """Return a human-readable suggestion reason."""
+# ── Reason generation ──────────────────────────────────────────────────────────
+
+def _build_reason(event: dict, user_interests: set, embed_score: float, behav_score: float) -> str:
     event_tags = set(event.get('tags') or [])
     overlap = user_interests & event_tags
+
+    if behav_score > 0.4:
+        return "Based on events you've joined"
     if overlap:
         tag_str = ', '.join(sorted(overlap)[:2])
         return f"Because you like {tag_str}"
+    if embed_score > 0.5:
+        return "Matches your vibe"
     return "Something new to try"
+
+
+# ── Public API ─────────────────────────────────────────────────────────────────
+
+def score_event_for_user(event: dict, user_interests: set, history_tags: set = None) -> float:
+    """
+    Fast single-event scorer used by event_service.get_events_for_user (list view).
+    Uses Jaccard + tiny noise — no API calls — so it scales to N events without latency.
+    The full hybrid scorer is reserved for get_suggested_events().
+    history_tags parameter kept for backward compatibility.
+    """
+    event_tags = set(event.get('tags') or [])
+    score = _jaccard(user_interests, event_tags)
+    return min(1.0, score + random.uniform(0, 0.05))
+
+
+def get_suggested_events(user_id, limit=5) -> list:
+    """
+    Return up to `limit` AI-suggested events with multi-signal hybrid scoring.
+
+    Pipeline:
+      1. Load profile (interests, trust_score)
+      2. Load history → joined/skipped ID sets + behavioral profile
+      3. Load open events, filter already-acted-on
+      4. Batch TF-IDF cosine similarities
+      5. Batch embedding cosine similarities (lazy-generates missing embeddings)
+      6. Per-event behavioral decay scores
+      7. Combine → sort → return top-limit with match_score + suggestion_reason
+    """
+    # 1. Profile
+    profile = get_profile(user_id) or {}
+    interests_list = list(profile.get('interests') or [])
+    trust_weight = _normalize_trust(profile.get('trust_score', 3.0))
+
+    # 2. History
+    history = get_user_event_history(user_id)
+    joined_ids = {h['event_id'] for h in history if h.get('action') == 'joined'}
+    skipped_ids = {h['event_id'] for h in history if h.get('action') == 'skipped'}
+    behavioral_profile = _build_behavioral_profile(history)
+
+    # 3. Candidate events (open, not yet acted on)
+    all_events = list_events(filters={'status': 'open'})
+    candidates = [
+        e for e in all_events
+        if e['id'] not in joined_ids and e['id'] not in skipped_ids
+    ]
+    if not candidates:
+        return []
+
+    # 4. TF-IDF scores (batch)
+    tfidf_scores = _compute_tfidf_scores(interests_list, candidates)
+
+    # 5. Embedding scores (batch, lazy generation)
+    embedding_scores = _compute_embedding_scores(interests_list, candidates)
+
+    # 6. Score each candidate
+    scored = []
+    user_interests_set = set(interests_list)
+    for event in candidates:
+        eid = event['id']
+        event_tags = set(event.get('tags') or [])
+
+        tfidf_s = tfidf_scores.get(eid, 0.0)
+        embed_s = embedding_scores.get(eid, 0.0)
+        behav_s = _compute_behavioral_score(event_tags, behavioral_profile)
+
+        final = (
+            W_TFIDF      * tfidf_s  +
+            W_EMBEDDING  * embed_s  +
+            W_BEHAVIORAL * behav_s  +
+            W_TRUST      * trust_weight
+        )
+        final = min(1.0, max(0.0, final))
+
+        scored.append({
+            **event,
+            'match_score': round(final, 4),
+            'suggestion_reason': _build_reason(event, user_interests_set, embed_s, behav_s),
+        })
+
+    scored.sort(key=lambda e: e['match_score'], reverse=True)
+    return scored[:limit]

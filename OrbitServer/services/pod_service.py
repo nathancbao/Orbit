@@ -41,7 +41,8 @@ def join_event(event_id, user_id):
     else:
         pod = create_event_pod(event_id, max_size=max_pod_size, first_member_id=user_id)
 
-    record_event_action(user_id, event_id, 'joined', pod_id=pod['id'])
+    record_event_action(user_id, event_id, 'joined', pod_id=pod['id'],
+                        tags_snapshot=event.get('tags') or [])
     return pod, None
 
 

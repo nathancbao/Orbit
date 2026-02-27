@@ -106,6 +106,7 @@ def create_event(data, creator_id, creator_type='user'):
         'creator_type': creator_type,
         'max_pod_size': int(data.get('max_pod_size', 4)),
         'status': 'open',
+        'embedding': None,
         'created_at': datetime.datetime.utcnow(),
         'updated_at': datetime.datetime.utcnow(),
     })
@@ -131,6 +132,18 @@ def update_event(event_id, data):
     entity['updated_at'] = datetime.datetime.utcnow()
     client.put(entity)
     return _entity_to_dict(entity)
+
+
+def store_event_embedding(event_id, embedding: list):
+    """Persist a float embedding vector to an Event entity."""
+    key = client.key('Event', int(event_id))
+    entity = client.get(key)
+    if not entity:
+        return None
+    entity['embedding'] = embedding
+    entity['updated_at'] = datetime.datetime.utcnow()
+    client.put(entity)
+    return True
 
 
 def delete_event(event_id):
@@ -318,8 +331,12 @@ def list_votes_for_pod(pod_id):
 # Fields: id (UUID), user_id, event_id, pod_id, action, attended, points_earned,
 #         created_at
 
-def record_event_action(user_id, event_id, action, pod_id=None):
-    """Record that a user interacted with an event (joined/browsed/skipped)."""
+def record_event_action(user_id, event_id, action, pod_id=None, tags_snapshot=None):
+    """Record that a user interacted with an event (joined/browsed/skipped).
+
+    tags_snapshot: list of tags from the event at interaction time, used by the
+    ML recommendation engine for behavioral decay scoring.
+    """
     hist_id = str(uuid.uuid4())
     key = client.key('UserEventHistory', hist_id)
     entity = datastore.Entity(key=key)
@@ -330,6 +347,7 @@ def record_event_action(user_id, event_id, action, pod_id=None):
         'action': action,
         'attended': None,
         'points_earned': 0,
+        'tags_snapshot': list(tags_snapshot) if tags_snapshot else [],
         'created_at': datetime.datetime.utcnow(),
     })
     client.put(entity)

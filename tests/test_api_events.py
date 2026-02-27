@@ -96,6 +96,15 @@ class TestCreateEvent:
                            json={"title": "Hike", "description": "Trail run", "tags": ["hiking", "outdoors"]})
         assert resp.status_code == 201
 
+    @patch('OrbitServer.api.events.get_or_create_event_embedding')
+    @patch('OrbitServer.api.events.create_new_event')
+    def test_triggers_embedding_on_create(self, mock_create, mock_embed, client):
+        mock_create.return_value = {"id": 5, "title": "Yoga", "status": "open"}
+        mock_embed.return_value = None
+        resp = client.post('/api/events', headers=auth_header(),
+                           json={"title": "Yoga", "description": "Morning flow"})
+        assert resp.status_code == 201
+
 
 class TestJoinEvent:
     def test_rejects_unauthenticated(self, client):

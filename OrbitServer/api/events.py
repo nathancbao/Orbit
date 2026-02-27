@@ -1,3 +1,5 @@
+import threading
+
 from flask import Blueprint, request, g
 
 from OrbitServer.utils.responses import success, error
@@ -9,6 +11,7 @@ from OrbitServer.services.event_service import (
 )
 from OrbitServer.services.pod_service import join_event, leave_event
 from OrbitServer.services.ai_suggestion_service import get_suggested_events
+from OrbitServer.services.embedding_service import get_or_create_event_embedding
 from OrbitServer.models.models import (
     list_event_pods, get_user_pod_for_event, record_event_action,
 )
@@ -102,6 +105,17 @@ def create():
         return error(errors, 400)
 
     event = create_new_event(data, g.user_id, creator_type='user')
+
+    # Generate embedding asynchronously so the HTTP response isn't blocked.
+    # If this fails, lazy generation will retry on the first recommendation request.
+    event_id = event['id']
+    def _generate_embedding():
+        try:
+            get_or_create_event_embedding(event_id)
+        except Exception:
+            pass
+    threading.Thread(target=_generate_embedding, daemon=True).start()
+
     return success(_to_str_id(event), 201)
 
 
@@ -193,5 +207,6 @@ def skip(event_id):
     event = get_event_detail(event_id)
     if not event:
         return error("Event not found", 404)
-    record_event_action(g.user_id, event_id, 'skipped')
+    record_event_action(g.user_id, event_id, 'skipped',
+                        tags_snapshot=event.get('tags') or [])
     return success({"message": "Event skipped"})
