@@ -10,22 +10,22 @@ import SwiftUI
 // MARK: - Color Palette
 
 enum DiscoveryTheme {
-    static let background = Color(hex: "020408")
-    static let surface = Color(hex: "0d1117")
+    static let background = Color(hex: "F8F9FC")
+    static let surface = Color.white
     static let accentBlue = Color(hex: "3B82F6")
-    static let accentTeal = Color(hex: "2DD4BF")
-    static let accentLavender = Color(hex: "A78BFA")
-    static let accentAmber = Color(hex: "F59E0B")
-    static let accentPink = Color(hex: "EC4899")
-    static let accentGreen = Color(hex: "10B981")
-    static let textPrimary = Color(hex: "E2E8F0")
-    static let textMuted = Color(hex: "64748B")
-    static let glow = Color(hex: "3B82F6").opacity(0.15)
+    static let accentTeal = Color(hex: "0D9488")
+    static let accentLavender = Color(hex: "8B5CF6")
+    static let accentAmber = Color(hex: "D97706")
+    static let accentPink = Color(hex: "DB2777")
+    static let accentGreen = Color(hex: "059669")
+    static let textPrimary = Color(hex: "1E293B")
+    static let textMuted = Color(hex: "94A3B8")
+    static let glow = Color(hex: "3B82F6").opacity(0.08)
 
-    // Event planets: cooler tones (blue, teal, green)
+    // Mission planets: bold, structured tones (blue, teal, green) — events with dates
     static let eventColors: [Color] = [accentBlue, accentTeal, accentGreen]
 
-    // Mission planets: warmer tones (amber, pink, lavender)
+    // Signal planets: warm, spontaneous tones (amber, pink, lavender) — anyone down?
     static let missionColors: [Color] = [accentAmber, accentPink, accentLavender]
 }
 
@@ -57,6 +57,11 @@ extension Color {
 
 // MARK: - Star Model
 
+enum StarStyle {
+    case dot
+    case fourPoint
+}
+
 struct Star: Identifiable {
     let id = UUID()
     let position: CGPoint
@@ -64,6 +69,7 @@ struct Star: Identifiable {
     let opacity: Double
     let twinkleSpeed: Double
     let phaseOffset: Double
+    let style: StarStyle
 }
 
 // MARK: - Planet Node Model
@@ -118,20 +124,49 @@ struct StarFieldView: View {
         TimelineView(.animation) { timeline in
             Canvas { context, size in
                 let time = timeline.date.timeIntervalSinceReferenceDate
+                let starColor: Color = Color(hex: "0F172A")
 
                 for star in stars {
                     let twinkle = (sin(time * star.twinkleSpeed + star.phaseOffset) + 1) / 2
                     let currentOpacity = star.opacity * (0.3 + twinkle * 0.7)
-
-                    let rect = CGRect(
-                        x: star.position.x * size.width - star.size / 2,
-                        y: star.position.y * size.height - star.size / 2,
-                        width: star.size,
-                        height: star.size
-                    )
+                    let cx = star.position.x * size.width
+                    let cy = star.position.y * size.height
 
                     context.opacity = currentOpacity
-                    context.fill(Circle().path(in: rect), with: .color(.white))
+
+                    switch star.style {
+                    case .dot:
+                        let rect = CGRect(
+                            x: cx - star.size / 2,
+                            y: cy - star.size / 2,
+                            width: star.size,
+                            height: star.size
+                        )
+                        context.fill(Circle().path(in: rect), with: .color(starColor))
+
+                    case .fourPoint:
+                        let s = star.size
+                        let armLength = s * 1.8
+                        let armWidth = s * 0.35
+                        var path = Path()
+                        // Vertical arm
+                        path.move(to: CGPoint(x: cx, y: cy - armLength))
+                        path.addLine(to: CGPoint(x: cx + armWidth, y: cy))
+                        path.addLine(to: CGPoint(x: cx, y: cy + armLength))
+                        path.addLine(to: CGPoint(x: cx - armWidth, y: cy))
+                        path.closeSubpath()
+                        // Horizontal arm
+                        path.move(to: CGPoint(x: cx - armLength, y: cy))
+                        path.addLine(to: CGPoint(x: cx, y: cy - armWidth))
+                        path.addLine(to: CGPoint(x: cx + armLength, y: cy))
+                        path.addLine(to: CGPoint(x: cx, y: cy + armWidth))
+                        path.closeSubpath()
+                        context.fill(path, with: .color(starColor))
+                        // Bright core
+                        let coreRect = CGRect(x: cx - s * 0.4, y: cy - s * 0.4, width: s * 0.8, height: s * 0.8)
+                        context.opacity = min(currentOpacity * 1.3, 1.0)
+                        context.fill(Circle().path(in: coreRect), with: .color(starColor))
+                    }
                 }
             }
         }
@@ -155,10 +190,10 @@ struct CenterNodeView: View {
                     .stroke(
                         AngularGradient(
                             colors: [
-                                DiscoveryTheme.accentBlue.opacity(0.5),
-                                DiscoveryTheme.accentTeal.opacity(0.3),
-                                DiscoveryTheme.accentBlue.opacity(0.1),
-                                DiscoveryTheme.accentBlue.opacity(0.5)
+                                DiscoveryTheme.accentBlue.opacity(0.4),
+                                DiscoveryTheme.accentTeal.opacity(0.25),
+                                DiscoveryTheme.accentBlue.opacity(0.08),
+                                DiscoveryTheme.accentBlue.opacity(0.4)
                             ],
                             center: .center
                         ),
@@ -172,8 +207,8 @@ struct CenterNodeView: View {
                     .fill(
                         RadialGradient(
                             colors: [
-                                DiscoveryTheme.accentBlue.opacity(0.4),
-                                DiscoveryTheme.accentBlue.opacity(0.1),
+                                DiscoveryTheme.accentBlue.opacity(0.15),
+                                DiscoveryTheme.accentBlue.opacity(0.05),
                                 Color.clear
                             ],
                             center: .center,
@@ -188,6 +223,7 @@ struct CenterNodeView: View {
                 Circle()
                     .fill(DiscoveryTheme.surface)
                     .frame(width: 90, height: 90)
+                    .shadow(color: Color.black.opacity(0.08), radius: 12, x: 0, y: 4)
                     .overlay(
                         Group {
                             if let url = imageUrl {
@@ -210,7 +246,7 @@ struct CenterNodeView: View {
                     )
                     .overlay(
                         Circle()
-                            .stroke(DiscoveryTheme.accentBlue.opacity(0.6), lineWidth: 2)
+                            .stroke(DiscoveryTheme.accentBlue.opacity(0.5), lineWidth: 2)
                     )
             }
 
@@ -248,31 +284,22 @@ struct PlanetNodeView: View {
     @State private var floatOffset: CGFloat = 0
     @State private var appeared: Bool = false
     @State private var ringRotation: Double = 0
+    @State private var signalPulse: CGFloat = 1.0
 
     private var planetSize: CGFloat { isSelected ? 60 : 52 }
     private var glowSize: CGFloat { isSelected ? 100 : 80 }
 
-    // Darker, more muted base color for realistic planet surface
-    private var baseColor: Color {
-        planet.accentColor.opacity(0.7)
-    }
-
-    // Even darker shadow color
-    private var shadowColor: Color {
-        Color.black.opacity(0.6)
-    }
-
     var body: some View {
         VStack(spacing: 6) {
             ZStack {
-                // Subtle atmospheric haze (much more subtle than before)
+                // Selection haze
                 if isSelected {
                     Circle()
                         .fill(
                             RadialGradient(
                                 colors: [
-                                    planet.accentColor.opacity(0.15),
-                                    planet.accentColor.opacity(0.05),
+                                    planet.accentColor.opacity(0.12),
+                                    planet.accentColor.opacity(0.04),
                                     Color.clear
                                 ],
                                 center: .center,
@@ -283,34 +310,49 @@ struct PlanetNodeView: View {
                         .frame(width: glowSize, height: glowSize)
                 }
 
-                // Ring for missions (Saturn-like) - more subtle
+                // --- MISSION: Saturn-like ring ---
                 if planet.isMission {
                     Ellipse()
                         .stroke(
                             LinearGradient(
                                 colors: [
-                                    planet.accentColor.opacity(0.4),
-                                    planet.accentColor.opacity(0.15)
+                                    planet.accentColor.opacity(0.5),
+                                    planet.accentColor.opacity(0.2)
                                 ],
                                 startPoint: .leading,
                                 endPoint: .trailing
                             ),
-                            lineWidth: 1.5
+                            lineWidth: 2
                         )
-                        .frame(width: planetSize + 20, height: 10)
+                        .frame(width: planetSize + 22, height: 11)
                         .rotationEffect(.degrees(ringRotation))
                 }
 
-                // Planet base with realistic lighting
+                // --- SIGNAL: Radiating pulse rings ---
+                if !planet.isMission {
+                    Circle()
+                        .stroke(planet.accentColor.opacity(0.2), lineWidth: 1)
+                        .frame(width: planetSize + 16, height: planetSize + 16)
+                        .scaleEffect(signalPulse)
+                        .opacity(Double(2.0 - signalPulse))
+
+                    Circle()
+                        .stroke(planet.accentColor.opacity(0.12), lineWidth: 1)
+                        .frame(width: planetSize + 28, height: planetSize + 28)
+                        .scaleEffect(signalPulse)
+                        .opacity(Double(2.0 - signalPulse) * 0.5)
+                }
+
+                // Planet body
                 ZStack {
-                    // Main planet body - darker base
+                    // Main sphere with lighting
                     Circle()
                         .fill(
                             RadialGradient(
                                 colors: [
-                                    planet.accentColor.opacity(0.5),
-                                    planet.accentColor.opacity(0.35),
-                                    planet.accentColor.opacity(0.2)
+                                    planet.accentColor.opacity(0.85),
+                                    planet.accentColor.opacity(0.6),
+                                    planet.accentColor.opacity(0.4)
                                 ],
                                 center: UnitPoint(x: 0.35, y: 0.35),
                                 startRadius: 0,
@@ -319,15 +361,15 @@ struct PlanetNodeView: View {
                         )
                         .frame(width: planetSize, height: planetSize)
 
-                    // Dark side shadow (terminator line effect)
+                    // Dark side shadow
                     Circle()
                         .fill(
                             LinearGradient(
                                 colors: [
                                     Color.clear,
                                     Color.clear,
-                                    Color.black.opacity(0.3),
-                                    Color.black.opacity(0.5)
+                                    Color.black.opacity(0.15),
+                                    Color.black.opacity(0.3)
                                 ],
                                 startPoint: UnitPoint(x: 0.3, y: 0.3),
                                 endPoint: UnitPoint(x: 0.9, y: 0.9)
@@ -335,32 +377,16 @@ struct PlanetNodeView: View {
                         )
                         .frame(width: planetSize, height: planetSize)
 
-                    // Limb darkening effect (edges darker)
-                    Circle()
-                        .stroke(
-                            RadialGradient(
-                                colors: [
-                                    Color.clear,
-                                    Color.black.opacity(0.25)
-                                ],
-                                center: .center,
-                                startRadius: planetSize / 3,
-                                endRadius: planetSize / 2
-                            ),
-                            lineWidth: planetSize / 4
-                        )
-                        .frame(width: planetSize, height: planetSize)
-
-                    // Surface band/texture (horizontal banding like gas giants)
+                    // Surface banding
                     Circle()
                         .fill(
                             LinearGradient(
                                 colors: [
-                                    Color.white.opacity(0.03),
+                                    Color.white.opacity(0.06),
+                                    planet.accentColor.opacity(0.1),
+                                    Color.white.opacity(0.04),
                                     planet.accentColor.opacity(0.08),
-                                    Color.white.opacity(0.02),
-                                    planet.accentColor.opacity(0.06),
-                                    Color.white.opacity(0.03)
+                                    Color.white.opacity(0.06)
                                 ],
                                 startPoint: .top,
                                 endPoint: .bottom
@@ -368,45 +394,46 @@ struct PlanetNodeView: View {
                         )
                         .frame(width: planetSize, height: planetSize)
 
-                    // Specular highlight (subtle light reflection)
+                    // Specular highlight
                     Circle()
                         .fill(
                             RadialGradient(
                                 colors: [
-                                    Color.white.opacity(0.25),
-                                    Color.white.opacity(0.08),
+                                    Color.white.opacity(0.45),
+                                    Color.white.opacity(0.15),
                                     Color.clear
                                 ],
                                 center: UnitPoint(x: 0.3, y: 0.25),
                                 startRadius: 0,
-                                endRadius: planetSize / 4
+                                endRadius: planetSize / 3.5
                             )
                         )
                         .frame(width: planetSize, height: planetSize)
 
-                    // Subtle rim light (atmosphere backlight)
+                    // Rim light
                     Circle()
                         .stroke(
                             LinearGradient(
                                 colors: [
                                     Color.clear,
                                     Color.clear,
-                                    planet.accentColor.opacity(0.2),
-                                    planet.accentColor.opacity(0.3)
+                                    planet.accentColor.opacity(0.3),
+                                    planet.accentColor.opacity(0.4)
                                 ],
                                 startPoint: UnitPoint(x: 0.3, y: 0.3),
                                 endPoint: UnitPoint(x: 0.85, y: 0.85)
                             ),
-                            lineWidth: 1
+                            lineWidth: 1.5
                         )
                         .frame(width: planetSize - 1, height: planetSize - 1)
                 }
+                .shadow(color: planet.accentColor.opacity(0.2), radius: 8, x: 0, y: 4)
 
-                // Icon overlay - slightly more transparent
+                // Icon overlay
                 Image(systemName: planet.icon)
                     .font(.system(size: isSelected ? 20 : 16, weight: .medium))
-                    .foregroundColor(.white.opacity(0.85))
-                    .shadow(color: Color.black.opacity(0.5), radius: 2, x: 0, y: 1)
+                    .foregroundColor(.white.opacity(0.9))
+                    .shadow(color: Color.black.opacity(0.3), radius: 2, x: 0, y: 1)
             }
 
             // Info label (visible on selection)
@@ -424,8 +451,9 @@ struct PlanetNodeView: View {
                 }
                 .padding(.horizontal, 10)
                 .padding(.vertical, 6)
-                .background(DiscoveryTheme.surface.opacity(0.9))
+                .background(DiscoveryTheme.surface)
                 .cornerRadius(8)
+                .shadow(color: Color.black.opacity(0.08), radius: 6, x: 0, y: 2)
                 .transition(.opacity.combined(with: .scale))
             }
         }
@@ -446,10 +474,15 @@ struct PlanetNodeView: View {
                 ) {
                     floatOffset = 6
                 }
-                // Slow ring rotation for missions
                 if planet.isMission {
+                    // Slow ring rotation for missions
                     withAnimation(.linear(duration: 8).repeatForever(autoreverses: false)) {
                         ringRotation = 360
+                    }
+                } else {
+                    // Pulsing broadcast rings for signals
+                    withAnimation(.easeOut(duration: 2).repeatForever(autoreverses: false)) {
+                        signalPulse = 1.5
                     }
                 }
             }
@@ -476,7 +509,7 @@ struct ConnectorLinesView: View {
 
                 context.stroke(
                     path,
-                    with: .color(planet.accentColor.opacity(0.15)),
+                    with: .color(planet.accentColor.opacity(0.25)),
                     style: StrokeStyle(lineWidth: 1, dash: dashPattern)
                 )
             }
@@ -587,7 +620,7 @@ struct DiscoveryNavBar: View {
                         ZStack {
                             if selectedTab == tab {
                                 Circle()
-                                    .fill(DiscoveryTheme.accentBlue.opacity(0.2))
+                                    .fill(DiscoveryTheme.accentBlue.opacity(0.12))
                                     .frame(width: 40, height: 40)
                             }
 
@@ -615,27 +648,8 @@ struct DiscoveryNavBar: View {
         .padding(.vertical, 12)
         .padding(.bottom, 20)
         .background(
-            ZStack {
-                DiscoveryTheme.surface.opacity(0.85)
-
-                VStack {
-                    Rectangle()
-                        .fill(
-                            LinearGradient(
-                                colors: [
-                                    DiscoveryTheme.accentBlue.opacity(0.3),
-                                    DiscoveryTheme.accentTeal.opacity(0.1),
-                                    Color.clear
-                                ],
-                                startPoint: .top,
-                                endPoint: .bottom
-                            )
-                        )
-                        .frame(height: 1)
-                    Spacer()
-                }
-            }
-            .background(.ultraThinMaterial)
+            DiscoveryTheme.surface
+                .shadow(color: Color.black.opacity(0.06), radius: 8, x: 0, y: -2)
         )
     }
 }
@@ -645,13 +659,14 @@ struct DiscoveryNavBar: View {
 struct DiscoveryLegend: View {
     var body: some View {
         HStack(spacing: 16) {
-            LegendItem(color: DiscoveryTheme.accentTeal, label: "Missions", icon: "calendar.circle.fill")
-            LegendItem(color: DiscoveryTheme.accentAmber, label: "Signals", icon: "antenna.radiowaves.left.and.right")
+            LegendItem(color: DiscoveryTheme.accentBlue, label: "Missions", icon: "calendar.circle.fill", detail: "has rings")
+            LegendItem(color: DiscoveryTheme.accentPink, label: "Signals", icon: "antenna.radiowaves.left.and.right", detail: "pulses")
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 8)
-        .background(DiscoveryTheme.surface.opacity(0.7))
+        .background(DiscoveryTheme.surface.opacity(0.9))
         .cornerRadius(12)
+        .shadow(color: Color.black.opacity(0.06), radius: 8, x: 0, y: 2)
     }
 }
 
@@ -659,6 +674,7 @@ struct LegendItem: View {
     let color: Color
     let label: String
     let icon: String
+    var detail: String? = nil
 
     var body: some View {
         HStack(spacing: 6) {
@@ -670,7 +686,8 @@ struct LegendItem: View {
                 .foregroundColor(color)
             Text(label)
                 .font(.caption2)
-                .foregroundColor(DiscoveryTheme.textMuted)
+                .fontWeight(.medium)
+                .foregroundColor(DiscoveryTheme.textPrimary)
         }
     }
 }
@@ -708,10 +725,10 @@ struct DiscoveryView: View {
                         }
                     }
 
-                // Radial glow from center
+                // Subtle radial glow from center
                 RadialGradient(
                     colors: [
-                        DiscoveryTheme.accentBlue.opacity(0.08),
+                        DiscoveryTheme.accentBlue.opacity(0.06),
                         DiscoveryTheme.accentBlue.opacity(0.02),
                         Color.clear
                     ],
@@ -812,16 +829,18 @@ struct DiscoveryView: View {
     // MARK: - Helper Functions
 
     private func generateStars(in size: CGSize) {
-        stars = (0..<120).map { _ in
-            Star(
+        stars = (0..<120).map { i in
+            let isFourPoint = i < 15
+            return Star(
                 position: CGPoint(
                     x: CGFloat.random(in: 0...1),
                     y: CGFloat.random(in: 0...1)
                 ),
-                size: CGFloat.random(in: 1...2.5),
-                opacity: Double.random(in: 0.3...0.8),
-                twinkleSpeed: Double.random(in: 0.5...2),
-                phaseOffset: Double.random(in: 0...Double.pi * 2)
+                size: isFourPoint ? CGFloat.random(in: 2...3.5) : CGFloat.random(in: 1...2.5),
+                opacity: isFourPoint ? Double.random(in: 0.7...1.0) : Double.random(in: 0.3...0.8),
+                twinkleSpeed: isFourPoint ? Double.random(in: 0.3...1.2) : Double.random(in: 0.5...2),
+                phaseOffset: Double.random(in: 0...Double.pi * 2),
+                style: isFourPoint ? .fourPoint : .dot
             )
         }
     }

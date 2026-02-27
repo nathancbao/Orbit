@@ -19,12 +19,13 @@ def get_user_missions(user_id):
 def remove_mission(mission_id, user_id):
     """
     Delete a mission if the requesting user owns it.
-    Returns (True, None) or (False, error_string).
+    Returns (success, error_message, status_code).
+    status_code is None on success.
     """
     mission = get_mission(mission_id)
     if not mission:
-        return False, "Mission not found"
+        return False, "Mission not found", 404
     if mission.get('creator_id') != int(user_id):
-        return False, "Only the creator can delete this mission"
+        return False, "Only the creator can delete this mission", 403
     delete_mission(mission_id)
-    return True, None
+    return True, None, None

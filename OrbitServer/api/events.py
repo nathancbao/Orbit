@@ -84,7 +84,10 @@ def list_all():
 @events_bp.route('/suggested', methods=['GET'])
 @require_auth
 def suggested():
-    limit = min(int(request.args.get('limit', 5)), 10)
+    try:
+        limit = min(int(request.args.get('limit', 5)), 10)
+    except (TypeError, ValueError):
+        limit = 5
     events = get_suggested_events(g.user_id, limit=limit)
 
     for event in events:
@@ -158,10 +161,9 @@ def update(event_id):
     if not valid:
         return error(errors, 400)
 
-    event, err = edit_event(event_id, data, g.user_id)
+    event, err, status_code = edit_event(event_id, data, g.user_id)
     if err:
-        status = 404 if "not found" in err.lower() else 403
-        return error(err, status)
+        return error(err, status_code)
     return success(_to_str_id(event))
 
 
@@ -170,10 +172,9 @@ def update(event_id):
 @events_bp.route('/<int:event_id>', methods=['DELETE'])
 @require_auth
 def delete(event_id):
-    result, err = remove_event(event_id, g.user_id)
+    result, err, status_code = remove_event(event_id, g.user_id)
     if err:
-        status = 404 if "not found" in err.lower() else 403
-        return error(err, status)
+        return error(err, status_code)
     return success({"message": "Event deleted successfully"})
 
 

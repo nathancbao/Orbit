@@ -1,4 +1,4 @@
-from OrbitServer.models.models import get_profile, upsert_profile, get_user
+from OrbitServer.models.models import get_profile, upsert_profile, get_user, COLLEGE_YEARS
 from OrbitServer.services.storage_service import upload_file
 
 
@@ -26,13 +26,13 @@ def _format_profile(raw):
 
 
 def _is_profile_complete(profile):
-    """A profile is complete when it has a name, college_year, and ≥3 interests."""
+    """A profile is complete when it has a name, valid college_year, and ≥3 interests."""
     name = profile.get('name', '')
     college_year = profile.get('college_year', '')
     interests = profile.get('interests', [])
     return (
         bool(name and isinstance(name, str) and name.strip()) and
-        bool(college_year) and
+        bool(college_year and college_year in COLLEGE_YEARS) and
         len(interests) >= 3
     )
 

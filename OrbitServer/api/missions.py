@@ -12,7 +12,7 @@ missions_bp = Blueprint('missions', __name__, url_prefix='/api/missions')
 
 # ── GET /missions ─────────────────────────────────────────────────────────────
 # Returns all missions created by the authenticated user.
-# Maps to: MissionsViewModel.loadMissions() (currently mocked — future use)
+# Maps to: MissionsViewModel.loadMissions()
 
 @missions_bp.route('', methods=['GET'])
 @require_auth
@@ -55,8 +55,7 @@ def create():
 @missions_bp.route('/<mission_id>', methods=['DELETE'])
 @require_auth
 def delete(mission_id):
-    result, err = remove_mission(mission_id, g.user_id)
+    result, err, status_code = remove_mission(mission_id, g.user_id)
     if err:
-        status = 404 if "not found" in err.lower() else 403
-        return error(err, status)
+        return error(err, status_code)
     return success({"message": "Mission deleted"})

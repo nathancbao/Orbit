@@ -8,6 +8,11 @@
 import Foundation
 import Combine
 
+enum MissionSegment: String, CaseIterable {
+    case discover = "Discover"
+    case mine = "My Missions"
+}
+
 @MainActor
 class MissionsViewModel: ObservableObject {
     @Published var suggestedMissions: [Mission] = []
@@ -18,6 +23,16 @@ class MissionsViewModel: ObservableObject {
     @Published var showMyYearOnly = false
 
     private var userYear: String = ""
+
+    /// Missions the user has joined (in a pod)
+    var myMissions: [Mission] {
+        allMissions.filter { $0.userPodStatus == "in_pod" }
+    }
+
+    /// Missions available to discover (not yet joined)
+    var discoverMissions: [Mission] {
+        allMissions.filter { $0.userPodStatus != "in_pod" }
+    }
 
     func load(userYear: String) async {
         self.userYear = userYear

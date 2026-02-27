@@ -8,7 +8,17 @@ def validate_edu_email(email):
     if not email or not isinstance(email, str):
         return False, "Email is required"
     email = email.strip().lower()
-    if not re.match(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$', email):
+    # Check max length (RFC 5321)
+    if len(email) > 254:
+        return False, "Email address too long"
+    # More robust email regex:
+    # - No consecutive dots
+    # - No leading/trailing dots in local part
+    # - Reasonable character restrictions
+    if not re.match(r'^[a-zA-Z0-9]([a-zA-Z0-9._%+-]*[a-zA-Z0-9])?@[a-zA-Z0-9]([a-zA-Z0-9.-]*[a-zA-Z0-9])?\.[a-zA-Z]{2,}$', email):
+        return False, "Invalid email format"
+    # Reject consecutive dots
+    if '..' in email:
         return False, "Invalid email format"
     if not email.endswith('.edu'):
         return False, "Only .edu email addresses are allowed"

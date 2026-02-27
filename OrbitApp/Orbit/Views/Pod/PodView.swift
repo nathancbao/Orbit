@@ -164,7 +164,7 @@ struct PodView: View {
                 }
                 .padding(.vertical, 12)
             }
-            .onChange(of: viewModel.messages.count) { _ in
+            .onChange(of: viewModel.messages.count) {
                 if let last = viewModel.messages.last {
                     withAnimation { proxy.scrollTo(last.id, anchor: .bottom) }
                 }

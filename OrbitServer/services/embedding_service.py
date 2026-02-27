@@ -13,6 +13,7 @@ Embedding model: voyage-3-lite (512-dim, cost-effective, tuned for retrieval tas
 
 import logging
 import os
+import threading
 from typing import Optional
 
 import numpy as np
@@ -23,6 +24,7 @@ logger = logging.getLogger(__name__)
 
 # In-process cache: event_id (int) -> np.ndarray of shape (512,)
 _embedding_cache: dict = {}
+_cache_lock = threading.Lock()
 
 # Lazy-initialized Anthropic client
 _client = None
@@ -88,9 +90,10 @@ def get_or_create_event_embedding(event_id: int) -> Optional[np.ndarray]:
     """
     event_id = int(event_id)
 
-    # L1: in-process cache
-    if event_id in _embedding_cache:
-        return _embedding_cache[event_id]
+    # L1: in-process cache (thread-safe read)
+    with _cache_lock:
+        if event_id in _embedding_cache:
+            return _embedding_cache[event_id]
 
     # L2: Datastore
     event = get_event(event_id)
@@ -100,7 +103,8 @@ def get_or_create_event_embedding(event_id: int) -> Optional[np.ndarray]:
     stored = event.get('embedding')
     if stored and len(stored) > 0:
         vec = np.array(stored, dtype=np.float32)
-        _embedding_cache[event_id] = vec
+        with _cache_lock:
+            _embedding_cache[event_id] = vec
         return vec
 
     # L3: Generate via API (lazy on first recommendation request)
@@ -115,7 +119,8 @@ def get_or_create_event_embedding(event_id: int) -> Optional[np.ndarray]:
         logger.warning(f"Failed to persist embedding for event {event_id}: {e}")
 
     vec = np.array(embedding, dtype=np.float32)
-    _embedding_cache[event_id] = vec
+    with _cache_lock:
+        _embedding_cache[event_id] = vec
     return vec
 
 
@@ -145,4 +150,5 @@ def cosine_similarity(a: np.ndarray, b: np.ndarray) -> float:
 
 def invalidate_cache(event_id: int) -> None:
     """Remove an event from the in-process cache (call after event update)."""
-    _embedding_cache.pop(int(event_id), None)
+    with _cache_lock:
+        _embedding_cache.pop(int(event_id), None)

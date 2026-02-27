@@ -12,6 +12,14 @@ NO_SHOW_PENALTY = -20
 KICK_MAJORITY_THRESHOLD = 0.5  # >50% of other members
 
 
+def _safe_int(value, default=None):
+    """Safely convert a value to int. Returns default on failure."""
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return default
+
+
 def join_event(event_id, user_id):
     """
     Assign a user to the next open pod for an event.
@@ -34,6 +42,10 @@ def join_event(event_id, user_id):
 
     # Find an open pod with room and join atomically
     pod = find_open_pod_for_event(event_id)
+    uid = _safe_int(user_id)
+    if uid is None:
+        return None, "Invalid user ID"
+
     if pod:
         def _add_member(entity):
             member_ids = list(entity.get('member_ids') or [])
@@ -64,6 +76,10 @@ def leave_event(event_id, user_id):
     Uses a Datastore transaction to prevent race conditions.
     Returns (True, None) or (False, error_string).
     """
+    uid = _safe_int(user_id)
+    if uid is None:
+        return False, "Invalid user ID"
+
     pod = get_user_pod_for_event(event_id, user_id)
     if not pod:
         return False, "You are not in a pod for this event"
@@ -81,27 +97,32 @@ def get_pod_with_members(pod_id, requesting_user_id):
     """
     Returns pod dict enriched with member profile stubs.
     Only accessible to pod members.
+    Returns (pod, error_message, status_code).
     """
+    uid = _safe_int(requesting_user_id)
+    if uid is None:
+        return None, "Invalid user ID", 400
+
     pod = get_event_pod(pod_id)
     if not pod:
-        return None, "Pod not found"
+        return None, "Pod not found", 404
 
     member_ids = pod.get('member_ids') or []
-    if int(requesting_user_id) not in member_ids:
-        return None, "You are not a member of this pod"
+    if uid not in member_ids:
+        return None, "You are not a member of this pod", 403
 
     members = []
-    for uid in member_ids:
-        profile = get_profile(uid) or {}
+    for member_uid in member_ids:
+        profile = get_profile(member_uid) or {}
         members.append({
-            'user_id': uid,
+            'user_id': member_uid,
             'name': profile.get('name', ''),
             'college_year': profile.get('college_year', ''),
             'interests': profile.get('interests', []),
             'photo': profile.get('photo'),
         })
 
-    return {**pod, 'members': members}, None
+    return {**pod, 'members': members}, None, None
 
 
 def vote_to_kick(pod_id, kicker_user_id, target_user_id):
@@ -109,19 +130,24 @@ def vote_to_kick(pod_id, kicker_user_id, target_user_id):
     Record a kick vote. If majority of non-target members vote kick,
     remove the target and open the pod for a replacement.
     Uses a Datastore transaction for atomicity.
-    Returns (pod, kicked, error).
+    Returns (pod, kicked, error_message, status_code).
     """
+    kicker_uid = _safe_int(kicker_user_id)
+    target_uid = _safe_int(target_user_id)
+    if kicker_uid is None or target_uid is None:
+        return None, False, "Invalid user ID", 400
+
     pod = get_event_pod(pod_id)
     if not pod:
-        return None, False, "Pod not found"
+        return None, False, "Pod not found", 404
 
     member_ids = list(pod.get('member_ids') or [])
-    if int(kicker_user_id) not in member_ids:
-        return None, False, "You are not a member of this pod"
-    if int(target_user_id) not in member_ids:
-        return None, False, "Target user is not in this pod"
-    if int(kicker_user_id) == int(target_user_id):
-        return None, False, "You cannot kick yourself"
+    if kicker_uid not in member_ids:
+        return None, False, "You are not a member of this pod", 403
+    if target_uid not in member_ids:
+        return None, False, "Target user is not in this pod", 400
+    if kicker_uid == target_uid:
+        return None, False, "You cannot kick yourself", 400
 
     kick_result = {'kicked': False, 'replacement': None, 'event_id': None}
 
@@ -160,43 +186,56 @@ def vote_to_kick(pod_id, kicker_user_id, target_user_id):
             _, pod = transactional_pod_update(pod_id, _add_replacement)
             record_event_action(replacement, kick_result['event_id'], 'joined', pod_id=pod_id)
 
-    return pod, kick_result['kicked'], None
+    return pod, kick_result['kicked'], None, None
 
 
 def _find_replacement(event_id, pod_id, current_members):
     """
     Find the first user who has joined the event but is not yet in any pod.
     This is a simple FIFO replacement — no matching logic needed at this edge case.
+    Returns user_id of replacement or None if no suitable candidate found.
     """
-    from OrbitServer.models.models import get_user_event_history, list_event_pods
-    import datetime
+    from OrbitServer.models.models import list_event_pods
+    from google.cloud import datastore
 
     # Get all members across all pods for this event
     occupied = set()
     for pod in list_event_pods(event_id):
-        if pod['id'] != pod_id:
-            occupied.update(pod.get('member_ids') or [])
+        occupied.update(pod.get('member_ids') or [])
     occupied.update(current_members)
 
-    # Check event history for users who joined but aren't placed
-    # (In practice, all joiners go into a pod immediately, so this
-    #  mainly catches users who were in a different pod that freed up a seat.)
-    return None  # Placeholder: could query a waiting list in a future iteration
+    # Query UserEventHistory for users who joined this event but aren't in any pod
+    client = datastore.Client()
+    query = client.query(kind='UserEventHistory')
+    query.add_filter('event_id', '=', int(event_id))
+    query.add_filter('action', '=', 'joined')
+    query.order = ['created_at']  # FIFO: earliest joiner gets priority
+
+    for record in query.fetch(limit=50):
+        user_id = record.get('user_id')
+        if user_id and user_id not in occupied:
+            return user_id
+
+    return None
 
 
 def confirm_attendance(pod_id, user_id):
     """
     Record that a user attended the event.
     Uses a Datastore transaction for atomicity.
-    Awards trust points. Returns (pod, error).
+    Awards trust points. Returns (pod, error_message, status_code).
     """
+    uid = _safe_int(user_id)
+    if uid is None:
+        return None, "Invalid user ID", 400
+
     pod = get_event_pod(pod_id)
     if not pod:
-        return None, "Pod not found"
+        return None, "Pod not found", 404
 
     member_ids = pod.get('member_ids') or []
-    if int(user_id) not in member_ids:
-        return None, "You are not a member of this pod"
+    if uid not in member_ids:
+        return None, "You are not a member of this pod", 403
 
     def _confirm(entity):
         m_ids = entity.get('member_ids') or []
@@ -211,7 +250,7 @@ def confirm_attendance(pod_id, user_id):
 
     # Award trust points (adjust_trust_score already uses its own transaction)
     adjust_trust_score(user_id, ATTENDANCE_CONFIRM_POINTS / 100)
-    return pod, None
+    return pod, None, None
 
 
 def apply_no_show_penalties(pod_id):

@@ -6,6 +6,7 @@ import SwiftUI
 struct MissionsView: View {
     @Binding var userProfile: Profile
     @StateObject private var viewModel = MissionsViewModel()
+    @State private var segment: MissionSegment = .discover
     @State private var selectedMission: Mission?
     @State private var showCreate = false
     @State private var showProfile = false
@@ -20,77 +21,96 @@ struct MissionsView: View {
             ZStack(alignment: .bottomTrailing) {
                 Color(.systemBackground).ignoresSafeArea()
 
-                ScrollView {
-                    VStack(alignment: .leading, spacing: 24) {
+                VStack(spacing: 0) {
+                    // Segment picker
+                    Picker("", selection: $segment) {
+                        ForEach(MissionSegment.allCases, id: \.self) { s in
+                            Text(s.rawValue).tag(s)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+                    .padding(.horizontal, 20)
+                    .padding(.vertical, 12)
 
-                        // Suggested missions strip
-                        if !viewModel.suggestedMissions.isEmpty {
-                            VStack(alignment: .leading, spacing: 12) {
-                                Text("suggested for you")
-                                    .font(.headline)
-                                    .padding(.horizontal, 20)
+                    ScrollView {
+                        VStack(alignment: .leading, spacing: 24) {
+                            if segment == .discover {
+                                // Suggested missions strip (Discover only)
+                                if !viewModel.suggestedMissions.isEmpty {
+                                    VStack(alignment: .leading, spacing: 12) {
+                                        Text("suggested for you")
+                                            .font(.headline)
+                                            .padding(.horizontal, 20)
 
+                                        ScrollView(.horizontal, showsIndicators: false) {
+                                            HStack(spacing: 14) {
+                                                ForEach(viewModel.suggestedMissions) { mission in
+                                                    SuggestedMissionCard(mission: mission) {
+                                                        selectedMission = mission
+                                                    }
+                                                }
+                                            }
+                                            .padding(.horizontal, 20)
+                                        }
+                                    }
+                                }
+
+                                // Tag Filters (Discover only)
                                 ScrollView(.horizontal, showsIndicators: false) {
-                                    HStack(spacing: 14) {
-                                        ForEach(viewModel.suggestedMissions) { mission in
-                                            SuggestedMissionCard(mission: mission) {
-                                                selectedMission = mission
+                                    HStack(spacing: 8) {
+                                        TagFilterChip(label: "all", isSelected: viewModel.filterTag == nil && !viewModel.showMyYearOnly) {
+                                            Task {
+                                                if viewModel.showMyYearOnly { await viewModel.toggleYearFilter() }
+                                                await viewModel.applyTag(nil)
+                                            }
+                                        }
+                                        TagFilterChip(label: "my year", isSelected: viewModel.showMyYearOnly) {
+                                            Task { await viewModel.toggleYearFilter() }
+                                        }
+                                        ForEach(allTags, id: \.self) { tag in
+                                            TagFilterChip(
+                                                label: tag.lowercased(),
+                                                isSelected: viewModel.filterTag == tag
+                                            ) {
+                                                Task { await viewModel.applyTag(viewModel.filterTag == tag ? nil : tag) }
                                             }
                                         }
                                     }
                                     .padding(.horizontal, 20)
                                 }
                             }
-                        }
 
-                        // Tag Filters (includes My Year chip)
-                        ScrollView(.horizontal, showsIndicators: false) {
-                            HStack(spacing: 8) {
-                                TagFilterChip(label: "all", isSelected: viewModel.filterTag == nil && !viewModel.showMyYearOnly) {
-                                    Task {
-                                        if viewModel.showMyYearOnly { await viewModel.toggleYearFilter() }
-                                        await viewModel.applyTag(nil)
-                                    }
-                                }
-                                TagFilterChip(label: "my year", isSelected: viewModel.showMyYearOnly) {
-                                    Task { await viewModel.toggleYearFilter() }
-                                }
-                                ForEach(allTags, id: \.self) { tag in
-                                    TagFilterChip(
-                                        label: tag.lowercased(),
-                                        isSelected: viewModel.filterTag == tag
-                                    ) {
-                                        Task { await viewModel.applyTag(viewModel.filterTag == tag ? nil : tag) }
+                            // Missions List
+                            if viewModel.isLoading {
+                                HStack { Spacer(); ProgressView(); Spacer() }
+                                    .padding(.vertical, 40)
+                            } else {
+                                let displayedMissions = segment == .discover
+                                    ? viewModel.discoverMissions
+                                    : viewModel.myMissions
+
+                                if displayedMissions.isEmpty {
+                                    EmptyMissionsView(segment: segment, onCreateTap: { showCreate = true })
+                                        .padding(.horizontal, 20)
+                                } else {
+                                    VStack(spacing: 14) {
+                                        ForEach(displayedMissions) { mission in
+                                            MissionListCard(mission: mission) {
+                                                selectedMission = mission
+                                            }
+                                            .padding(.horizontal, 20)
+                                        }
                                     }
                                 }
                             }
-                            .padding(.horizontal, 20)
-                        }
 
-                        // Missions List
-                        if viewModel.isLoading {
-                            HStack { Spacer(); ProgressView(); Spacer() }
-                                .padding(.vertical, 40)
-                        } else if viewModel.allMissions.isEmpty {
-                            EmptyMissionsView(onCreateTap: { showCreate = true })
-                                .padding(.horizontal, 20)
-                        } else {
-                            VStack(spacing: 14) {
-                                ForEach(viewModel.allMissions) { mission in
-                                    MissionListCard(mission: mission) {
-                                        selectedMission = mission
-                                    }
-                                    .padding(.horizontal, 20)
-                                }
-                            }
+                            Spacer(minLength: 100)
                         }
-
-                        Spacer(minLength: 100)
+                        .padding(.top, 16)
                     }
-                    .padding(.top, 16)
-                }
-                .refreshable {
-                    await viewModel.reload()
+                    .refreshable {
+                        await viewModel.reload()
+                    }
                 }
 
                 // FAB — create mission
@@ -380,20 +400,23 @@ struct TagFilterChip: View {
 // MARK: - Empty Missions View
 
 struct EmptyMissionsView: View {
+    var segment: MissionSegment = .discover
     var onCreateTap: (() -> Void)? = nil
 
     var body: some View {
         VStack(spacing: 16) {
-            Image(systemName: "paperplane")
+            Image(systemName: segment == .discover ? "paperplane" : "tray")
                 .font(.system(size: 48))
                 .foregroundStyle(OrbitTheme.gradient)
-            Text("no missions yet")
+            Text(segment == .discover ? "no missions yet" : "no missions joined")
                 .font(.headline)
-            Text("be the first — create a mission for others to join")
+            Text(segment == .discover
+                 ? "be the first — create a mission for others to join"
+                 : "discover and join missions to see them here")
                 .font(.subheadline)
                 .foregroundColor(.secondary)
                 .multilineTextAlignment(.center)
-            if let onCreateTap {
+            if let onCreateTap, segment == .discover {
                 Button(action: onCreateTap) {
                     Label("Create a Mission", systemImage: "plus")
                         .font(.subheadline)

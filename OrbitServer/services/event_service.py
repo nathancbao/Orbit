@@ -37,11 +37,15 @@ def get_event_detail(event_id):
 
 
 def edit_event(event_id, data, user_id):
+    """
+    Edit an event. Returns (event, error_message, status_code).
+    status_code is None on success.
+    """
     event = get_event(event_id)
     if not event:
-        return None, "Event not found"
+        return None, "Event not found", 404
     if event['creator_id'] != int(user_id):
-        return None, "Only the creator can edit this event"
+        return None, "Only the creator can edit this event", 403
     updated = update_event(event_id, data)
 
     # If content fields changed, invalidate cached embedding and regenerate
@@ -56,14 +60,18 @@ def edit_event(event_id, data, user_id):
                 pass
         threading.Thread(target=_regenerate, daemon=True).start()
 
-    return updated, None
+    return updated, None, None
 
 
 def remove_event(event_id, user_id):
+    """
+    Remove an event. Returns (success, error_message, status_code).
+    status_code is None on success.
+    """
     event = get_event(event_id)
     if not event:
-        return False, "Event not found"
+        return False, "Event not found", 404
     if event['creator_id'] != int(user_id):
-        return False, "Only the creator can delete this event"
+        return False, "Only the creator can delete this event", 403
     delete_event(event_id)
-    return True, None
+    return True, None, None

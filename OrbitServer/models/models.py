@@ -226,21 +226,23 @@ def update_event_pod(pod_id, data):
 def delete_event_pod(pod_id):
     key = client.key('EventPod', str(pod_id))
     client.delete(key)
-    # Cascade: delete messages and votes
+    # Cascade: delete messages and votes (batched to avoid memory issues)
     query = client.query(kind='ChatMessage')
     query.add_filter('pod_id', '=', str(pod_id))
-    for msg in list(query.fetch()):
+    query.keys_only()
+    for msg in query.fetch(limit=1000):
         client.delete(msg.key)
     query2 = client.query(kind='Vote')
     query2.add_filter('pod_id', '=', str(pod_id))
-    for vote in list(query2.fetch()):
+    query2.keys_only()
+    for vote in query2.fetch(limit=1000):
         client.delete(vote.key)
 
 
-def list_event_pods(event_id):
+def list_event_pods(event_id, limit=500):
     query = client.query(kind='EventPod')
     query.add_filter('event_id', '=', int(event_id))
-    results = list(query.fetch())
+    results = list(query.fetch(limit=limit))
     return [_entity_to_dict(e) for e in results]
 
 
@@ -308,7 +310,7 @@ def list_chat_messages(pod_id, limit=100):
 #         options [list of strings], votes {user_id_str: option_index},
 #         status (open|closed), result (string), created_at, closed_at
 
-def create_vote(pod_id, created_by, vote_type, options):
+def create_vote(pod_id, created_by, vote_type, options, expected_voters=None):
     vote_id = str(uuid.uuid4())
     key = client.key('Vote', vote_id)
     entity = datastore.Entity(key=key)
@@ -320,6 +322,7 @@ def create_vote(pod_id, created_by, vote_type, options):
         'votes': {},
         'status': 'open',
         'result': None,
+        'expected_voters': expected_voters,
         'created_at': datetime.datetime.utcnow(),
         'closed_at': None,
     })
@@ -362,10 +365,10 @@ def transactional_vote_update(vote_id, update_fn):
         return result, _entity_to_dict(entity)
 
 
-def list_votes_for_pod(pod_id):
+def list_votes_for_pod(pod_id, limit=100):
     query = client.query(kind='Vote')
     query.add_filter('pod_id', '=', str(pod_id))
-    results = list(query.fetch())
+    results = list(query.fetch(limit=limit))
     return [_entity_to_dict(e) for e in results]
 
 
@@ -467,11 +470,11 @@ def delete_mission(mission_id):
     client.delete(key)
 
 
-def list_missions_for_user(user_id):
+def list_missions_for_user(user_id, limit=100):
     query = client.query(kind='Mission')
     query.add_filter('creator_id', '=', int(user_id))
     query.order = ['-created_at']
-    results = list(query.fetch())
+    results = list(query.fetch(limit=limit))
     return [_entity_to_dict(e) for e in results]
 
 
@@ -488,7 +491,7 @@ def update_mission_status(mission_id, status):
 
 # ── EventPod user membership query ────────────────────────────────────────────
 
-def get_user_pods(user_id):
+def get_user_pods(user_id, limit=100):
     """Return all EventPod entities the user is a member of.
 
     Datastore automatically builds single-property indexes for array fields,
@@ -496,7 +499,7 @@ def get_user_pods(user_id):
     """
     query = client.query(kind='EventPod')
     query.add_filter('member_ids', '=', int(user_id))
-    results = list(query.fetch())
+    results = list(query.fetch(limit=limit))
     return [_entity_to_dict(e) for e in results]
 
 

@@ -37,7 +37,8 @@ def create_poll(pod_id, user_id, vote_type, options):
     pod = get_event_pod(pod_id)
     if not pod:
         return None, "Pod not found"
-    if int(user_id) not in (pod.get('member_ids') or []):
+    member_ids = pod.get('member_ids') or []
+    if int(user_id) not in member_ids:
         return None, "You are not a member of this pod"
 
     # Only one open vote of each type at a time
@@ -46,7 +47,8 @@ def create_poll(pod_id, user_id, vote_type, options):
         if v['vote_type'] == vote_type and v['status'] == 'open':
             return None, f"There is already an open {vote_type} vote for this pod"
 
-    vote = create_vote(pod_id, user_id, vote_type, options)
+    # Store expected voter count at creation time to avoid race conditions
+    vote = create_vote(pod_id, user_id, vote_type, options, expected_voters=len(member_ids))
 
     # Post a system message announcing the vote
     create_chat_message(
@@ -83,7 +85,10 @@ def respond_to_vote(pod_id, vote_id, user_id, option_index):
         votes_map[str(user_id)] = option_index
         entity['votes'] = votes_map
 
-        if len(votes_map) >= len(member_ids):
+        # Auto-close when all expected voters have voted
+        # Use expected_voters from vote creation time to avoid race conditions
+        expected_voters = entity.get('expected_voters') or len(member_ids)
+        if len(votes_map) >= expected_voters:
             opts = entity.get('options') or []
             winner, _ = _tally_votes(votes_map, opts)
             entity['status'] = 'closed'
@@ -107,12 +112,20 @@ def respond_to_vote(pod_id, vote_id, user_id, option_index):
 
 
 def _tally_votes(votes_map, options):
-    """Return (winning_option_string, winning_index) by plurality."""
+    """Return (winning_option_string, winning_index) by plurality.
+    Returns (None, -1) if no valid votes or empty options.
+    """
+    if not options:
+        return None, -1
     counts = [0] * len(options)
     for option_index in votes_map.values():
         if 0 <= option_index < len(options):
             counts[option_index] += 1
-    winning_index = counts.index(max(counts))
+    max_count = max(counts)
+    if max_count == 0:
+        # No valid votes - default to first option
+        return options[0], 0
+    winning_index = counts.index(max_count)
     return options[winning_index], winning_index
 
 

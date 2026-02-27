@@ -7,6 +7,7 @@ struct SignalsView: View {
     @Binding var userProfile: Profile
     @StateObject private var viewModel = SignalsViewModel()
     @State private var segment: SignalSegment = .discover
+    @State private var selectedSignal: Signal?
     @State private var showForm = false
     @State private var showProfile = false
 
@@ -49,9 +50,12 @@ struct SignalsView: View {
                             ScrollView {
                                 VStack(spacing: 14) {
                                     ForEach(displayed) { signal in
-                                        SignalCard(signal: signal, showDelete: segment == .mine) {
-                                            viewModel.deleteSignal(id: signal.id)
-                                        }
+                                        SignalCard(
+                                            signal: signal,
+                                            showDelete: segment == .mine,
+                                            onTap: { selectedSignal = signal },
+                                            onDelete: { viewModel.deleteSignal(id: signal.id) }
+                                        )
                                         .padding(.horizontal, 20)
                                     }
                                 }
@@ -106,6 +110,9 @@ struct SignalsView: View {
             SignalFormView()
                 .environmentObject(viewModel)
         }
+        .sheet(item: $selectedSignal) { signal in
+            SignalDetailView(signal: signal)
+        }
         .overlay(alignment: .bottom) {
             if viewModel.showToast {
                 toastView
@@ -139,68 +146,72 @@ struct SignalsView: View {
 struct SignalCard: View {
     let signal: Signal
     let showDelete: Bool
+    let onTap: () -> Void
     let onDelete: () -> Void
 
     @State private var showDeleteConfirm = false
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            OrbitTheme.gradientFill
-                .frame(height: 4)
+        Button(action: onTap) {
+            VStack(alignment: .leading, spacing: 0) {
+                OrbitTheme.gradientFill
+                    .frame(height: 4)
 
-            VStack(alignment: .leading, spacing: 10) {
-                HStack(alignment: .top, spacing: 10) {
-                    Image(systemName: signal.activityCategory.icon)
-                        .font(.title3)
-                        .foregroundStyle(OrbitTheme.gradient)
+                VStack(alignment: .leading, spacing: 10) {
+                    HStack(alignment: .top, spacing: 10) {
+                        Image(systemName: signal.activityCategory.icon)
+                            .font(.title3)
+                            .foregroundStyle(OrbitTheme.gradient)
 
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(signal.displayTitle)
-                            .font(.headline)
-                            .foregroundColor(.white)
-                            .lineLimit(2)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(signal.displayTitle)
+                                .font(.headline)
+                                .foregroundColor(.white)
+                                .lineLimit(2)
 
-                        Text(signal.activityCategory.displayName)
-                            .font(.caption)
-                            .foregroundColor(.white.opacity(0.6))
+                            Text(signal.activityCategory.displayName)
+                                .font(.caption)
+                                .foregroundColor(.white.opacity(0.6))
+                        }
+
+                        Spacer()
+
+                        SignalStatusBadge(status: signal.status)
                     }
 
-                    Spacer()
+                    HStack(spacing: 5) {
+                        Image(systemName: "calendar")
+                            .font(.caption)
+                        Text(signal.availabilitySummary)
+                            .font(.caption)
+                    }
+                    .foregroundColor(.white.opacity(0.7))
 
-                    SignalStatusBadge(status: signal.status)
-                }
+                    HStack(spacing: 5) {
+                        Image(systemName: "person.2.fill")
+                            .font(.caption)
+                        Text(signal.groupSizeLabel)
+                            .font(.caption)
+                    }
+                    .foregroundColor(.white.opacity(0.7))
 
-                HStack(spacing: 5) {
-                    Image(systemName: "calendar")
-                        .font(.caption)
-                    Text(signal.availabilitySummary)
-                        .font(.caption)
+                    if !signal.description.isEmpty {
+                        Text(signal.description)
+                            .font(.caption)
+                            .foregroundColor(.white.opacity(0.5))
+                            .lineLimit(2)
+                    }
                 }
-                .foregroundColor(.white.opacity(0.7))
-
-                HStack(spacing: 5) {
-                    Image(systemName: "person.2.fill")
-                        .font(.caption)
-                    Text(signal.groupSizeLabel)
-                        .font(.caption)
-                }
-                .foregroundColor(.white.opacity(0.7))
-
-                if !signal.description.isEmpty {
-                    Text(signal.description)
-                        .font(.caption)
-                        .foregroundColor(.white.opacity(0.5))
-                        .lineLimit(2)
-                }
+                .padding(14)
             }
-            .padding(14)
+            .background(OrbitTheme.cardGradient)
+            .clipShape(RoundedRectangle(cornerRadius: 18))
+            .overlay(
+                RoundedRectangle(cornerRadius: 18)
+                    .stroke(Color.white.opacity(0.08), lineWidth: 1)
+            )
         }
-        .background(OrbitTheme.cardGradient)
-        .clipShape(RoundedRectangle(cornerRadius: 18))
-        .overlay(
-            RoundedRectangle(cornerRadius: 18)
-                .stroke(Color.white.opacity(0.08), lineWidth: 1)
-        )
+        .buttonStyle(.plain)
         .contextMenu {
             if showDelete {
                 Button(role: .destructive) {
@@ -274,3 +285,4 @@ struct EmptySignalsView: View {
         .padding(.horizontal, 40)
     }
 }
+
