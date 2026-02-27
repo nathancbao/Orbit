@@ -252,82 +252,161 @@ struct PlanetNodeView: View {
     private var planetSize: CGFloat { isSelected ? 60 : 52 }
     private var glowSize: CGFloat { isSelected ? 100 : 80 }
 
+    // Darker, more muted base color for realistic planet surface
+    private var baseColor: Color {
+        planet.accentColor.opacity(0.7)
+    }
+
+    // Even darker shadow color
+    private var shadowColor: Color {
+        Color.black.opacity(0.6)
+    }
+
     var body: some View {
         VStack(spacing: 6) {
             ZStack {
-                // Outer glow
-                Circle()
-                    .fill(
-                        RadialGradient(
-                            colors: [
-                                planet.accentColor.opacity(isSelected ? 0.5 : 0.3),
-                                planet.accentColor.opacity(0.1),
-                                Color.clear
-                            ],
-                            center: .center,
-                            startRadius: planetSize / 2,
-                            endRadius: glowSize / 2
+                // Subtle atmospheric haze (much more subtle than before)
+                if isSelected {
+                    Circle()
+                        .fill(
+                            RadialGradient(
+                                colors: [
+                                    planet.accentColor.opacity(0.15),
+                                    planet.accentColor.opacity(0.05),
+                                    Color.clear
+                                ],
+                                center: .center,
+                                startRadius: planetSize / 2,
+                                endRadius: glowSize / 2
+                            )
                         )
-                    )
-                    .frame(width: glowSize, height: glowSize)
+                        .frame(width: glowSize, height: glowSize)
+                }
 
-                // Ring for missions (Saturn-like)
+                // Ring for missions (Saturn-like) - more subtle
                 if planet.isMission {
                     Ellipse()
                         .stroke(
                             LinearGradient(
                                 colors: [
-                                    planet.accentColor.opacity(0.6),
-                                    planet.accentColor.opacity(0.2)
+                                    planet.accentColor.opacity(0.4),
+                                    planet.accentColor.opacity(0.15)
                                 ],
                                 startPoint: .leading,
                                 endPoint: .trailing
                             ),
-                            lineWidth: 2
+                            lineWidth: 1.5
                         )
-                        .frame(width: planetSize + 20, height: 12)
+                        .frame(width: planetSize + 20, height: 10)
                         .rotationEffect(.degrees(ringRotation))
                 }
 
-                // Planet body
-                Circle()
-                    .fill(
-                        RadialGradient(
-                            colors: [
-                                planet.accentColor.opacity(0.9),
-                                planet.accentColor.opacity(0.6),
-                                planet.accentColor.opacity(0.4)
-                            ],
-                            center: UnitPoint(x: 0.3, y: 0.3),
-                            startRadius: 0,
-                            endRadius: planetSize / 2
-                        )
-                    )
-                    .frame(width: planetSize, height: planetSize)
-                    .overlay(
-                        // Surface texture pattern
-                        Circle()
-                            .fill(
-                                RadialGradient(
-                                    colors: [
-                                        Color.white.opacity(0.15),
-                                        Color.clear
-                                    ],
-                                    center: UnitPoint(x: 0.25, y: 0.25),
-                                    startRadius: 0,
-                                    endRadius: planetSize / 3
-                                )
+                // Planet base with realistic lighting
+                ZStack {
+                    // Main planet body - darker base
+                    Circle()
+                        .fill(
+                            RadialGradient(
+                                colors: [
+                                    planet.accentColor.opacity(0.5),
+                                    planet.accentColor.opacity(0.35),
+                                    planet.accentColor.opacity(0.2)
+                                ],
+                                center: UnitPoint(x: 0.35, y: 0.35),
+                                startRadius: 0,
+                                endRadius: planetSize / 1.8
                             )
-                    )
-                    .overlay(
-                        Circle()
-                            .stroke(planet.accentColor.opacity(0.8), lineWidth: 1.5)
-                    )
+                        )
+                        .frame(width: planetSize, height: planetSize)
 
-                // Icon overlay
+                    // Dark side shadow (terminator line effect)
+                    Circle()
+                        .fill(
+                            LinearGradient(
+                                colors: [
+                                    Color.clear,
+                                    Color.clear,
+                                    Color.black.opacity(0.3),
+                                    Color.black.opacity(0.5)
+                                ],
+                                startPoint: UnitPoint(x: 0.3, y: 0.3),
+                                endPoint: UnitPoint(x: 0.9, y: 0.9)
+                            )
+                        )
+                        .frame(width: planetSize, height: planetSize)
+
+                    // Limb darkening effect (edges darker)
+                    Circle()
+                        .stroke(
+                            RadialGradient(
+                                colors: [
+                                    Color.clear,
+                                    Color.black.opacity(0.25)
+                                ],
+                                center: .center,
+                                startRadius: planetSize / 3,
+                                endRadius: planetSize / 2
+                            ),
+                            lineWidth: planetSize / 4
+                        )
+                        .frame(width: planetSize, height: planetSize)
+
+                    // Surface band/texture (horizontal banding like gas giants)
+                    Circle()
+                        .fill(
+                            LinearGradient(
+                                colors: [
+                                    Color.white.opacity(0.03),
+                                    planet.accentColor.opacity(0.08),
+                                    Color.white.opacity(0.02),
+                                    planet.accentColor.opacity(0.06),
+                                    Color.white.opacity(0.03)
+                                ],
+                                startPoint: .top,
+                                endPoint: .bottom
+                            )
+                        )
+                        .frame(width: planetSize, height: planetSize)
+
+                    // Specular highlight (subtle light reflection)
+                    Circle()
+                        .fill(
+                            RadialGradient(
+                                colors: [
+                                    Color.white.opacity(0.25),
+                                    Color.white.opacity(0.08),
+                                    Color.clear
+                                ],
+                                center: UnitPoint(x: 0.3, y: 0.25),
+                                startRadius: 0,
+                                endRadius: planetSize / 4
+                            )
+                        )
+                        .frame(width: planetSize, height: planetSize)
+
+                    // Subtle rim light (atmosphere backlight)
+                    Circle()
+                        .stroke(
+                            LinearGradient(
+                                colors: [
+                                    Color.clear,
+                                    Color.clear,
+                                    planet.accentColor.opacity(0.2),
+                                    planet.accentColor.opacity(0.3)
+                                ],
+                                startPoint: UnitPoint(x: 0.3, y: 0.3),
+                                endPoint: UnitPoint(x: 0.85, y: 0.85)
+                            ),
+                            lineWidth: 1
+                        )
+                        .frame(width: planetSize - 1, height: planetSize - 1)
+                }
+
+                // Icon overlay - slightly more transparent
                 Image(systemName: planet.icon)
-                    .font(.system(size: isSelected ? 22 : 18, weight: .semibold))
-                    .foregroundColor(.white.opacity(0.9))
+                    .font(.system(size: isSelected ? 20 : 16, weight: .medium))
+                    .foregroundColor(.white.opacity(0.85))
+                    .shadow(color: Color.black.opacity(0.5), radius: 2, x: 0, y: 1)
             }
 
             // Info label (visible on selection)
