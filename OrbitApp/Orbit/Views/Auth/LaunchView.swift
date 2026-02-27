@@ -59,17 +59,7 @@ struct LaunchView: View {
                     Text("L A U N C H !")
                         .font(.system(size: 16, weight: .medium, design: .default))
                         .tracking(2)
-                        .foregroundStyle(
-                            LinearGradient(
-                                colors: [
-                                    Color(red: 0.9, green: 0.65, blue: 0.72),
-                                    Color(red: 0.7, green: 0.68, blue: 0.85),
-                                    Color(red: 0.5, green: 0.58, blue: 0.82)
-                                ],
-                                startPoint: .leading,
-                                endPoint: .trailing
-                            )
-                        )
+                        .foregroundStyle(OrbitTheme.gradient)
                         .padding(.horizontal, 35)
                         .padding(.vertical, 14)
                         .overlay(
@@ -88,16 +78,6 @@ struct LaunchView: View {
 // MARK: - Top Wavy Lines
 
 struct TopWavyLines: View {
-    private let gradient = LinearGradient(
-        colors: [
-            Color(red: 0.9, green: 0.6, blue: 0.7),
-            Color(red: 0.7, green: 0.65, blue: 0.85),
-            Color(red: 0.45, green: 0.55, blue: 0.85)
-        ],
-        startPoint: .leading,
-        endPoint: .trailing
-    )
-
     var body: some View {
         GeometryReader { geo in
             ZStack {
@@ -108,7 +88,7 @@ struct TopWavyLines: View {
                     waveHeight: 15,
                     frequency: 1.2
                 )
-                .stroke(gradient, lineWidth: 2.5)
+                .stroke(OrbitTheme.gradient, lineWidth: 2.5)
 
                 // Line 2 - Purple (middle)
                 WavyLinePath(
@@ -117,7 +97,7 @@ struct TopWavyLines: View {
                     waveHeight: 12,
                     frequency: 1.5
                 )
-                .stroke(gradient, lineWidth: 2.5)
+                .stroke(OrbitTheme.gradient, lineWidth: 2.5)
 
                 // Line 3 - Blue (top)
                 WavyLinePath(
@@ -126,7 +106,7 @@ struct TopWavyLines: View {
                     waveHeight: 18,
                     frequency: 1.0
                 )
-                .stroke(gradient, lineWidth: 2.5)
+                .stroke(OrbitTheme.gradient, lineWidth: 2.5)
             }
         }
     }
@@ -135,16 +115,6 @@ struct TopWavyLines: View {
 // MARK: - Bottom Wavy Lines
 
 struct BottomWavyLines: View {
-    private let gradient = LinearGradient(
-        colors: [
-            Color(red: 0.9, green: 0.6, blue: 0.7),
-            Color(red: 0.7, green: 0.65, blue: 0.85),
-            Color(red: 0.45, green: 0.55, blue: 0.85)
-        ],
-        startPoint: .leading,
-        endPoint: .trailing
-    )
-
     var body: some View {
         GeometryReader { geo in
             ZStack {
@@ -155,7 +125,7 @@ struct BottomWavyLines: View {
                     waveHeight: 18,
                     frequency: 1.3
                 )
-                .stroke(gradient, lineWidth: 2.5)
+                .stroke(OrbitTheme.gradient, lineWidth: 2.5)
 
                 // Line 2 - Purple (middle)
                 WavyLinePath(
@@ -164,7 +134,7 @@ struct BottomWavyLines: View {
                     waveHeight: 15,
                     frequency: 1.6
                 )
-                .stroke(gradient, lineWidth: 2.5)
+                .stroke(OrbitTheme.gradient, lineWidth: 2.5)
 
                 // Line 3 - Blue (bottom)
                 WavyLinePath(
@@ -173,7 +143,7 @@ struct BottomWavyLines: View {
                     waveHeight: 20,
                     frequency: 1.1
                 )
-                .stroke(gradient, lineWidth: 2.5)
+                .stroke(OrbitTheme.gradient, lineWidth: 2.5)
             }
         }
     }
@@ -231,7 +201,7 @@ struct SparklesView: View {
         path.move(to: CGPoint(x: center.x - size/2, y: center.y))
         path.addLine(to: CGPoint(x: center.x + size/2, y: center.y))
 
-        context.stroke(path, with: .color(.black), lineWidth: 1.5)
+        context.stroke(path, with: .color(OrbitTheme.purple), lineWidth: 1.5)
     }
 }
 

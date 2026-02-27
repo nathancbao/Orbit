@@ -4,7 +4,7 @@ import SwiftUI
 // Unified list of all pods the user has joined (missions + signals).
 
 struct PodsView: View {
-    let userProfile: Profile
+    @Binding var userProfile: Profile
     @State private var pods: [EventPod] = []
     @State private var isLoading = false
     @State private var showProfile = false
@@ -57,13 +57,17 @@ struct PodsView: View {
                 }
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button { showProfile = true } label: {
-                        ProfileAvatarView(photo: userProfile.photo, size: 30)
+                        ProfileAvatarView(photo: userProfile.photo, size: 30, name: userProfile.name)
                     }
                 }
             }
         }
         .sheet(isPresented: $showProfile) {
-            ProfileDisplayView(profile: userProfile, onEdit: { showProfile = false })
+            ProfileDisplayView(
+                profile: userProfile,
+                onEdit: { showProfile = false },
+                onProfileUpdated: { updated in userProfile = updated }
+            )
         }
         .task { await loadPods() }
     }

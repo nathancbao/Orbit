@@ -4,7 +4,7 @@ import SwiftUI
 // Spontaneous activity feed with Discover / My Signals segments and a FAB to create.
 
 struct SignalsView: View {
-    let userProfile: Profile
+    @Binding var userProfile: Profile
     @StateObject private var viewModel = SignalsViewModel()
     @State private var segment: SignalSegment = .discover
     @State private var showForm = false
@@ -90,13 +90,17 @@ struct SignalsView: View {
                 }
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button { showProfile = true } label: {
-                        ProfileAvatarView(photo: userProfile.photo, size: 30)
+                        ProfileAvatarView(photo: userProfile.photo, size: 30, name: userProfile.name)
                     }
                 }
             }
         }
         .sheet(isPresented: $showProfile) {
-            ProfileDisplayView(profile: userProfile, onEdit: { showProfile = false })
+            ProfileDisplayView(
+                profile: userProfile,
+                onEdit: { showProfile = false },
+                onProfileUpdated: { updated in userProfile = updated }
+            )
         }
         .sheet(isPresented: $showForm) {
             SignalFormView()

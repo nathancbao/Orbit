@@ -3,6 +3,7 @@ import SwiftUI
 struct ProfileDisplayView: View {
     let profile: Profile
     var onEdit: (() -> Void)? = nil
+    var onProfileUpdated: ((Profile) -> Void)? = nil
 
     @Environment(\.dismiss) private var dismiss
     @State private var showEdit = false
@@ -120,7 +121,10 @@ struct ProfileDisplayView: View {
             }
             .navigationDestination(isPresented: $showEdit) {
                 QuickProfileSetupView(
-                    onComplete: { _, _ in dismiss() },
+                    onComplete: { updatedProfile, _ in
+                        onProfileUpdated?(updatedProfile)
+                        dismiss()
+                    },
                     onCancel: { showEdit = false },
                     initialProfile: profile
                 )

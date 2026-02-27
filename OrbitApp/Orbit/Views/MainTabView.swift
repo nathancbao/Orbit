@@ -1,10 +1,15 @@
 import SwiftUI
 
 struct MainTabView: View {
-    let profile: Profile
+    @State var profile: Profile
     let onEditProfile: () -> Void
 
     @State private var selectedTab: Tab = .discovery
+
+    init(profile: Profile, onEditProfile: @escaping () -> Void) {
+        _profile = State(initialValue: profile)
+        self.onEditProfile = onEditProfile
+    }
 
     enum Tab {
         case discovery
@@ -24,21 +29,21 @@ struct MainTabView: View {
                 .tag(Tab.discovery)
 
             // Missions Tab (fixed-date events discover feed)
-            MissionsView(userProfile: profile)
+            MissionsView(userProfile: $profile)
                 .tabItem {
                     Label("Missions", systemImage: "paperplane.fill")
                 }
                 .tag(Tab.missions)
 
             // Signals Tab (spontaneous activity feed + FAB)
-            SignalsView(userProfile: profile)
+            SignalsView(userProfile: $profile)
                 .tabItem {
                     Label("Signals", systemImage: "antenna.radiowaves.left.and.right")
                 }
                 .tag(Tab.signals)
 
             // Pods Tab (all joined pods)
-            PodsView(userProfile: profile)
+            PodsView(userProfile: $profile)
                 .tabItem {
                     Label("Pods", systemImage: "person.3.fill")
                 }

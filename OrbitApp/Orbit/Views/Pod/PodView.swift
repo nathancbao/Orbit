@@ -177,7 +177,7 @@ struct PodView: View {
 
     private var inputBar: some View {
         HStack(spacing: 10) {
-            TextField("say something...", text: $viewModel.messageText, axis: .vertical)
+            TextField("Say something...", text: $viewModel.messageText, axis: .vertical)
                 .lineLimit(1...4)
                 .padding(.horizontal, 14)
                 .padding(.vertical, 10)
@@ -262,12 +262,7 @@ struct MemberStripView: View {
     }
 
     private func avatarColor(for name: String) -> Color {
-        let colors: [Color] = [
-            OrbitTheme.pink,
-            OrbitTheme.purple,
-            OrbitTheme.blue,
-            Color(red: 0.8, green: 0.6, blue: 0.8),
-        ]
+        let colors: [Color] = [OrbitTheme.pink, OrbitTheme.purple, OrbitTheme.blue]
         let index = abs(name.hashValue) % colors.count
         return colors[index]
     }

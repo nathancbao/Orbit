@@ -4,7 +4,7 @@ import SwiftUI
 // Discover feed for fixed-date community missions.
 
 struct MissionsView: View {
-    let userProfile: Profile
+    @Binding var userProfile: Profile
     @StateObject private var viewModel = MissionsViewModel()
     @State private var selectedMission: Mission?
     @State private var showCreate = false
@@ -121,7 +121,7 @@ struct MissionsView: View {
                 }
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button { showProfile = true } label: {
-                        ProfileAvatarView(photo: userProfile.photo, size: 30)
+                        ProfileAvatarView(photo: userProfile.photo, size: 30, name: userProfile.name)
                     }
                 }
             }
@@ -136,9 +136,11 @@ struct MissionsView: View {
             MissionCreateView()
         }
         .sheet(isPresented: $showProfile) {
-            ProfileDisplayView(profile: userProfile, onEdit: {
-                showProfile = false
-            })
+            ProfileDisplayView(
+                profile: userProfile,
+                onEdit: { showProfile = false },
+                onProfileUpdated: { updated in userProfile = updated }
+            )
         }
         .task {
             await viewModel.load(userYear: userProfile.collegeYear)
@@ -541,6 +543,7 @@ struct MissionCreateView: View {
 struct ProfileAvatarView: View {
     let photo: String?
     let size: CGFloat
+    var name: String? = nil
 
     var body: some View {
         Group {
@@ -548,16 +551,31 @@ struct ProfileAvatarView: View {
                 AsyncImage(url: parsed) { image in
                     image.resizable().scaledToFill()
                 } placeholder: {
-                    Image(systemName: "person.fill")
-                        .foregroundColor(.secondary)
+                    placeholder
                 }
             } else {
-                Image(systemName: "person.fill")
-                    .foregroundColor(.secondary)
+                placeholder
             }
         }
         .frame(width: size, height: size)
         .clipShape(Circle())
         .overlay(Circle().stroke(Color(.systemGray4), lineWidth: 1))
+    }
+
+    @ViewBuilder
+    private var placeholder: some View {
+        if let first = name?.first {
+            Text(String(first).uppercased())
+                .font(.system(size: size * 0.4, weight: .semibold))
+                .foregroundColor(.white)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .background(OrbitTheme.gradientFill)
+        } else {
+            Image(systemName: "person.fill")
+                .foregroundColor(.secondary)
+                .font(.system(size: size * 0.5))
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .background(Color(.systemGray5))
+        }
     }
 }
