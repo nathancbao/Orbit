@@ -179,6 +179,126 @@ struct MissionDetailView: View {
     }
 }
 
+// MARK: - Signal Detail View
+// Shown as a sheet when user taps a signal (e.g., from Discovery).
+// Displays full signal info.
+
+struct SignalDetailView: View {
+    let signal: Signal
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        NavigationStack {
+            ZStack {
+                Color.white.ignoresSafeArea()
+
+                VStack {
+                    Spacer()
+                    BottomWavyLines().frame(height: 150)
+                }
+                .ignoresSafeArea()
+
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 24) {
+
+                        // Icon and Title
+                        HStack(spacing: 12) {
+                            Image(systemName: signal.activityCategory.icon)
+                                .font(.title)
+                                .foregroundStyle(OrbitTheme.gradient)
+
+                            Text(signal.displayTitle)
+                                .font(.largeTitle)
+                                .fontWeight(.bold)
+                        }
+                        .padding(.top, 8)
+
+                        // Category and Status
+                        HStack(spacing: 16) {
+                            HStack(spacing: 6) {
+                                Image(systemName: "tag")
+                                    .foregroundStyle(OrbitTheme.gradient)
+                                Text(signal.activityCategory.displayName)
+                                    .font(.subheadline)
+                            }
+
+                            SignalStatusBadge(status: signal.status)
+                        }
+                        .foregroundColor(.secondary)
+
+                        // Group Size
+                        HStack(spacing: 6) {
+                            Image(systemName: "person.2.fill")
+                                .foregroundStyle(OrbitTheme.gradient)
+                            Text(signal.groupSizeLabel)
+                                .font(.subheadline)
+                        }
+                        .foregroundColor(.secondary)
+
+                        // Description
+                        if !signal.description.isEmpty {
+                            Text(signal.description)
+                                .font(.body)
+                                .foregroundColor(.primary)
+                                .lineSpacing(4)
+                        }
+
+                        Divider()
+
+                        // Availability Section
+                        VStack(alignment: .leading, spacing: 12) {
+                            Text("availability")
+                                .font(.headline)
+
+                            Text(signal.availabilitySummary)
+                                .font(.subheadline)
+                                .foregroundColor(.secondary)
+
+                            if !signal.availability.isEmpty {
+                                ForEach(signal.availability) { slot in
+                                    HStack(spacing: 10) {
+                                        Text(slot.dayLabel)
+                                            .font(.subheadline)
+                                            .fontWeight(.medium)
+                                            .frame(width: 70, alignment: .leading)
+
+                                        ForEach(slot.timeBlocks, id: \.self) { block in
+                                            HStack(spacing: 4) {
+                                                Image(systemName: block.icon)
+                                                    .font(.caption2)
+                                                Text(block.label)
+                                                    .font(.caption)
+                                            }
+                                            .padding(.horizontal, 8)
+                                            .padding(.vertical, 4)
+                                            .background(OrbitTheme.purple.opacity(0.12))
+                                            .clipShape(Capsule())
+                                            .foregroundColor(OrbitTheme.purple)
+                                        }
+                                    }
+                                    .padding(12)
+                                    .background(Color(.systemGray6))
+                                    .cornerRadius(12)
+                                }
+                            }
+                        }
+
+                        Spacer(minLength: 60)
+                    }
+                    .padding(.horizontal, 24)
+                    .padding(.top, 8)
+                }
+            }
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button("Done") { dismiss() }
+                }
+            }
+        }
+    }
+}
+
 // MARK: - Mission Pod Status Section
 
 struct MissionPodStatusSection: View {
