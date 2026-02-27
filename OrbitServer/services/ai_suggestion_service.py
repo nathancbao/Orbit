@@ -104,8 +104,14 @@ def _action_score(action: str, attended) -> float:
 def _decay_weight(created_at) -> float:
     if created_at is None:
         return 0.0
+    # _entity_to_dict converts datetimes to ISO strings — parse back if needed
+    if isinstance(created_at, str):
+        try:
+            created_at = datetime.datetime.fromisoformat(created_at.replace('Z', '+00:00'))
+        except ValueError:
+            return 0.0
     now = datetime.datetime.utcnow()
-    if hasattr(created_at, 'replace'):
+    if hasattr(created_at, 'tzinfo') and created_at.tzinfo:
         created_at = created_at.replace(tzinfo=None)
     age_days = max(0.0, (now - created_at).total_seconds() / 86400.0)
     return math.exp(-DECAY_LAMBDA * age_days)

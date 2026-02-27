@@ -82,14 +82,16 @@ def upsert_profile(user_id, data):
 
 
 def adjust_trust_score(user_id, delta):
-    """Add delta to a user's trust_score, clamped to [0.0, 5.0]."""
-    key = client.key('Profile', int(user_id))
-    entity = client.get(key)
-    if entity:
-        current = float(entity.get('trust_score', 0.0))
-        entity['trust_score'] = max(0.0, min(5.0, current + delta))
-        entity['updated_at'] = datetime.datetime.utcnow()
-        client.put(entity)
+    """Add delta to a user's trust_score, clamped to [0.0, 5.0].
+    Uses a transaction to avoid lost updates from concurrent adjustments."""
+    with client.transaction():
+        key = client.key('Profile', int(user_id))
+        entity = client.get(key)
+        if entity:
+            current = float(entity.get('trust_score', 0.0))
+            entity['trust_score'] = max(0.0, min(5.0, current + delta))
+            entity['updated_at'] = datetime.datetime.utcnow()
+            client.put(entity)
 
 
 # ── Event ─────────────────────────────────────────────────────────────────────
@@ -258,6 +260,23 @@ def find_open_pod_for_event(event_id):
     return None
 
 
+def transactional_pod_update(pod_id, update_fn):
+    """Atomically read-modify-write an EventPod inside a Datastore transaction.
+
+    update_fn(entity) is called with the raw Datastore entity.
+    It should mutate the entity in place and return a result value.
+    Returns (result, updated_pod_dict) or (None, None) if pod not found.
+    """
+    with client.transaction():
+        key = client.key('EventPod', str(pod_id))
+        entity = client.get(key)
+        if not entity:
+            return None, None
+        result = update_fn(entity)
+        client.put(entity)
+        return result, _entity_to_dict(entity)
+
+
 # ── ChatMessage ───────────────────────────────────────────────────────────────
 # Fields: id (UUID), pod_id, user_id, content, message_type, created_at
 
@@ -324,6 +343,23 @@ def update_vote(vote_id, data):
             entity[field] = data[field]
     client.put(entity)
     return _entity_to_dict(entity)
+
+
+def transactional_vote_update(vote_id, update_fn):
+    """Atomically read-modify-write a Vote inside a Datastore transaction.
+
+    update_fn(entity) is called with the raw Datastore entity.
+    It should mutate the entity in place and return a result value.
+    Returns (result, updated_vote_dict) or (None, None) if vote not found.
+    """
+    with client.transaction():
+        key = client.key('Vote', str(vote_id))
+        entity = client.get(key)
+        if not entity:
+            return None, None
+        result = update_fn(entity)
+        client.put(entity)
+        return result, _entity_to_dict(entity)
 
 
 def list_votes_for_pod(pod_id):

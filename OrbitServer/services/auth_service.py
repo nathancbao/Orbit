@@ -72,13 +72,16 @@ def verify_code(email, code):
       if not record:                                                                                                        
           return None, "No verification code found for this email"                                                          
                                                                                                                             
-      # Fix datetime comparison                                                                                             
-      expires_at = record['expires_at']                                                                                     
-      if hasattr(expires_at, 'tzinfo') and expires_at.tzinfo:                                                               
-          now = datetime.datetime.now(datetime.timezone.utc)                                                                
-      else:                                                                                                                 
-          now = datetime.datetime.utcnow()                                                                                  
-                                                                                                                            
+      # Fix datetime comparison — _entity_to_dict converts datetime to ISO string,
+      # so parse it back before comparing.
+      expires_at = record['expires_at']
+      if isinstance(expires_at, str):
+          expires_at = datetime.datetime.fromisoformat(expires_at.replace('Z', '+00:00'))
+      if hasattr(expires_at, 'tzinfo') and expires_at.tzinfo:
+          now = datetime.datetime.now(datetime.timezone.utc)
+      else:
+          now = datetime.datetime.utcnow()
+
       if now > expires_at:                                                                                                  
           delete_verification_code(email)                                                                                   
           return None, "Verification code has expired"                                                                      

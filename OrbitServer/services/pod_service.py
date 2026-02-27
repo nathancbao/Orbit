@@ -4,7 +4,7 @@ from OrbitServer.models.models import (
     get_event, get_event_pod, update_event_pod, create_event_pod,
     find_open_pod_for_event, get_user_pod_for_event,
     list_event_pods, get_profile, record_event_action,
-    adjust_trust_score,
+    adjust_trust_score, transactional_pod_update,
 )
 
 ATTENDANCE_CONFIRM_POINTS = 50
@@ -16,6 +16,7 @@ def join_event(event_id, user_id):
     """
     Assign a user to the next open pod for an event.
     Creates a new pod if none are open.
+    Uses a Datastore transaction to prevent race conditions.
     Returns (pod_dict, error_string).
     """
     event = get_event(event_id)
@@ -31,13 +32,24 @@ def join_event(event_id, user_id):
 
     max_pod_size = event.get('max_pod_size', 4)
 
-    # Find an open pod with room
+    # Find an open pod with room and join atomically
     pod = find_open_pod_for_event(event_id)
     if pod:
-        member_ids = list(pod.get('member_ids') or [])
-        member_ids.append(int(user_id))
-        new_status = 'full' if len(member_ids) >= max_pod_size else 'open'
-        pod = update_event_pod(pod['id'], {'member_ids': member_ids, 'status': new_status})
+        def _add_member(entity):
+            member_ids = list(entity.get('member_ids') or [])
+            if int(user_id) in member_ids:
+                return 'already_joined'
+            if len(member_ids) >= max_pod_size:
+                return 'full'
+            member_ids.append(int(user_id))
+            entity['member_ids'] = member_ids
+            entity['status'] = 'full' if len(member_ids) >= max_pod_size else 'open'
+            return 'joined'
+
+        result, pod = transactional_pod_update(pod['id'], _add_member)
+        if result == 'full':
+            # Pod filled between our check and the transaction; create a new one
+            pod = create_event_pod(event_id, max_size=max_pod_size, first_member_id=user_id)
     else:
         pod = create_event_pod(event_id, max_size=max_pod_size, first_member_id=user_id)
 
@@ -49,15 +61,19 @@ def join_event(event_id, user_id):
 def leave_event(event_id, user_id):
     """
     Remove a user from their pod for an event.
+    Uses a Datastore transaction to prevent race conditions.
     Returns (True, None) or (False, error_string).
     """
     pod = get_user_pod_for_event(event_id, user_id)
     if not pod:
         return False, "You are not in a pod for this event"
 
-    member_ids = [m for m in (pod.get('member_ids') or []) if m != int(user_id)]
-    new_status = 'open' if len(member_ids) < pod.get('max_size', 4) else pod['status']
-    update_event_pod(pod['id'], {'member_ids': member_ids, 'status': new_status})
+    def _remove_member(entity):
+        member_ids = [m for m in (entity.get('member_ids') or []) if m != int(user_id)]
+        entity['member_ids'] = member_ids
+        entity['status'] = 'open' if len(member_ids) < entity.get('max_size', 4) else entity.get('status', 'open')
+
+    transactional_pod_update(pod['id'], _remove_member)
     return True, None
 
 
@@ -92,6 +108,7 @@ def vote_to_kick(pod_id, kicker_user_id, target_user_id):
     """
     Record a kick vote. If majority of non-target members vote kick,
     remove the target and open the pod for a replacement.
+    Uses a Datastore transaction for atomicity.
     Returns (pod, kicked, error).
     """
     pod = get_event_pod(pod_id)
@@ -106,40 +123,44 @@ def vote_to_kick(pod_id, kicker_user_id, target_user_id):
     if int(kicker_user_id) == int(target_user_id):
         return None, False, "You cannot kick yourself"
 
-    kick_votes = dict(pod.get('kick_votes') or {})
-    target_key = str(target_user_id)
-    voters = kick_votes.get(target_key, [])
-    if int(kicker_user_id) not in voters:
-        voters.append(int(kicker_user_id))
-    kick_votes[target_key] = voters
+    kick_result = {'kicked': False, 'replacement': None, 'event_id': None}
 
-    # Count non-target members eligible to vote
-    eligible_voters = [m for m in member_ids if m != int(target_user_id)]
-    majority_needed = len(eligible_voters) * KICK_MAJORITY_THRESHOLD
+    def _apply_kick_vote(entity):
+        m_ids = list(entity.get('member_ids') or [])
+        kick_votes = dict(entity.get('kick_votes') or {})
+        target_key = str(target_user_id)
+        voters = list(kick_votes.get(target_key, []))
+        if int(kicker_user_id) not in voters:
+            voters.append(int(kicker_user_id))
+        kick_votes[target_key] = voters
 
-    kicked = False
-    if len(voters) > majority_needed:
-        # Execute kick
-        member_ids.remove(int(target_user_id))
-        del kick_votes[target_key]
-        kicked = True
-        # Try to find a replacement from event's open waiting list
-        event_id = pod.get('event_id')
-        replacement = _find_replacement(event_id, pod_id, member_ids)
+        eligible_voters = [m for m in m_ids if m != int(target_user_id)]
+        majority_needed = len(eligible_voters) * KICK_MAJORITY_THRESHOLD
+
+        if len(voters) > majority_needed:
+            m_ids.remove(int(target_user_id))
+            del kick_votes[target_key]
+            kick_result['kicked'] = True
+            kick_result['event_id'] = entity.get('event_id')
+            entity['member_ids'] = m_ids
+            entity['status'] = 'full' if len(m_ids) >= entity.get('max_size', 4) else 'open'
+
+        entity['kick_votes'] = kick_votes
+
+    _, pod = transactional_pod_update(pod_id, _apply_kick_vote)
+
+    if kick_result['kicked'] and kick_result['event_id']:
+        replacement = _find_replacement(kick_result['event_id'], pod_id, pod.get('member_ids', []))
         if replacement:
-            member_ids.append(replacement)
-            record_event_action(replacement, event_id, 'joined', pod_id=pod_id)
+            def _add_replacement(entity):
+                m_ids = list(entity.get('member_ids') or [])
+                m_ids.append(replacement)
+                entity['member_ids'] = m_ids
+                entity['status'] = 'full' if len(m_ids) >= entity.get('max_size', 4) else 'open'
+            _, pod = transactional_pod_update(pod_id, _add_replacement)
+            record_event_action(replacement, kick_result['event_id'], 'joined', pod_id=pod_id)
 
-        new_status = 'full' if len(member_ids) >= pod.get('max_size', 4) else 'open'
-        pod = update_event_pod(pod_id, {
-            'member_ids': member_ids,
-            'status': new_status,
-            'kick_votes': kick_votes,
-        })
-    else:
-        pod = update_event_pod(pod_id, {'kick_votes': kick_votes})
-
-    return pod, kicked, None
+    return pod, kick_result['kicked'], None
 
 
 def _find_replacement(event_id, pod_id, current_members):
@@ -166,6 +187,7 @@ def _find_replacement(event_id, pod_id, current_members):
 def confirm_attendance(pod_id, user_id):
     """
     Record that a user attended the event.
+    Uses a Datastore transaction for atomicity.
     Awards trust points. Returns (pod, error).
     """
     pod = get_event_pod(pod_id)
@@ -176,20 +198,19 @@ def confirm_attendance(pod_id, user_id):
     if int(user_id) not in member_ids:
         return None, "You are not a member of this pod"
 
-    confirmed = list(pod.get('confirmed_attendees') or [])
-    if int(user_id) not in confirmed:
-        confirmed.append(int(user_id))
+    def _confirm(entity):
+        m_ids = entity.get('member_ids') or []
+        confirmed = list(entity.get('confirmed_attendees') or [])
+        if int(user_id) not in confirmed:
+            confirmed.append(int(user_id))
+        entity['confirmed_attendees'] = confirmed
+        if len(confirmed) >= len(m_ids) * 0.5:
+            entity['status'] = 'completed'
 
-    updates = {'confirmed_attendees': confirmed}
+    _, pod = transactional_pod_update(pod_id, _confirm)
 
-    # If majority confirmed, mark pod as completed
-    if len(confirmed) >= len(member_ids) * 0.5:
-        updates['status'] = 'completed'
-
-    pod = update_event_pod(pod_id, updates)
-
-    # Award trust points
-    adjust_trust_score(user_id, ATTENDANCE_CONFIRM_POINTS / 100)  # scale to 0–5 range
+    # Award trust points (adjust_trust_score already uses its own transaction)
+    adjust_trust_score(user_id, ATTENDANCE_CONFIRM_POINTS / 100)
     return pod, None
 
 

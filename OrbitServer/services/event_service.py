@@ -1,8 +1,11 @@
+import threading
+
 from OrbitServer.models.models import (
     create_event, get_event, update_event, delete_event,
-    list_events, get_profile,
+    list_events, get_profile, store_event_embedding,
 )
 from OrbitServer.services.ai_suggestion_service import score_event_for_user
+from OrbitServer.services.embedding_service import invalidate_cache, get_or_create_event_embedding
 
 
 def get_events_for_user(user_id, filters=None):
@@ -40,6 +43,19 @@ def edit_event(event_id, data, user_id):
     if event['creator_id'] != int(user_id):
         return None, "Only the creator can edit this event"
     updated = update_event(event_id, data)
+
+    # If content fields changed, invalidate cached embedding and regenerate
+    content_fields = {'title', 'description', 'tags'}
+    if content_fields & set(data.keys()):
+        invalidate_cache(event_id)
+        store_event_embedding(event_id, None)  # clear stale Datastore embedding
+        def _regenerate():
+            try:
+                get_or_create_event_embedding(event_id)
+            except Exception:
+                pass
+        threading.Thread(target=_regenerate, daemon=True).start()
+
     return updated, None
 
 

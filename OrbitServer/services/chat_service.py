@@ -3,7 +3,7 @@ import datetime
 from OrbitServer.models.models import (
     get_event_pod, create_chat_message, list_chat_messages,
     create_vote, get_vote, update_vote, list_votes_for_pod,
-    update_event_pod,
+    update_event_pod, transactional_vote_update,
 )
 from OrbitServer.utils.profanity import filter_message
 
@@ -75,29 +75,34 @@ def respond_to_vote(pod_id, vote_id, user_id, option_index):
     if not isinstance(option_index, int) or option_index < 0 or option_index >= len(options):
         return None, "Invalid option index"
 
-    votes_map = dict(vote.get('votes') or {})
-    votes_map[str(user_id)] = option_index
+    # Use a transaction to prevent concurrent vote overwrites
+    close_result = {'should_close': False, 'winner': None, 'vote_type': vote.get('vote_type')}
 
-    updates = {'votes': votes_map}
+    def _apply_vote(entity):
+        votes_map = dict(entity.get('votes') or {})
+        votes_map[str(user_id)] = option_index
+        entity['votes'] = votes_map
 
-    # Auto-close when all members have voted
-    if len(votes_map) >= len(member_ids):
-        result, result_index = _tally_votes(votes_map, options)
-        updates['status'] = 'closed'
-        updates['result'] = result
-        updates['closed_at'] = datetime.datetime.utcnow()
+        if len(votes_map) >= len(member_ids):
+            opts = entity.get('options') or []
+            winner, _ = _tally_votes(votes_map, opts)
+            entity['status'] = 'closed'
+            entity['result'] = winner
+            entity['closed_at'] = datetime.datetime.utcnow()
+            close_result['should_close'] = True
+            close_result['winner'] = winner
 
-        # Set the result on the pod
-        pod_field = 'scheduled_time' if vote['vote_type'] == 'time' else 'scheduled_place'
-        update_event_pod(pod_id, {pod_field: result})
+    _, vote = transactional_vote_update(vote_id, _apply_vote)
 
+    if close_result['should_close']:
+        pod_field = 'scheduled_time' if close_result['vote_type'] == 'time' else 'scheduled_place'
+        update_event_pod(pod_id, {pod_field: close_result['winner']})
         create_chat_message(
             pod_id, user_id,
-            f"✅ Vote closed! {vote['vote_type'].capitalize()} set to: {result}",
+            f"Vote closed! {close_result['vote_type'].capitalize()} set to: {close_result['winner']}",
             message_type='vote_result',
         )
 
-    vote = update_vote(vote_id, updates)
     return vote, None
 
 

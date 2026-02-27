@@ -50,7 +50,7 @@ def _annotate_pod_status(event, user_id):
         return
 
     pods = list_event_pods(event_id)
-    has_room = any(
+    has_room = not pods or any(
         p['status'] == 'open' and len(p.get('member_ids') or []) < p.get('max_size', 4)
         for p in pods
     )
