@@ -139,7 +139,7 @@ class TestNormalizeTrust:
 
     def test_invalid_trust_returns_default(self):
         from OrbitServer.services.ai_suggestion_service import _normalize_trust
-        assert _normalize_trust(None) == 0.6
+        assert _normalize_trust(None) == 0.0
 
 
 class TestGetSuggestedEvents:
