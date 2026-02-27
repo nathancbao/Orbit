@@ -4,6 +4,7 @@ from OrbitServer.utils.responses import success, error
 from OrbitServer.utils.auth import require_auth
 from OrbitServer.utils.validators import validate_profile_data
 from OrbitServer.services.user_service import get_user_profile, update_user_profile, upload_photo
+from OrbitServer.models.models import get_user_pods
 
 users_bp = Blueprint('users', __name__, url_prefix='/api/users')
 
@@ -48,6 +49,18 @@ def upload_me_photo():
     if err:
         return error(err, 500)
     return success(profile)
+
+
+@users_bp.route('/me/pods', methods=['GET'])
+@require_auth
+def list_my_pods():
+    """
+    GET /api/users/me/pods
+    Return all EventPod entities the authenticated user belongs to.
+    Used by Swift PodsView to populate the Pods tab.
+    """
+    pods = get_user_pods(g.user_id)
+    return success(pods)
 
 
 @users_bp.route('/<user_id>', methods=['GET'])

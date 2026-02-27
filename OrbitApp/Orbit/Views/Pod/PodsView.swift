@@ -74,8 +74,10 @@ struct PodsView: View {
 
     private func loadPods() async {
         isLoading = true
-        // TODO: call /users/me/pods endpoint when available
-        try? await Task.sleep(for: .milliseconds(300))
+        pods = (try? await APIService.shared.request(
+            endpoint: Constants.API.Endpoints.myPods,
+            authenticated: true
+        )) ?? []
         isLoading = false
     }
 }

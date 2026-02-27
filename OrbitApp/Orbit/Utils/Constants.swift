@@ -19,6 +19,7 @@ enum Constants {
 
             // User / Profile
             static let me = "/users/me"
+            static let myPods = "/users/me/pods"
             static let uploadPhoto = "/users/me/photo"
 
             // Events

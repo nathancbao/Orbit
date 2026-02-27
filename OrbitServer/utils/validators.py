@@ -94,13 +94,17 @@ def validate_event_data(data, is_update=False):
     return True, None
 
 
-# ── Mission validation ────────────────────────────────────────────────────────
-# Matches Swift ActivityCategory raw values and TimeBlock raw values exactly.
+# ── Mission / Signal validation ───────────────────────────────────────────────
+# Must match Swift ActivityCategory raw values exactly:
+#   case sports  = "Sports"
+#   case food    = "Food"
+#   case movies  = "Movies"
+#   case hangout = "Hangout"
+#   case study   = "Study"
+#   case custom  = "Custom"
 
 _ACTIVITY_CATEGORIES = {
-    'Pickleball', 'Basketball', 'Cafe Hopping', 'Restaurant',
-    'Study Session', 'Hiking', 'Gym', 'Running', 'Yoga',
-    'Board Games', 'Movies', 'Custom',
+    'Sports', 'Food', 'Movies', 'Hangout', 'Study', 'Custom',
 }
 
 _TIME_BLOCKS = {'morning', 'afternoon', 'evening'}

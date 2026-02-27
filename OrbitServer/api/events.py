@@ -21,16 +21,16 @@ events_bp = Blueprint('events', __name__, url_prefix='/api/events')
 
 def _to_str_id(event):
     """
-    Return a shallow copy of the event dict with 'id' coerced to str.
-
-    Datastore auto-generates numeric IDs for Event entities. Swift's Event
-    model declares  `var id: String`, so JSONDecoder will fail if it receives
-    a JSON integer.  Stringify here so the client always sees a string ID
-    (e.g. "5629499534213120") while all internal logic still uses the raw int.
+    Return a copy of the event dict safe for the Swift client:
+      - 'id' coerced to str  (Swift Mission.id: String)
+      - 'embedding' stripped (512-float vector the client never needs;
+        stripping also sidesteps any numpy-float serialization edge cases)
     """
     if event is None:
         return None
-    return {**event, 'id': str(event['id'])}
+    d = {**event, 'id': str(event['id'])}
+    d.pop('embedding', None)
+    return d
 
 
 def _annotate_pod_status(event, user_id):

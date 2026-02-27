@@ -9,10 +9,16 @@ COLLEGE_YEARS = {'freshman', 'sophomore', 'junior', 'senior', 'grad'}
 
 
 def _deep_convert(obj):
-    """Recursively convert embedded Datastore entities to plain dicts."""
+    """Recursively convert embedded Datastore entities and datetimes to JSON-safe types."""
+    if isinstance(obj, datetime.datetime):
+        # Always emit ISO-8601 (with Z suffix) so Swift's .iso8601 decoder strategy
+        # can parse it and the string is human-readable everywhere else.
+        return obj.replace(tzinfo=None).isoformat() + 'Z'
+    if isinstance(obj, datetime.date):
+        return obj.isoformat()
     if hasattr(obj, 'items'):
         return {k: _deep_convert(v) for k, v in obj.items()}
-    elif isinstance(obj, list):
+    if isinstance(obj, list):
         return [_deep_convert(item) for item in obj]
     return obj
 
@@ -407,7 +413,7 @@ def create_mission(data, creator_id):
         'min_group_size': int(data.get('min_group_size', 2)),
         'max_group_size': int(data.get('max_group_size', 6)),
         'availability': data.get('availability', []),
-        'status': 'pending_match',
+        'status': 'pending',   # matches Swift SignalStatus.pending
         'created_at': datetime.datetime.utcnow(),
     })
     client.put(entity)
@@ -434,6 +440,7 @@ def list_missions_for_user(user_id):
 
 
 def update_mission_status(mission_id, status):
+    """Update signal/mission status. Valid values: 'pending' | 'active'."""
     key = client.key('Mission', str(mission_id))
     entity = client.get(key)
     if not entity:
@@ -441,6 +448,20 @@ def update_mission_status(mission_id, status):
     entity['status'] = status
     client.put(entity)
     return _entity_to_dict(entity)
+
+
+# ── EventPod user membership query ────────────────────────────────────────────
+
+def get_user_pods(user_id):
+    """Return all EventPod entities the user is a member of.
+
+    Datastore automatically builds single-property indexes for array fields,
+    so filtering member_ids by equality works without a composite index.
+    """
+    query = client.query(kind='EventPod')
+    query.add_filter('member_ids', '=', int(user_id))
+    results = list(query.fetch())
+    return [_entity_to_dict(e) for e in results]
 
 
 # ── RefreshToken ──────────────────────────────────────────────────────────────
