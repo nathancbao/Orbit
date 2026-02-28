@@ -13,6 +13,51 @@ NO_SHOW_PENALTY = -20
 KICK_MAJORITY_THRESHOLD = 0.5  # >50% of other members
 
 
+def _compute_pod_compatibility(user_interests: set, pod_members: list) -> float:
+    """
+    Average Jaccard similarity between user_interests and each pod member's interests.
+    Returns 0.0 for empty pods or empty user interest sets.
+    """
+    if not pod_members or not user_interests:
+        return 0.0
+    total = 0.0
+    for member in pod_members:
+        member_interests = set(member.get('interests') or [])
+        union = user_interests | member_interests
+        if not union:
+            continue
+        total += len(user_interests & member_interests) / len(union)
+    return total / len(pod_members)
+
+
+def _find_best_pod_for_user(event_id: int, user_interests: set, max_pod_size: int):
+    """
+    Return the open pod with the highest interest compatibility with the user.
+    Falls back to the first open pod if the user has no interests set.
+    Returns None if no open pods exist.
+    """
+    open_pods = [
+        p for p in list_event_pods(event_id)
+        if p.get('status') == 'open'
+        and len(p.get('member_ids') or []) < max_pod_size
+    ]
+    if not open_pods:
+        return None
+    if not user_interests:
+        return open_pods[0]
+
+    best_pod, best_score = open_pods[0], -1.0
+    for pod in open_pods:
+        members = [
+            {'interests': (get_profile(mid) or {}).get('interests') or []}
+            for mid in (pod.get('member_ids') or [])
+        ]
+        score = _compute_pod_compatibility(user_interests, members)
+        if score > best_score:
+            best_score, best_pod = score, pod
+    return best_pod
+
+
 def join_event(event_id, user_id):
     """
     Assign a user to the next open pod for an event.
@@ -33,8 +78,12 @@ def join_event(event_id, user_id):
 
     max_pod_size = event.get('max_pod_size', 4)
 
-    # Find an open pod with room and join atomically
-    pod = find_open_pod_for_event(event_id)
+    # Fetch user interests for compatibility-based pod selection
+    profile = get_profile(user_id) or {}
+    user_interests = set(profile.get('interests') or [])
+
+    # Find the best-fit open pod (most interest overlap), or create a new one
+    pod = _find_best_pod_for_user(event_id, user_interests, max_pod_size)
     uid = _safe_int(user_id)
     if uid is None:
         return None, "Invalid user ID"

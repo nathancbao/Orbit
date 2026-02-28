@@ -1,16 +1,18 @@
 """
-Hybrid multi-signal ML recommendation engine for Orbit events.
+Hybrid multi-signal recommendation engine for Orbit events.
 
 Scoring formula (all signals normalized to [0, 1] before weighting):
-    score = 0.4 * tfidf_cosine      — keyword/tag content similarity
-          + 0.3 * embedding_cosine  — semantic similarity via Claude API (cached)
-          + 0.2 * behavioral_decay  — weighted join/skip history with temporal decay
-          + 0.1 * trust_weight      — user reliability signal
+    score = 0.30 * tfidf_cosine      — keyword/tag content similarity
+          + 0.20 * semantic_cosine   — meaning-level similarity via fastembed
+          + 0.25 * lightfm_score     — collaborative filtering (learned from all users)
+          + 0.15 * behavioral_decay  — weighted join/skip history with temporal decay
+          + 0.10 * trust_weight      — user reliability signal
 
 Degrades gracefully:
-  - No embedding API key → embedding_cosine = 0.0
   - No interaction history → behavioral_decay = 0.0
   - No interests → tfidf_cosine = 0.0
+  - fastembed unavailable → semantic_cosine = 0.0
+  - LightFM not yet trained or user unknown → lightfm_score = 0.0
 """
 
 import datetime
@@ -26,14 +28,16 @@ from OrbitServer.models.models import list_events, get_profile, get_user_event_h
 from OrbitServer.services.embedding_service import (
     get_or_create_event_embedding, get_user_embedding, cosine_similarity,
 )
+from OrbitServer.services.lightfm_service import get_lightfm_scores
 
 logger = logging.getLogger(__name__)
 
 # ── Scoring weights ────────────────────────────────────────────────────────────
-W_TFIDF      = 0.4
-W_EMBEDDING  = 0.3
-W_BEHAVIORAL = 0.2
-W_TRUST      = 0.1
+W_TFIDF      = 0.30
+W_SEMANTIC   = 0.20
+W_LIGHTFM    = 0.25
+W_BEHAVIORAL = 0.15
+W_TRUST      = 0.10
 
 # ── Behavioral decay parameters ────────────────────────────────────────────────
 DECAY_LAMBDA = 0.05   # exp(-0.05 * days), half-life ≈ 14 days
@@ -176,34 +180,9 @@ def _normalize_trust(trust_score) -> float:
         return 0.0
 
 
-# ── Embedding signal ───────────────────────────────────────────────────────────
-
-def _compute_embedding_scores(user_interests: list, events: list) -> dict:
-    """
-    Compute embedding cosine similarity between user and each event.
-    Triggers lazy embedding generation for events that don't have one yet.
-    Returns {event_id: 0.0} for all events if user embedding fails.
-    """
-    if not user_interests:
-        return {e['id']: 0.0 for e in events}
-
-    user_vec = get_user_embedding(user_interests)
-    if user_vec is None:
-        return {e['id']: 0.0 for e in events}
-
-    scores = {}
-    for event in events:
-        event_vec = get_or_create_event_embedding(event['id'])
-        if event_vec is None:
-            scores[event['id']] = 0.0
-        else:
-            scores[event['id']] = max(0.0, cosine_similarity(user_vec, event_vec))
-    return scores
-
-
 # ── Reason generation ──────────────────────────────────────────────────────────
 
-def _build_reason(event: dict, user_interests: set, embed_score: float, behav_score: float) -> str:
+def _build_reason(event: dict, user_interests: set, behav_score: float) -> str:
     event_tags = set(event.get('tags') or [])
     overlap = user_interests & event_tags
 
@@ -212,8 +191,6 @@ def _build_reason(event: dict, user_interests: set, embed_score: float, behav_sc
     if overlap:
         tag_str = ', '.join(sorted(overlap)[:2])
         return f"Because you like {tag_str}"
-    if embed_score > 0.5:
-        return "Matches your vibe"
     return "Something new to try"
 
 
@@ -233,16 +210,17 @@ def score_event_for_user(event: dict, user_interests: set, history_tags: set = N
 
 def get_suggested_events(user_id, limit=5) -> list:
     """
-    Return up to `limit` AI-suggested events with multi-signal hybrid scoring.
+    Return up to `limit` suggested events with multi-signal hybrid scoring.
 
     Pipeline:
       1. Load profile (interests, trust_score)
       2. Load history → joined/skipped ID sets + behavioral profile
       3. Load open events, filter already-acted-on
       4. Batch TF-IDF cosine similarities
-      5. Batch embedding cosine similarities (lazy-generates missing embeddings)
-      6. Per-event behavioral decay scores
-      7. Combine → sort → return top-limit with match_score + suggestion_reason
+      5. Generate user embedding for semantic scoring
+      6. Batch LightFM collaborative scores
+      7. Per-event: behavioral decay + semantic cosine + LightFM scores
+      8. Combine → sort → return top-limit with match_score + suggestion_reason
     """
     # 1. Profile
     profile = get_profile(user_id) or {}
@@ -267,10 +245,13 @@ def get_suggested_events(user_id, limit=5) -> list:
     # 4. TF-IDF scores (batch)
     tfidf_scores = _compute_tfidf_scores(interests_list, candidates)
 
-    # 5. Embedding scores (batch, lazy generation)
-    embedding_scores = _compute_embedding_scores(interests_list, candidates)
+    # 5. User embedding for semantic scoring (None if model unavailable)
+    user_vec = get_user_embedding(interests_list)
 
-    # 6. Score each candidate
+    # 6. LightFM collaborative scores (batch)
+    lightfm_scores = get_lightfm_scores(user_id, [e['id'] for e in candidates])
+
+    # 7. Score each candidate
     scored = []
     user_interests_set = set(interests_list)
     for event in candidates:
@@ -278,13 +259,20 @@ def get_suggested_events(user_id, limit=5) -> list:
         event_tags = set(event.get('tags') or [])
 
         tfidf_s = tfidf_scores.get(eid, 0.0)
-        embed_s = embedding_scores.get(eid, 0.0)
         behav_s = _compute_behavioral_score(event_tags, behavioral_profile)
+        lightfm_s = lightfm_scores.get(eid, 0.0)
+
+        semantic_s = 0.0
+        if user_vec is not None:
+            event_vec = get_or_create_event_embedding(eid)
+            if event_vec is not None:
+                semantic_s = max(0.0, min(1.0, cosine_similarity(user_vec, event_vec)))
 
         final = (
-            W_TFIDF      * tfidf_s  +
-            W_EMBEDDING  * embed_s  +
-            W_BEHAVIORAL * behav_s  +
+            W_TFIDF      * tfidf_s     +
+            W_SEMANTIC   * semantic_s  +
+            W_LIGHTFM    * lightfm_s   +
+            W_BEHAVIORAL * behav_s     +
             W_TRUST      * trust_weight
         )
         final = min(1.0, max(0.0, final))
@@ -292,7 +280,7 @@ def get_suggested_events(user_id, limit=5) -> list:
         scored.append({
             **event,
             'match_score': round(final, 4),
-            'suggestion_reason': _build_reason(event, user_interests_set, embed_s, behav_s),
+            'suggestion_reason': _build_reason(event, user_interests_set, behav_s),
         })
 
     scored.sort(key=lambda e: e['match_score'], reverse=True)

@@ -43,15 +43,17 @@ class TestJoinEvent:
 
     @patch('OrbitServer.services.pod_service.record_event_action')
     @patch('OrbitServer.services.pod_service.transactional_pod_update')
-    @patch('OrbitServer.services.pod_service.find_open_pod_for_event')
+    @patch('OrbitServer.services.pod_service._find_best_pod_for_user')
+    @patch('OrbitServer.services.pod_service.get_profile')
     @patch('OrbitServer.services.pod_service.get_user_pod_for_event')
     @patch('OrbitServer.services.pod_service.get_event')
-    def test_joins_existing_open_pod(self, mock_event, mock_existing, mock_find,
-                                     mock_trans, mock_record):
+    def test_joins_existing_open_pod(self, mock_event, mock_existing, mock_profile,
+                                     mock_best, mock_trans, mock_record):
         from OrbitServer.services.pod_service import join_event
         mock_event.return_value = {'id': 1, 'status': 'open', 'max_pod_size': 4, 'tags': []}
         mock_existing.return_value = None
-        mock_find.return_value = {'id': 'pod-1', 'member_ids': [2, 3], 'status': 'open'}
+        mock_profile.return_value = {'interests': []}
+        mock_best.return_value = {'id': 'pod-1', 'member_ids': [2, 3], 'status': 'open'}
 
         def side_effect(pod_id, update_fn):
             entity = {'id': 'pod-1', 'member_ids': [2, 3], 'status': 'open', 'max_size': 4}
@@ -66,15 +68,17 @@ class TestJoinEvent:
 
     @patch('OrbitServer.services.pod_service.record_event_action')
     @patch('OrbitServer.services.pod_service.create_event_pod')
-    @patch('OrbitServer.services.pod_service.find_open_pod_for_event')
+    @patch('OrbitServer.services.pod_service._find_best_pod_for_user')
+    @patch('OrbitServer.services.pod_service.get_profile')
     @patch('OrbitServer.services.pod_service.get_user_pod_for_event')
     @patch('OrbitServer.services.pod_service.get_event')
-    def test_creates_new_pod_when_none_open(self, mock_event, mock_existing, mock_find,
-                                            mock_create, mock_record):
+    def test_creates_new_pod_when_none_open(self, mock_event, mock_existing, mock_profile,
+                                            mock_best, mock_create, mock_record):
         from OrbitServer.services.pod_service import join_event
         mock_event.return_value = {'id': 1, 'status': 'open', 'max_pod_size': 4, 'tags': []}
         mock_existing.return_value = None
-        mock_find.return_value = None
+        mock_profile.return_value = {'interests': []}
+        mock_best.return_value = None
         mock_create.return_value = {'id': 'pod-new', 'member_ids': [5]}
 
         pod, err = join_event(1, 5)
@@ -83,16 +87,18 @@ class TestJoinEvent:
 
     @patch('OrbitServer.services.pod_service.record_event_action')
     @patch('OrbitServer.services.pod_service.transactional_pod_update')
-    @patch('OrbitServer.services.pod_service.find_open_pod_for_event')
+    @patch('OrbitServer.services.pod_service._find_best_pod_for_user')
+    @patch('OrbitServer.services.pod_service.get_profile')
     @patch('OrbitServer.services.pod_service.get_user_pod_for_event')
     @patch('OrbitServer.services.pod_service.get_event')
-    def test_pod_marked_full_when_at_cap(self, mock_event, mock_existing, mock_find,
-                                         mock_trans, mock_record):
+    def test_pod_marked_full_when_at_cap(self, mock_event, mock_existing, mock_profile,
+                                         mock_best, mock_trans, mock_record):
         from OrbitServer.services.pod_service import join_event
         mock_event.return_value = {'id': 1, 'status': 'open', 'max_pod_size': 4, 'tags': []}
         mock_existing.return_value = None
+        mock_profile.return_value = {'interests': []}
         # 3 members already, adding user 5 hits max_pod_size of 4
-        mock_find.return_value = {'id': 'pod-1', 'member_ids': [2, 3, 4], 'status': 'open'}
+        mock_best.return_value = {'id': 'pod-1', 'member_ids': [2, 3, 4], 'status': 'open'}
 
         def side_effect(pod_id, update_fn):
             entity = {'id': 'pod-1', 'member_ids': [2, 3, 4], 'status': 'open', 'max_size': 4}
@@ -106,15 +112,17 @@ class TestJoinEvent:
         assert 5 in pod['member_ids']
 
     @patch('OrbitServer.services.pod_service.record_event_action')
-    @patch('OrbitServer.services.pod_service.find_open_pod_for_event')
+    @patch('OrbitServer.services.pod_service._find_best_pod_for_user')
+    @patch('OrbitServer.services.pod_service.get_profile')
     @patch('OrbitServer.services.pod_service.get_user_pod_for_event')
     @patch('OrbitServer.services.pod_service.get_event')
-    def test_records_joined_action(self, mock_event, mock_existing, mock_find,
-                                   mock_record):
+    def test_records_joined_action(self, mock_event, mock_existing, mock_profile,
+                                   mock_best, mock_record):
         from OrbitServer.services.pod_service import join_event
         mock_event.return_value = {'id': 1, 'status': 'open', 'max_pod_size': 4, 'tags': []}
         mock_existing.return_value = None
-        mock_find.return_value = None
+        mock_profile.return_value = {'interests': []}
+        mock_best.return_value = None
         with patch('OrbitServer.services.pod_service.create_event_pod') as mock_create:
             mock_create.return_value = {'id': 'pod-new', 'member_ids': [5]}
             join_event(1, 5)
@@ -123,17 +131,19 @@ class TestJoinEvent:
     @patch('OrbitServer.services.pod_service.record_event_action')
     @patch('OrbitServer.services.pod_service.create_event_pod')
     @patch('OrbitServer.services.pod_service.transactional_pod_update')
-    @patch('OrbitServer.services.pod_service.find_open_pod_for_event')
+    @patch('OrbitServer.services.pod_service._find_best_pod_for_user')
+    @patch('OrbitServer.services.pod_service.get_profile')
     @patch('OrbitServer.services.pod_service.get_user_pod_for_event')
     @patch('OrbitServer.services.pod_service.get_event')
     def test_creates_new_pod_when_transaction_finds_full(self, mock_event, mock_existing,
-                                                         mock_find, mock_trans,
-                                                         mock_create, mock_record):
+                                                         mock_profile, mock_best,
+                                                         mock_trans, mock_create, mock_record):
         """If the pod fills up between find and transaction, a new pod is created."""
         from OrbitServer.services.pod_service import join_event
         mock_event.return_value = {'id': 1, 'status': 'open', 'max_pod_size': 4, 'tags': []}
         mock_existing.return_value = None
-        mock_find.return_value = {'id': 'pod-1', 'member_ids': [2, 3, 4], 'status': 'open'}
+        mock_profile.return_value = {'interests': []}
+        mock_best.return_value = {'id': 'pod-1', 'member_ids': [2, 3, 4], 'status': 'open'}
 
         def side_effect(pod_id, update_fn):
             # Simulate pod already full when transaction runs
@@ -255,3 +265,88 @@ class TestConfirmAttendance:
         pod, err, status_code = confirm_attendance('pod-1', 1)
         assert err is None
         assert pod['status'] == 'completed'
+
+
+class TestComputePodCompatibility:
+    def test_empty_members(self):
+        from OrbitServer.services.pod_service import _compute_pod_compatibility
+        assert _compute_pod_compatibility({'python', 'ml'}, []) == 0.0
+
+    def test_empty_user_interests(self):
+        from OrbitServer.services.pod_service import _compute_pod_compatibility
+        assert _compute_pod_compatibility(set(), [{'interests': ['python']}]) == 0.0
+
+    def test_full_overlap(self):
+        from OrbitServer.services.pod_service import _compute_pod_compatibility
+        result = _compute_pod_compatibility({'python', 'ml'}, [{'interests': ['python', 'ml']}])
+        assert result == 1.0
+
+    def test_no_overlap(self):
+        from OrbitServer.services.pod_service import _compute_pod_compatibility
+        result = _compute_pod_compatibility({'python', 'ml'}, [{'interests': ['art', 'music']}])
+        assert result == 0.0
+
+    def test_partial_overlap(self):
+        from OrbitServer.services.pod_service import _compute_pod_compatibility
+        # user={a,b,c}, member={b,c,d} → intersection=2, union=4 → 0.5
+        result = _compute_pod_compatibility({'a', 'b', 'c'}, [{'interests': ['b', 'c', 'd']}])
+        assert abs(result - 0.5) < 1e-9
+
+    def test_averaged_over_members(self):
+        from OrbitServer.services.pod_service import _compute_pod_compatibility
+        # member1 full overlap (1.0), member2 no overlap (0.0) → average 0.5
+        members = [{'interests': ['python', 'ml']}, {'interests': ['art', 'music']}]
+        result = _compute_pod_compatibility({'python', 'ml'}, members)
+        assert abs(result - 0.5) < 1e-9
+
+
+class TestFindBestPodForUser:
+    @patch('OrbitServer.services.pod_service.list_event_pods')
+    def test_no_open_pods(self, mock_list):
+        from OrbitServer.services.pod_service import _find_best_pod_for_user
+        mock_list.return_value = []
+        assert _find_best_pod_for_user(1, {'python'}, 4) is None
+
+    @patch('OrbitServer.services.pod_service.list_event_pods')
+    def test_no_user_interests_returns_first_pod(self, mock_list):
+        from OrbitServer.services.pod_service import _find_best_pod_for_user
+        pod_a = {'id': 'pod-a', 'member_ids': [1], 'status': 'open'}
+        pod_b = {'id': 'pod-b', 'member_ids': [2], 'status': 'open'}
+        mock_list.return_value = [pod_a, pod_b]
+        result = _find_best_pod_for_user(1, set(), 4)
+        assert result['id'] == 'pod-a'
+
+    @patch('OrbitServer.services.pod_service.get_profile')
+    @patch('OrbitServer.services.pod_service.list_event_pods')
+    def test_selects_most_compatible_pod(self, mock_list, mock_profile):
+        from OrbitServer.services.pod_service import _find_best_pod_for_user
+        pod_match = {'id': 'pod-match', 'member_ids': [10], 'status': 'open'}
+        pod_nomatch = {'id': 'pod-nomatch', 'member_ids': [20], 'status': 'open'}
+        mock_list.return_value = [pod_nomatch, pod_match]
+
+        def profile_side_effect(uid):
+            if uid == 10:
+                return {'interests': ['python', 'ml']}
+            return {'interests': ['art', 'music']}
+        mock_profile.side_effect = profile_side_effect
+
+        result = _find_best_pod_for_user(1, {'python', 'ml'}, 4)
+        assert result['id'] == 'pod-match'
+
+    @patch('OrbitServer.services.pod_service.get_profile')
+    @patch('OrbitServer.services.pod_service.list_event_pods')
+    def test_single_open_pod_returned(self, mock_list, mock_profile):
+        from OrbitServer.services.pod_service import _find_best_pod_for_user
+        pod = {'id': 'pod-1', 'member_ids': [1], 'status': 'open'}
+        mock_list.return_value = [pod]
+        mock_profile.return_value = {'interests': ['art']}
+        result = _find_best_pod_for_user(1, {'python'}, 4)
+        assert result['id'] == 'pod-1'
+
+    @patch('OrbitServer.services.pod_service.list_event_pods')
+    def test_ignores_full_pods(self, mock_list):
+        from OrbitServer.services.pod_service import _find_best_pod_for_user
+        full_pod = {'id': 'pod-full', 'member_ids': [1, 2, 3, 4], 'status': 'full'}
+        mock_list.return_value = [full_pod]
+        result = _find_best_pod_for_user(1, {'python'}, 4)
+        assert result is None

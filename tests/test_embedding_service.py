@@ -86,28 +86,63 @@ class TestGetOrCreateEventEmbedding:
         # Cleanup
         embedding_service._embedding_cache.pop(42, None)
 
-    def test_returns_none_on_api_failure(self):
+    def test_returns_none_when_generation_fails(self):
         from OrbitServer.services import embedding_service
         event = {'id': 5, 'title': 'Hike', 'description': 'Trail', 'tags': ['outdoors'], 'embedding': None}
         embedding_service._embedding_cache.clear()
         with patch.object(embedding_service, 'get_event', return_value=event):
-            with patch.object(embedding_service, '_call_anthropic_embedding', return_value=None):
+            with patch.object(embedding_service, '_generate_embedding', return_value=None):
                 result = embedding_service.get_or_create_event_embedding(5)
                 assert result is None
 
-    def test_generates_and_stores_embedding_on_cache_miss(self):
+    def test_generates_and_stores_when_missing(self):
         from OrbitServer.services import embedding_service
-        event = {'id': 7, 'title': 'Swim', 'description': 'Pool', 'tags': ['fitness'], 'embedding': None}
-        fake_embedding = [0.1] * 512
+        event = {'id': 7, 'title': 'Board Games', 'description': 'Fun', 'tags': ['games'], 'embedding': None}
+        fake_vec = np.array([0.1, 0.2, 0.3], dtype=np.float32)
         embedding_service._embedding_cache.clear()
         with patch.object(embedding_service, 'get_event', return_value=event):
-            with patch.object(embedding_service, '_call_anthropic_embedding', return_value=fake_embedding):
+            with patch.object(embedding_service, '_generate_embedding', return_value=fake_vec):
                 with patch.object(embedding_service, 'store_event_embedding') as mock_store:
                     result = embedding_service.get_or_create_event_embedding(7)
                     assert result is not None
-                    assert len(result) == 512
-                    mock_store.assert_called_once_with(7, fake_embedding)
+                    assert np.allclose(result, fake_vec)
+                    mock_store.assert_called_once_with(7, fake_vec.tolist())
         embedding_service._embedding_cache.pop(7, None)
+
+
+class TestGenerateEmbedding:
+    def test_returns_float32_array(self):
+        from OrbitServer.services import embedding_service
+        fake_vec = np.array([0.1, 0.2, 0.3], dtype=np.float64)
+        mock_model = MagicMock()
+        mock_model.embed.return_value = iter([fake_vec])
+        with patch.object(embedding_service, '_get_model', return_value=mock_model):
+            result = embedding_service._generate_embedding("some text")
+            assert isinstance(result, np.ndarray)
+            assert result.dtype == np.float32
+
+    def test_returns_none_on_model_failure(self):
+        from OrbitServer.services import embedding_service
+        with patch.object(embedding_service, '_get_model', side_effect=RuntimeError("load failed")):
+            result = embedding_service._generate_embedding("some text")
+            assert result is None
+
+    def test_get_user_embedding_returns_array(self):
+        from OrbitServer.services import embedding_service
+        fake_vec = np.array([0.5, 0.6], dtype=np.float32)
+        with patch.object(embedding_service, '_generate_embedding', return_value=fake_vec) as mock_gen:
+            result = embedding_service.get_user_embedding(['hiking', 'photography'])
+            assert result is not None
+            mock_gen.assert_called_once()
+            assert 'hiking' in mock_gen.call_args[0][0]
+
+    def test_get_user_embedding_empty_interests(self):
+        from OrbitServer.services import embedding_service
+        fake_vec = np.array([0.1], dtype=np.float32)
+        with patch.object(embedding_service, '_generate_embedding', return_value=fake_vec) as mock_gen:
+            result = embedding_service.get_user_embedding([])
+            mock_gen.assert_called_once()
+            assert result is not None
 
 
 class TestInvalidateCache:

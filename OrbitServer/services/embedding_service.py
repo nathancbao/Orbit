@@ -1,18 +1,16 @@
 """
-Embedding service wrapping the Anthropic API (Voyage AI models).
+Embedding service — local fastembed model, no external API.
 
-Embeddings are cached at two levels:
-  1. In-process dict (_embedding_cache): survives within a gunicorn worker lifetime
-  2. Datastore Event.embedding field: persistent across deployments and worker restarts
+Uses BAAI/bge-small-en-v1.5 (~24MB, ONNX Runtime) for semantic embeddings.
+No API keys required. Model is lazy-loaded on first call and kept in memory.
 
-Cache miss path: call Anthropic API → write back to Datastore → update in-process cache.
+Event embeddings are generated once and persisted to Datastore, then cached
+in-process. User embeddings are generated fresh per request from interests.
 
-Embedding model: voyage-3-lite (512-dim, cost-effective, tuned for retrieval tasks)
-  ~$0.0001 per event embedding. Failures degrade gracefully to 0.0 score.
+cosine_similarity() is exposed as a shared math helper for other services.
 """
 
 import logging
-import os
 import threading
 from typing import Optional
 
@@ -22,30 +20,38 @@ from OrbitServer.models.models import get_event, store_event_embedding
 
 logger = logging.getLogger(__name__)
 
-# In-process cache: event_id (int) -> np.ndarray of shape (512,)
+# In-process cache: event_id (int) -> np.ndarray
 _embedding_cache: dict = {}
 _cache_lock = threading.Lock()
 
-# Lazy-initialized Anthropic client
-_client = None
+# Lazy-loaded fastembed model
+_fastembed_model = None
+_model_lock = threading.Lock()
 
 
-def _get_client():
-    global _client
-    if _client is None:
-        try:
-            import anthropic as _anthropic
-            api_key = os.environ.get('ANTHROPIC_API_KEY')
-            if not api_key:
-                raise RuntimeError("ANTHROPIC_API_KEY environment variable not set")
-            _client = _anthropic.Anthropic(api_key=api_key)
-        except ImportError:
-            raise RuntimeError("anthropic package not installed")
-    return _client
+def _get_model():
+    """Lazy-load the fastembed model on first call (thread-safe, double-checked)."""
+    global _fastembed_model
+    if _fastembed_model is None:
+        with _model_lock:
+            if _fastembed_model is None:
+                from fastembed import TextEmbedding
+                _fastembed_model = TextEmbedding("BAAI/bge-small-en-v1.5")
+    return _fastembed_model
+
+
+def _generate_embedding(text: str) -> Optional[np.ndarray]:
+    """Generate a float32 embedding vector for text. Returns None on failure."""
+    try:
+        vectors = list(_get_model().embed([text]))
+        return np.array(vectors[0], dtype=np.float32)
+    except Exception:
+        logger.exception("fastembed generation failed")
+        return None
 
 
 def _build_event_text(event: dict) -> str:
-    """Combine event fields into a document string for embedding."""
+    """Combine event fields into a document string."""
     title = event.get('title', '').strip()
     description = event.get('description', '').strip()
     tags = event.get('tags') or []
@@ -55,42 +61,24 @@ def _build_event_text(event: dict) -> str:
 
 
 def _build_user_text(interests: list) -> str:
-    """Represent user interests as an embeddable text snippet."""
+    """Represent user interests as a text snippet."""
     return f"Interests: {', '.join(interests)}" if interests else "No interests specified"
-
-
-def _call_anthropic_embedding(text: str) -> Optional[list]:
-    """
-    Call Anthropic embeddings API and return float list.
-    Returns None on any API error (callers treat None as zero score).
-    """
-    try:
-        client = _get_client()
-        response = client.embeddings.create(
-            model="voyage-3-lite",
-            input=[text],
-            input_type="document",
-        )
-        return response.data[0].embedding
-    except Exception as e:
-        logger.warning(f"Anthropic embedding API error: {e}")
-        return None
 
 
 def get_or_create_event_embedding(event_id: int) -> Optional[np.ndarray]:
     """
-    Return the embedding for an event as a numpy array.
+    Return the embedding for an event, generating and persisting it if needed.
 
-    Cache hierarchy:
-      1. In-process dict (_embedding_cache)
-      2. Datastore Event.embedding field
-      3. Anthropic API call (writes back to Datastore and in-process cache)
+    Lookup order:
+      L1 — in-process cache
+      L2 — Datastore (already stored from a previous request)
+      L3 — generate with fastembed, store to Datastore, cache in-process
 
-    Returns None if embedding cannot be generated (API error, event not found).
+    Returns None if the event doesn't exist or generation fails.
     """
     event_id = int(event_id)
 
-    # L1: in-process cache (thread-safe read)
+    # L1: in-process cache
     with _cache_lock:
         if event_id in _embedding_cache:
             return _embedding_cache[event_id]
@@ -107,36 +95,18 @@ def get_or_create_event_embedding(event_id: int) -> Optional[np.ndarray]:
             _embedding_cache[event_id] = vec
         return vec
 
-    # L3: Generate via API (lazy on first recommendation request)
-    text = _build_event_text(event)
-    embedding = _call_anthropic_embedding(text)
-    if embedding is None:
-        return None
-
-    try:
-        store_event_embedding(event_id, embedding)
-    except Exception as e:
-        logger.warning(f"Failed to persist embedding for event {event_id}: {e}")
-
-    vec = np.array(embedding, dtype=np.float32)
-    with _cache_lock:
-        _embedding_cache[event_id] = vec
+    # L3: generate, persist, cache
+    vec = _generate_embedding(_build_event_text(event))
+    if vec is not None:
+        store_event_embedding(event_id, vec.tolist())
+        with _cache_lock:
+            _embedding_cache[event_id] = vec
     return vec
 
 
 def get_user_embedding(interests: list) -> Optional[np.ndarray]:
-    """
-    Generate an on-the-fly embedding for a user's interests.
-    Not cached (interests change on profile update).
-    Returns None on API error.
-    """
-    if not interests:
-        return None
-    text = _build_user_text(interests)
-    embedding = _call_anthropic_embedding(text)
-    if embedding is None:
-        return None
-    return np.array(embedding, dtype=np.float32)
+    """Generate an embedding for a user's interests."""
+    return _generate_embedding(_build_user_text(interests))
 
 
 def cosine_similarity(a: np.ndarray, b: np.ndarray) -> float:
@@ -149,6 +119,6 @@ def cosine_similarity(a: np.ndarray, b: np.ndarray) -> float:
 
 
 def invalidate_cache(event_id: int) -> None:
-    """Remove an event from the in-process cache (call after event update)."""
+    """Remove an event from the in-process cache."""
     with _cache_lock:
         _embedding_cache.pop(int(event_id), None)

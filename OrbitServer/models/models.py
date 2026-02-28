@@ -407,6 +407,20 @@ def get_user_event_history(user_id, limit=50):
     return [_entity_to_dict(e) for e in results]
 
 
+def list_all_event_history(limit=10000):
+    """Fetch all UserEventHistory records for model training."""
+    query = client.query(kind='UserEventHistory')
+    results = list(query.fetch(limit=limit))
+    return [_entity_to_dict(e) for e in results]
+
+
+def list_all_profiles(limit=10000):
+    """Fetch all Profile records for model training."""
+    query = client.query(kind='Profile')
+    results = list(query.fetch(limit=limit))
+    return [_entity_to_dict(e) for e in results]
+
+
 def update_event_history(hist_id, data):
     key = client.key('UserEventHistory', str(hist_id))
     entity = client.get(key)

@@ -8,4 +8,5 @@ sendgrid==6.11.0
 python-dotenv==1.0.0
 scikit-learn==1.4.2
 numpy==1.26.4
-anthropic==0.28.0
+fastembed==0.3.6
+lightfm==1.17

@@ -20,10 +20,6 @@ sys.modules['google.cloud'] = mock_google.cloud
 sys.modules['google.cloud.datastore'] = mock_datastore
 sys.modules['google.cloud.storage'] = mock_storage
 
-# Mock anthropic so embedding_service.py can be imported without an API key.
-mock_anthropic = MagicMock()
-sys.modules['anthropic'] = mock_anthropic
-
 # Now the datastore.Client() call in models/models.py will return a MagicMock,
 # and datastore.Entity will also be a MagicMock.
 
