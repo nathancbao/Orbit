@@ -2,6 +2,7 @@ from flask import Blueprint, request
 
 from OrbitServer.utils.responses import success, error
 from OrbitServer.utils.validators import validate_edu_email
+from OrbitServer.utils.rate_limit import limiter
 from OrbitServer.services.auth_service import (
     send_verification_code,
     verify_code,
@@ -13,6 +14,7 @@ auth_bp = Blueprint('auth', __name__, url_prefix='/api/auth')
 
 
 @auth_bp.route('/send-code', methods=['POST'])
+@limiter.limit("5 per minute")
 def send_code():
     data = request.get_json(silent=True) or {}
     email = data.get('email', '')

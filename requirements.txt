@@ -1,4 +1,5 @@
 Flask==3.0.0
+Flask-Limiter==3.5.0
 gunicorn==21.2.0
 google-cloud-datastore==2.19.0
 google-cloud-storage==2.14.0

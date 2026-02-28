@@ -101,9 +101,10 @@ class TestLogout:
 
     @patch('OrbitServer.services.auth_service.delete_refresh_token')
     def test_logout_success(self, mock_delete_rt, client):
+        from OrbitServer.services.auth_service import _hash_token
         resp = client.post('/api/auth/logout',
                            json={"refresh_token": "some-token"})
         body = json.loads(resp.data)
         assert resp.status_code == 200
         assert body["success"] is True
-        mock_delete_rt.assert_called_once_with("some-token")
+        mock_delete_rt.assert_called_once_with(_hash_token("some-token"))

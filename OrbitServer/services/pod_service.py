@@ -6,18 +6,11 @@ from OrbitServer.models.models import (
     list_event_pods, get_profile, record_event_action,
     adjust_trust_score, transactional_pod_update,
 )
+from OrbitServer.utils.helpers import safe_int as _safe_int
 
 ATTENDANCE_CONFIRM_POINTS = 50
 NO_SHOW_PENALTY = -20
 KICK_MAJORITY_THRESHOLD = 0.5  # >50% of other members
-
-
-def _safe_int(value, default=None):
-    """Safely convert a value to int. Returns default on failure."""
-    try:
-        return int(value)
-    except (TypeError, ValueError):
-        return default
 
 
 def join_event(event_id, user_id):

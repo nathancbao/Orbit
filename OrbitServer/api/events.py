@@ -19,16 +19,11 @@ from OrbitServer.models.models import (
 events_bp = Blueprint('events', __name__, url_prefix='/api/events')
 
 
-def _to_str_id(event):
-    """
-    Return a copy of the event dict safe for the Swift client:
-      - 'id' coerced to str  (Swift Mission.id: String)
-      - 'embedding' stripped (512-float vector the client never needs;
-        stripping also sidesteps any numpy-float serialization edge cases)
-    """
+def _strip_embedding(event):
+    """Strip the embedding vector from an event dict — the client never needs it."""
     if event is None:
         return None
-    d = {**event, 'id': str(event['id'])}
+    d = dict(event)
     d.pop('embedding', None)
     return d
 
@@ -76,7 +71,7 @@ def list_all():
     for event in events:
         _annotate_pod_status(event, g.user_id)
 
-    return success([_to_str_id(e) for e in events])
+    return success([_strip_embedding(e) for e in events])
 
 
 # ── GET /events/suggested ────────────────────────────────────────────────────
@@ -93,7 +88,7 @@ def suggested():
     for event in events:
         _annotate_pod_status(event, g.user_id)
 
-    return success([_to_str_id(e) for e in events])
+    return success([_strip_embedding(e) for e in events])
 
 
 # ── POST /events ──────────────────────────────────────────────────────────────
@@ -119,12 +114,12 @@ def create():
             pass
     threading.Thread(target=_generate_embedding, daemon=True).start()
 
-    return success(_to_str_id(event), 201)
+    return success(_strip_embedding(event), 201)
 
 
 # ── GET /events/<id> ─────────────────────────────────────────────────────────
 
-@events_bp.route('/<int:event_id>', methods=['GET'])
+@events_bp.route('/<event_id>', methods=['GET'])
 @require_auth
 def get_one(event_id):
     event = get_event_detail(event_id)
@@ -147,12 +142,12 @@ def get_one(event_id):
     # Annotate user-specific pod status (was missing in original GET /events/<id>)
     _annotate_pod_status(event, g.user_id)
 
-    return success(_to_str_id(event))
+    return success(_strip_embedding(event))
 
 
 # ── PUT /events/<id> ─────────────────────────────────────────────────────────
 
-@events_bp.route('/<int:event_id>', methods=['PUT'])
+@events_bp.route('/<event_id>', methods=['PUT'])
 @require_auth
 def update(event_id):
     data = request.get_json(silent=True) or {}
@@ -164,12 +159,12 @@ def update(event_id):
     event, err, status_code = edit_event(event_id, data, g.user_id)
     if err:
         return error(err, status_code)
-    return success(_to_str_id(event))
+    return success(_strip_embedding(event))
 
 
 # ── DELETE /events/<id> ───────────────────────────────────────────────────────
 
-@events_bp.route('/<int:event_id>', methods=['DELETE'])
+@events_bp.route('/<event_id>', methods=['DELETE'])
 @require_auth
 def delete(event_id):
     result, err, status_code = remove_event(event_id, g.user_id)
@@ -180,7 +175,7 @@ def delete(event_id):
 
 # ── POST /events/<id>/join ────────────────────────────────────────────────────
 
-@events_bp.route('/<int:event_id>/join', methods=['POST'])
+@events_bp.route('/<event_id>/join', methods=['POST'])
 @require_auth
 def join(event_id):
     pod, err = join_event(event_id, g.user_id)
@@ -191,7 +186,7 @@ def join(event_id):
 
 # ── DELETE /events/<id>/leave ─────────────────────────────────────────────────
 
-@events_bp.route('/<int:event_id>/leave', methods=['DELETE'])
+@events_bp.route('/<event_id>/leave', methods=['DELETE'])
 @require_auth
 def leave(event_id):
     result, err = leave_event(event_id, g.user_id)
@@ -202,7 +197,7 @@ def leave(event_id):
 
 # ── POST /events/<id>/skip ────────────────────────────────────────────────────
 
-@events_bp.route('/<int:event_id>/skip', methods=['POST'])
+@events_bp.route('/<event_id>/skip', methods=['POST'])
 @require_auth
 def skip(event_id):
     event = get_event_detail(event_id)

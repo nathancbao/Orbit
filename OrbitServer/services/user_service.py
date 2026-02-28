@@ -66,7 +66,13 @@ def update_user_profile(user_id, data):
 
 
 def upload_photo(user_id, file):
-    url = upload_file(file, folder='profile_photos')
+    try:
+        url = upload_file(file, folder='profile_photos')
+    except ValueError as e:
+        return None, str(e)
+    except RuntimeError as e:
+        return None, str(e)
+
     profile_data = upsert_profile(user_id, {'photo': url})
     profile = _format_profile(profile_data)
     return {

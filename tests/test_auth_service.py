@@ -71,13 +71,15 @@ class TestVerifyCodeNormal:
         assert "expired" in err.lower()
         mock_delete.assert_called_once()
 
+    @patch('OrbitServer.services.auth_service.increment_failed_attempts')
     @patch('OrbitServer.services.auth_service.get_verification_code')
-    def test_wrong_code(self, mock_get_code):
+    def test_wrong_code(self, mock_get_code, mock_incr):
         from OrbitServer.services.auth_service import verify_code
         mock_get_code.return_value = {
             'code': '111111',
             'expires_at': datetime.datetime.utcnow() + datetime.timedelta(minutes=5),
         }
+        mock_incr.return_value = 1  # first failed attempt
 
         result, err = verify_code('a@b.edu', '999999')
         assert result is None
@@ -155,7 +157,7 @@ class TestRefreshAccessToken:
 class TestLogout:
     @patch('OrbitServer.services.auth_service.delete_refresh_token')
     def test_deletes_token(self, mock_delete):
-        from OrbitServer.services.auth_service import logout
+        from OrbitServer.services.auth_service import logout, _hash_token
         result = logout('some-token')
         assert result is True
-        mock_delete.assert_called_once_with('some-token')
+        mock_delete.assert_called_once_with(_hash_token('some-token'))

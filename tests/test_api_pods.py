@@ -19,7 +19,7 @@ class TestGetPod:
     def test_returns_pod(self, mock_get, client):
         mock_get.return_value = (
             {"id": "pod-1", "event_id": 1, "members": [{"user_id": 1, "name": "Alex"}]},
-            None
+            None, None
         )
         resp = client.get('/api/pods/pod-1', headers=auth_header())
         body = json.loads(resp.data)
@@ -29,13 +29,13 @@ class TestGetPod:
 
     @patch('OrbitServer.api.pods.get_pod_with_members')
     def test_pod_not_found(self, mock_get, client):
-        mock_get.return_value = (None, "Pod not found")
+        mock_get.return_value = (None, "Pod not found", 404)
         resp = client.get('/api/pods/bad-id', headers=auth_header())
         assert resp.status_code == 404
 
     @patch('OrbitServer.api.pods.get_pod_with_members')
     def test_pod_not_member(self, mock_get, client):
-        mock_get.return_value = (None, "You are not a member of this pod")
+        mock_get.return_value = (None, "You are not a member of this pod", 403)
         resp = client.get('/api/pods/pod-1', headers=auth_header())
         assert resp.status_code == 403
 
@@ -51,7 +51,7 @@ class TestKickVote:
 
     @patch('OrbitServer.api.pods.vote_to_kick')
     def test_kick_vote_recorded(self, mock_kick, client):
-        mock_kick.return_value = ({"id": "pod-1", "kick_votes": {"2": [1]}}, False, None)
+        mock_kick.return_value = ({"id": "pod-1", "kick_votes": {"2": [1]}}, False, None, None)
         resp = client.post('/api/pods/pod-1/kick', headers=auth_header(),
                            json={"target_user_id": 2})
         body = json.loads(resp.data)
@@ -61,7 +61,7 @@ class TestKickVote:
 
     @patch('OrbitServer.api.pods.vote_to_kick')
     def test_kick_executed(self, mock_kick, client):
-        mock_kick.return_value = ({"id": "pod-1", "member_ids": [1, 3]}, True, None)
+        mock_kick.return_value = ({"id": "pod-1", "member_ids": [1, 3]}, True, None, None)
         resp = client.post('/api/pods/pod-1/kick', headers=auth_header(),
                            json={"target_user_id": 2})
         body = json.loads(resp.data)
@@ -70,14 +70,14 @@ class TestKickVote:
 
     @patch('OrbitServer.api.pods.vote_to_kick')
     def test_kick_pod_not_found(self, mock_kick, client):
-        mock_kick.return_value = (None, False, "Pod not found")
+        mock_kick.return_value = (None, False, "Pod not found", 404)
         resp = client.post('/api/pods/pod-1/kick', headers=auth_header(),
                            json={"target_user_id": 2})
         assert resp.status_code == 404
 
     @patch('OrbitServer.api.pods.vote_to_kick')
     def test_kick_not_member(self, mock_kick, client):
-        mock_kick.return_value = (None, False, "You are not a member of this pod")
+        mock_kick.return_value = (None, False, "You are not a member of this pod", 403)
         resp = client.post('/api/pods/pod-1/kick', headers=auth_header(),
                            json={"target_user_id": 2})
         assert resp.status_code == 403
@@ -90,7 +90,7 @@ class TestConfirmAttendance:
 
     @patch('OrbitServer.api.pods.confirm_attendance')
     def test_confirm_success(self, mock_confirm, client):
-        mock_confirm.return_value = ({"id": "pod-1", "confirmed_attendees": [1]}, None)
+        mock_confirm.return_value = ({"id": "pod-1", "confirmed_attendees": [1]}, None, None)
         resp = client.post('/api/pods/pod-1/confirm-attendance', headers=auth_header())
         body = json.loads(resp.data)
         assert resp.status_code == 200
@@ -99,12 +99,12 @@ class TestConfirmAttendance:
 
     @patch('OrbitServer.api.pods.confirm_attendance')
     def test_confirm_not_member(self, mock_confirm, client):
-        mock_confirm.return_value = (None, "You are not a member of this pod")
+        mock_confirm.return_value = (None, "You are not a member of this pod", 403)
         resp = client.post('/api/pods/pod-1/confirm-attendance', headers=auth_header())
         assert resp.status_code == 403
 
     @patch('OrbitServer.api.pods.confirm_attendance')
     def test_confirm_pod_not_found(self, mock_confirm, client):
-        mock_confirm.return_value = (None, "Pod not found")
+        mock_confirm.return_value = (None, "Pod not found", 404)
         resp = client.post('/api/pods/pod-1/confirm-attendance', headers=auth_header())
         assert resp.status_code == 404

@@ -2,6 +2,7 @@ from flask import Blueprint, request, g
 
 from OrbitServer.utils.responses import success, error
 from OrbitServer.utils.auth import require_auth
+from OrbitServer.utils.rate_limit import limiter
 from OrbitServer.utils.validators import validate_message_data, validate_vote_data
 from OrbitServer.services.chat_service import (
     get_messages, send_message, create_poll, respond_to_vote, get_votes_for_pod,
@@ -21,6 +22,7 @@ def messages(pod_id):
 
 
 @chat_bp.route('/<pod_id>/messages', methods=['POST'])
+@limiter.limit("30 per minute")
 @require_auth
 def post_message(pod_id):
     data = request.get_json(silent=True) or {}

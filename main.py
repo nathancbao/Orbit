@@ -1,5 +1,6 @@
 from flask import Flask, jsonify
 
+from OrbitServer.utils.rate_limit import limiter
 from OrbitServer.api.auth import auth_bp
 from OrbitServer.api.users import users_bp
 from OrbitServer.api.events import events_bp
@@ -8,6 +9,8 @@ from OrbitServer.api.chat import chat_bp
 from OrbitServer.api.missions import missions_bp
 
 app = Flask(__name__)
+
+limiter.init_app(app)
 
 app.register_blueprint(auth_bp)
 app.register_blueprint(users_bp)

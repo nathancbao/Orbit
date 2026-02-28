@@ -183,7 +183,7 @@ class TestConfirmAttendance:
         from OrbitServer.services.pod_service import confirm_attendance
         mock_get.return_value = None
 
-        pod, err = confirm_attendance('bad-id', 1)
+        pod, err, status_code = confirm_attendance('bad-id', 1)
         assert pod is None
         assert "not found" in err.lower()
 
@@ -192,7 +192,7 @@ class TestConfirmAttendance:
         from OrbitServer.services.pod_service import confirm_attendance
         mock_get.return_value = {'id': 'pod-1', 'member_ids': [2, 3], 'confirmed_attendees': []}
 
-        pod, err = confirm_attendance('pod-1', 99)
+        pod, err, status_code = confirm_attendance('pod-1', 99)
         assert pod is None
         assert "not a member" in err.lower()
 
@@ -211,7 +211,7 @@ class TestConfirmAttendance:
             return None, entity
         mock_trans.side_effect = side_effect
 
-        pod, err = confirm_attendance('pod-1', 1)
+        pod, err, status_code = confirm_attendance('pod-1', 1)
         assert err is None
         mock_adjust.assert_called_once()
         assert 1 in pod['confirmed_attendees']
@@ -232,7 +232,7 @@ class TestConfirmAttendance:
             return None, entity
         mock_trans.side_effect = side_effect
 
-        pod, err = confirm_attendance('pod-1', 1)
+        pod, err, status_code = confirm_attendance('pod-1', 1)
         assert err is None
         assert pod['confirmed_attendees'].count(1) == 1  # not added twice
 
@@ -252,6 +252,6 @@ class TestConfirmAttendance:
             return None, entity
         mock_trans.side_effect = side_effect
 
-        pod, err = confirm_attendance('pod-1', 1)
+        pod, err, status_code = confirm_attendance('pod-1', 1)
         assert err is None
         assert pod['status'] == 'completed'
