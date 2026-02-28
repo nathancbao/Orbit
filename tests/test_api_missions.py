@@ -133,7 +133,7 @@ class TestDiscoverMissions:
         resp = client.get('/api/missions/discover')
         assert resp.status_code == 401
 
-    @patch('OrbitServer.api.missions.discover_missions')
+    @patch('OrbitServer.api.missions.get_all_missions')
     def test_returns_missions(self, mock_discover, client):
         mock_discover.return_value = ([
             {"id": "uuid-1", "title": "Sports", "status": "pending"},
@@ -143,28 +143,15 @@ class TestDiscoverMissions:
         body = json.loads(resp.data)
         assert resp.status_code == 200
         assert body["success"] is True
-        assert len(body["data"]["missions"]) == 2
+        assert len(body["data"]) == 2
 
-    @patch('OrbitServer.api.missions.discover_missions')
-    def test_passes_category_filter(self, mock_discover, client):
+    @patch('OrbitServer.api.missions.get_all_missions')
+    def test_returns_empty_list(self, mock_discover, client):
         mock_discover.return_value = ([], None)
-        client.get('/api/missions/discover?category=Sports', headers=auth_header())
-        args = mock_discover.call_args
-        assert args.kwargs.get('category') == 'Sports' or args[1].get('category') == 'Sports'
-
-    @patch('OrbitServer.api.missions.discover_missions')
-    def test_respects_limit(self, mock_discover, client):
-        mock_discover.return_value = ([], None)
-        client.get('/api/missions/discover?limit=5', headers=auth_header())
-        args = mock_discover.call_args
-        assert args.kwargs.get('limit') == 5 or args[1].get('limit') == 5
-
-    @patch('OrbitServer.api.missions.discover_missions')
-    def test_caps_limit_at_50(self, mock_discover, client):
-        mock_discover.return_value = ([], None)
-        client.get('/api/missions/discover?limit=999', headers=auth_header())
-        args = mock_discover.call_args
-        assert args.kwargs.get('limit') == 50 or args[1].get('limit') == 50
+        resp = client.get('/api/missions/discover', headers=auth_header())
+        body = json.loads(resp.data)
+        assert resp.status_code == 200
+        assert body["data"] == []
 
 
 # ── POST /api/missions/<id>/rsvp ─────────────────────────────────────────────

@@ -27,7 +27,7 @@ def _entity_to_dict(entity):
     if entity is None:
         return None
     d = _deep_convert(dict(entity))
-    d['id'] = entity.key.id_or_name
+    d['id'] = str(entity.key.id_or_name)
     return d
 
 
@@ -451,6 +451,7 @@ def create_mission(data, creator_id):
         'min_group_size': int(data.get('min_group_size', 2)),
         'max_group_size': int(data.get('max_group_size', 6)),
         'availability': data.get('availability', []),
+        'rsvps': [],
         'status': 'pending',   # matches Swift SignalStatus.pending
         'created_at': datetime.datetime.utcnow(),
     })
@@ -494,6 +495,35 @@ def update_mission_status(mission_id, status):
     entity['status'] = status
     client.put(entity)
     return _entity_to_dict(entity)
+
+
+def transactional_mission_rsvp(mission_id, user_id):
+    """Atomically add a user to a mission's rsvps list.
+
+    Returns (mission_dict, error_string).
+    - Rejects duplicate RSVPs.
+    - Auto-transitions status to 'active' when rsvps >= min_group_size.
+    """
+    with client.transaction():
+        key = client.key('Mission', str(mission_id))
+        entity = client.get(key)
+        if not entity:
+            return None, "Mission not found"
+
+        rsvps = list(entity.get('rsvps') or [])
+        uid = int(user_id)
+        if uid in rsvps:
+            return None, "You have already RSVP'd to this signal"
+
+        rsvps.append(uid)
+        entity['rsvps'] = rsvps
+
+        min_gs = int(entity.get('min_group_size', 2))
+        if len(rsvps) >= min_gs and entity.get('status') == 'pending':
+            entity['status'] = 'active'
+
+        client.put(entity)
+        return _entity_to_dict(entity), None
 
 
 # ── EventPod user membership query ────────────────────────────────────────────
@@ -541,10 +571,23 @@ def store_verification_code(email, code):
     entity.update({
         'email': email,
         'code': code,
+        'failed_attempts': 0,
         'created_at': datetime.datetime.utcnow(),
         'expires_at': datetime.datetime.utcnow() + datetime.timedelta(minutes=10),
     })
     client.put(entity)
+
+
+def increment_failed_attempts(email):
+    """Increment failed_attempts counter. Returns new count."""
+    key = client.key('VerificationCode', email)
+    entity = client.get(key)
+    if not entity:
+        return 0
+    count = int(entity.get('failed_attempts', 0)) + 1
+    entity['failed_attempts'] = count
+    client.put(entity)
+    return count
 
 
 def get_verification_code(email):

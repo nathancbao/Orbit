@@ -5,8 +5,8 @@ from OrbitServer.utils.auth import require_auth
 from OrbitServer.utils.rate_limit import limiter
 from OrbitServer.utils.validators import validate_mission_data
 from OrbitServer.services.mission_service import (
-    create_new_mission, get_user_missions, remove_mission,
-    rsvp_mission, discover_missions,
+    create_new_mission, get_user_missions, get_all_missions,
+    remove_mission, rsvp_mission,
 )
 
 missions_bp = Blueprint('missions', __name__, url_prefix='/api/missions')
@@ -73,44 +73,6 @@ def delete(mission_id):
     if err:
         return error(err, status_code)
     return success({"message": "Mission deleted"})
-
-
-# ── GET /missions/discover ───────────────────────────────────────────────────
-# Paginated feed of all signals. Supports ?limit=, ?cursor=, ?category= filters.
-
-@missions_bp.route('/discover', methods=['GET'])
-@require_auth
-def discover():
-    try:
-        limit = min(int(request.args.get('limit', 20)), 50)
-    except (TypeError, ValueError):
-        limit = 20
-
-    cursor = request.args.get('cursor')
-    # Datastore cursors are URL-safe base64; decode to bytes for the client lib
-    cursor_bytes = None
-    if cursor:
-        import base64
-        try:
-            cursor_bytes = base64.urlsafe_b64decode(cursor)
-        except Exception:
-            return error("Invalid cursor", 400)
-
-    category = request.args.get('category')
-
-    missions, next_cursor = discover_missions(
-        limit=limit,
-        cursor_token=cursor_bytes,
-        category=category,
-        exclude_user_id=g.user_id,
-    )
-
-    result = {"missions": missions}
-    if next_cursor:
-        import base64
-        result["next_cursor"] = base64.urlsafe_b64encode(next_cursor).decode()
-
-    return success(result)
 
 
 # ── POST /missions/<id>/rsvp ─────────────────────────────────────────────────

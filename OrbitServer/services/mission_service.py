@@ -1,7 +1,7 @@
 from OrbitServer.models.models import (
     create_mission, get_mission, delete_mission,
-    list_missions_for_user, update_mission_status,
-    transactional_mission_rsvp, list_all_missions,
+    list_missions_for_user, list_all_missions,
+    transactional_mission_rsvp,
 )
 
 
@@ -41,16 +41,3 @@ def remove_mission(mission_id, user_id):
 def rsvp_mission(mission_id, user_id):
     """RSVP to a signal. Returns (mission_dict, error_string)."""
     return transactional_mission_rsvp(mission_id, user_id)
-
-
-def discover_missions(limit=20, cursor_token=None, category=None, exclude_user_id=None):
-    """Return paginated missions for the discover feed.
-
-    Returns (list, next_cursor_or_None).
-    """
-    return list_all_missions(
-        limit=limit,
-        cursor_token=cursor_token,
-        category=category,
-        exclude_user_id=exclude_user_id,
-    )

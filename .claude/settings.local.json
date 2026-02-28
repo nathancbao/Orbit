@@ -33,7 +33,8 @@
       "Bash(grep:*)",
       "Bash(wc:*)",
       "Bash(xargs:*)",
-      "Bash(pip3 show:*)"
+      "Bash(pip3 show:*)",
+      "Bash(rm:*)"
     ]
   }
 }
