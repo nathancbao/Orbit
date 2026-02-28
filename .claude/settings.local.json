@@ -30,7 +30,10 @@
       "Bash(pip install:*)",
       "Bash(xcodebuild:*)",
       "Bash(git -C /Users/adriannguyen/Desktop/Orbit log --oneline -20)",
-      "Bash(grep:*)"
+      "Bash(grep:*)",
+      "Bash(wc:*)",
+      "Bash(xargs:*)",
+      "Bash(pip3 show:*)"
     ]
   }
 }

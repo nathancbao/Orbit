@@ -35,6 +35,11 @@ enum Constants {
             static func podKick(_ id: String) -> String { "/pods/\(id)/kick" }
             static func podConfirm(_ id: String) -> String { "/pods/\(id)/confirm-attendance" }
 
+            // Signals (backend: /api/missions)
+            static let signals = "/missions"
+            static let discoverSignals = "/missions/discover"
+            static func signal(_ id: String) -> String { "/missions/\(id)" }
+
             // Chat
             static func podMessages(_ id: String) -> String { "/pods/\(id)/messages" }
             static func podVotes(_ id: String) -> String { "/pods/\(id)/votes" }

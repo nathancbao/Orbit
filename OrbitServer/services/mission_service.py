@@ -11,6 +11,12 @@ def create_new_mission(data, creator_id):
     return mission, None
 
 
+def get_all_missions():
+    """Return all missions, newest first (for discover feed). Returns (list, None)."""
+    missions = list_all_missions()
+    return missions, None
+
+
 def get_user_missions(user_id):
     """Return all missions posted by a user, newest first. Returns (list, None)."""
     missions = list_missions_for_user(user_id)

@@ -25,6 +25,18 @@ def list_missions():
     return success(missions)
 
 
+# ── GET /missions/discover ────────────────────────────────────────────────────
+# Returns all missions (discover feed for all users).
+
+@missions_bp.route('/discover', methods=['GET'])
+@require_auth
+def discover():
+    missions, err = get_all_missions()
+    if err:
+        return error(err, 500)
+    return success(missions)
+
+
 # ── POST /missions ────────────────────────────────────────────────────────────
 # Create a new activity-request mission.
 # Swift body (snake_case):
@@ -32,8 +44,7 @@ def list_missions():
 #   availability: [{"date": "<ISO8601>", "time_blocks": ["morning", ...]}],
 #   description?
 #
-# NOTE: When Swift AvailabilitySlot is wired to this API, add CodingKeys:
-#   "time_blocks" → timeBlocks  (currently no CodingKeys on AvailabilitySlot)
+# Swift AvailabilitySlot has CodingKeys mapping timeBlocks ↔ "time_blocks".
 
 @missions_bp.route('', methods=['POST'])
 @limiter.limit("10 per minute")
