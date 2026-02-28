@@ -222,20 +222,26 @@ struct SignalFormView: View {
             UIImpactFeedbackGenerator(style: .medium).impactOccurred()
             submitSignal()
         } label: {
-            Text("Send Signal")
-                .font(.headline)
-                .fontWeight(.semibold)
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 16)
-                .background(
-                    canSubmit
-                        ? OrbitTheme.gradientFill
-                        : LinearGradient(colors: [Color.gray.opacity(0.3)], startPoint: .leading, endPoint: .trailing)
-                )
-                .foregroundColor(canSubmit ? .white : .secondary)
-                .clipShape(RoundedRectangle(cornerRadius: 14))
+            HStack(spacing: 8) {
+                if viewModel.isSubmitting {
+                    ProgressView()
+                        .tint(.white)
+                }
+                Text(viewModel.isSubmitting ? "Sending..." : "Send Signal")
+                    .font(.headline)
+                    .fontWeight(.semibold)
+            }
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 16)
+            .background(
+                canSubmit && !viewModel.isSubmitting
+                    ? OrbitTheme.gradientFill
+                    : LinearGradient(colors: [Color.gray.opacity(0.3)], startPoint: .leading, endPoint: .trailing)
+            )
+            .foregroundColor(canSubmit && !viewModel.isSubmitting ? .white : .secondary)
+            .clipShape(RoundedRectangle(cornerRadius: 14))
         }
-        .disabled(!canSubmit)
+        .disabled(!canSubmit || viewModel.isSubmitting)
         .padding(.top, 8)
     }
 
@@ -264,7 +270,7 @@ struct SignalFormView: View {
     }
 
     private func submitSignal() {
-        guard canSubmit else { return }
+        guard canSubmit, !viewModel.isSubmitting else { return }
         let calendar = Calendar.current
         let today = calendar.startOfDay(for: Date())
 
@@ -277,16 +283,19 @@ struct SignalFormView: View {
             return AvailabilitySlot(date: date, timeBlocks: blocks)
         }
 
-        viewModel.createSignal(
-            activityCategory: selectedCategory,
-            customActivityName: selectedCategory == .custom ? customActivityName.trimmingCharacters(in: .whitespaces) : nil,
-            minGroupSize: minGroupSize,
-            maxGroupSize: maxGroupSize,
-            availability: slots,
-            description: description.trimmingCharacters(in: .whitespaces)
-        )
-
-        dismiss()
+        Task {
+            await viewModel.createSignal(
+                activityCategory: selectedCategory,
+                customActivityName: selectedCategory == .custom ? customActivityName.trimmingCharacters(in: .whitespaces) : nil,
+                minGroupSize: minGroupSize,
+                maxGroupSize: maxGroupSize,
+                availability: slots,
+                description: description.trimmingCharacters(in: .whitespaces)
+            )
+            if !viewModel.showError {
+                dismiss()
+            }
+        }
     }
 }
 

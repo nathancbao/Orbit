@@ -1,6 +1,6 @@
 from OrbitServer.models.models import (
     create_mission, get_mission, delete_mission,
-    list_missions_for_user, update_mission_status,
+    list_missions_for_user, list_all_missions, update_mission_status,
 )
 
 
@@ -8,6 +8,12 @@ def create_new_mission(data, creator_id):
     """Create and persist an activity-request mission. Returns (mission, None)."""
     mission = create_mission(data, creator_id)
     return mission, None
+
+
+def get_all_missions():
+    """Return all missions, newest first (for discover feed). Returns (list, None)."""
+    missions = list_all_missions()
+    return missions, None
 
 
 def get_user_missions(user_id):

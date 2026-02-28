@@ -75,6 +75,41 @@ struct AvailabilitySlot: Codable, Identifiable, Equatable {
 
     var id: Date { date }
 
+    enum CodingKeys: String, CodingKey {
+        case date
+        case timeBlocks = "time_blocks"
+    }
+
+    // Backend sends date as "YYYY-MM-DD" string, not ISO8601 with time.
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        let dateString = try container.decode(String.self, forKey: .date)
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd"
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        guard let parsed = formatter.date(from: dateString) else {
+            throw DecodingError.dataCorruptedError(forKey: .date, in: container,
+                debugDescription: "Expected yyyy-MM-dd format, got \(dateString)")
+        }
+        self.date = parsed
+        self.timeBlocks = try container.decode([TimeBlock].self, forKey: .timeBlocks)
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd"
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        try container.encode(formatter.string(from: date), forKey: .date)
+        try container.encode(timeBlocks, forKey: .timeBlocks)
+    }
+
+    // Local initializer (used when creating from form).
+    init(date: Date, timeBlocks: [TimeBlock]) {
+        self.date = date
+        self.timeBlocks = timeBlocks
+    }
+
     var dayLabel: String {
         let f = DateFormatter(); f.dateFormat = "EEE M/d"
         return f.string(from: date)

@@ -4,7 +4,7 @@ from OrbitServer.utils.responses import success, error
 from OrbitServer.utils.auth import require_auth
 from OrbitServer.utils.validators import validate_mission_data
 from OrbitServer.services.mission_service import (
-    create_new_mission, get_user_missions, remove_mission,
+    create_new_mission, get_user_missions, get_all_missions, remove_mission,
 )
 
 missions_bp = Blueprint('missions', __name__, url_prefix='/api/missions')
@@ -23,6 +23,18 @@ def list_missions():
     return success(missions)
 
 
+# ── GET /missions/discover ────────────────────────────────────────────────────
+# Returns all missions (discover feed for all users).
+
+@missions_bp.route('/discover', methods=['GET'])
+@require_auth
+def discover():
+    missions, err = get_all_missions()
+    if err:
+        return error(err, 500)
+    return success(missions)
+
+
 # ── POST /missions ────────────────────────────────────────────────────────────
 # Create a new activity-request mission.
 # Swift body (snake_case):
@@ -30,8 +42,7 @@ def list_missions():
 #   availability: [{"date": "<ISO8601>", "time_blocks": ["morning", ...]}],
 #   description?
 #
-# NOTE: When Swift AvailabilitySlot is wired to this API, add CodingKeys:
-#   "time_blocks" → timeBlocks  (currently no CodingKeys on AvailabilitySlot)
+# Swift AvailabilitySlot has CodingKeys mapping timeBlocks ↔ "time_blocks".
 
 @missions_bp.route('', methods=['POST'])
 @require_auth

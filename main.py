@@ -1,3 +1,5 @@
+import os
+
 from flask import Flask, jsonify
 
 from OrbitServer.api.auth import auth_bp
@@ -28,4 +30,4 @@ def health():
 
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=8080, debug=True)
+    app.run(host='0.0.0.0', port=8080, debug=os.environ.get('FLASK_DEBUG', '0') == '1')

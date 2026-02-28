@@ -33,35 +33,36 @@ struct SignalsView: View {
                     .padding(.vertical, 12)
 
                     // Content
-                    if viewModel.isLoading && viewModel.signals.isEmpty {
+                    let signals = segment == .discover
+                        ? viewModel.discoverSignals
+                        : viewModel.mySignals
+
+                    if viewModel.isLoading && signals.isEmpty {
                         Spacer()
                         ProgressView().tint(OrbitTheme.purple)
                         Spacer()
+                    } else if signals.isEmpty {
+                        Spacer()
+                        EmptySignalsView(segment: segment, onSignalTap: { showForm = true })
+                        Spacer()
                     } else {
-                        let displayed = segment == .discover
-                            ? viewModel.signals
-                            : viewModel.signals.filter { _ in true } // TODO: filter to current user's when auth available
-
-                        if displayed.isEmpty {
-                            Spacer()
-                            EmptySignalsView(segment: segment, onSignalTap: { showForm = true })
-                            Spacer()
-                        } else {
-                            ScrollView {
-                                VStack(spacing: 14) {
-                                    ForEach(displayed) { signal in
-                                        SignalCard(
-                                            signal: signal,
-                                            showDelete: segment == .mine,
-                                            onTap: { selectedSignal = signal },
-                                            onDelete: { viewModel.deleteSignal(id: signal.id) }
-                                        )
-                                        .padding(.horizontal, 20)
-                                    }
+                        ScrollView {
+                            VStack(spacing: 14) {
+                                ForEach(signals) { signal in
+                                    SignalCard(
+                                        signal: signal,
+                                        showDelete: segment == .mine,
+                                        onTap: { selectedSignal = signal },
+                                        onDelete: { Task { await viewModel.deleteSignal(id: signal.id) } }
+                                    )
+                                    .padding(.horizontal, 20)
                                 }
-                                .padding(.top, 8)
-                                .padding(.bottom, 100)
                             }
+                            .padding(.top, 8)
+                            .padding(.bottom, 100)
+                        }
+                        .refreshable {
+                            await viewModel.reload()
                         }
                     }
                 }
@@ -111,7 +112,7 @@ struct SignalsView: View {
                 .environmentObject(viewModel)
         }
         .sheet(item: $selectedSignal) { signal in
-            SignalDetailView(signal: signal)
+            SignalDetailView(signal: signal, viewModel: viewModel)
         }
         .overlay(alignment: .bottom) {
             if viewModel.showToast {
@@ -121,8 +122,8 @@ struct SignalsView: View {
             }
         }
         .animation(.spring(duration: 0.3), value: viewModel.showToast)
-        .onAppear {
-            viewModel.loadSignals()
+        .task {
+            await viewModel.loadSignals()
         }
     }
 
@@ -285,4 +286,3 @@ struct EmptySignalsView: View {
         .padding(.horizontal, 40)
     }
 }
-

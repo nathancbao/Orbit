@@ -185,7 +185,10 @@ struct MissionDetailView: View {
 
 struct SignalDetailView: View {
     let signal: Signal
+    var viewModel: SignalsViewModel?
     @Environment(\.dismiss) private var dismiss
+    @State private var showSignedUp = false
+    @State private var localToast = false
 
     var body: some View {
         NavigationStack {
@@ -198,97 +201,137 @@ struct SignalDetailView: View {
                 }
                 .ignoresSafeArea()
 
-                ScrollView {
-                    VStack(alignment: .leading, spacing: 24) {
+                VStack(spacing: 0) {
+                    ScrollView {
+                        VStack(alignment: .leading, spacing: 24) {
 
-                        // Icon and Title
-                        HStack(spacing: 12) {
-                            Image(systemName: signal.activityCategory.icon)
-                                .font(.title)
-                                .foregroundStyle(OrbitTheme.gradient)
-
-                            Text(signal.displayTitle)
-                                .font(.largeTitle)
-                                .fontWeight(.bold)
-                        }
-                        .padding(.top, 8)
-
-                        // Category and Status
-                        HStack(spacing: 16) {
-                            HStack(spacing: 6) {
-                                Image(systemName: "tag")
+                            // Icon and Title
+                            HStack(spacing: 12) {
+                                Image(systemName: signal.activityCategory.icon)
+                                    .font(.title)
                                     .foregroundStyle(OrbitTheme.gradient)
-                                Text(signal.activityCategory.displayName)
+
+                                Text(signal.displayTitle)
+                                    .font(.largeTitle)
+                                    .fontWeight(.bold)
+                            }
+                            .padding(.top, 8)
+
+                            // Category and Status
+                            HStack(spacing: 16) {
+                                HStack(spacing: 6) {
+                                    Image(systemName: "tag")
+                                        .foregroundStyle(OrbitTheme.gradient)
+                                    Text(signal.activityCategory.displayName)
+                                        .font(.subheadline)
+                                }
+
+                                SignalStatusBadge(status: signal.status)
+                            }
+                            .foregroundColor(.secondary)
+
+                            // Group Size
+                            HStack(spacing: 6) {
+                                Image(systemName: "person.2.fill")
+                                    .foregroundStyle(OrbitTheme.gradient)
+                                Text(signal.groupSizeLabel)
                                     .font(.subheadline)
                             }
+                            .foregroundColor(.secondary)
 
-                            SignalStatusBadge(status: signal.status)
-                        }
-                        .foregroundColor(.secondary)
+                            // Description
+                            if !signal.description.isEmpty {
+                                Text(signal.description)
+                                    .font(.body)
+                                    .foregroundColor(.primary)
+                                    .lineSpacing(4)
+                            }
 
-                        // Group Size
-                        HStack(spacing: 6) {
-                            Image(systemName: "person.2.fill")
-                                .foregroundStyle(OrbitTheme.gradient)
-                            Text(signal.groupSizeLabel)
-                                .font(.subheadline)
-                        }
-                        .foregroundColor(.secondary)
+                            Divider()
 
-                        // Description
-                        if !signal.description.isEmpty {
-                            Text(signal.description)
-                                .font(.body)
-                                .foregroundColor(.primary)
-                                .lineSpacing(4)
-                        }
+                            // Availability Section
+                            VStack(alignment: .leading, spacing: 12) {
+                                Text("availability")
+                                    .font(.headline)
 
-                        Divider()
+                                Text(signal.availabilitySummary)
+                                    .font(.subheadline)
+                                    .foregroundColor(.secondary)
 
-                        // Availability Section
-                        VStack(alignment: .leading, spacing: 12) {
-                            Text("availability")
-                                .font(.headline)
+                                if !signal.availability.isEmpty {
+                                    ForEach(signal.availability) { slot in
+                                        HStack(spacing: 10) {
+                                            Text(slot.dayLabel)
+                                                .font(.subheadline)
+                                                .fontWeight(.medium)
+                                                .frame(width: 70, alignment: .leading)
 
-                            Text(signal.availabilitySummary)
-                                .font(.subheadline)
-                                .foregroundColor(.secondary)
-
-                            if !signal.availability.isEmpty {
-                                ForEach(signal.availability) { slot in
-                                    HStack(spacing: 10) {
-                                        Text(slot.dayLabel)
-                                            .font(.subheadline)
-                                            .fontWeight(.medium)
-                                            .frame(width: 70, alignment: .leading)
-
-                                        ForEach(slot.timeBlocks, id: \.self) { block in
-                                            HStack(spacing: 4) {
-                                                Image(systemName: block.icon)
-                                                    .font(.caption2)
-                                                Text(block.label)
-                                                    .font(.caption)
+                                            ForEach(slot.timeBlocks, id: \.self) { block in
+                                                HStack(spacing: 4) {
+                                                    Image(systemName: block.icon)
+                                                        .font(.caption2)
+                                                    Text(block.label)
+                                                        .font(.caption)
+                                                }
+                                                .padding(.horizontal, 8)
+                                                .padding(.vertical, 4)
+                                                .background(OrbitTheme.purple.opacity(0.12))
+                                                .clipShape(Capsule())
+                                                .foregroundColor(OrbitTheme.purple)
                                             }
-                                            .padding(.horizontal, 8)
-                                            .padding(.vertical, 4)
-                                            .background(OrbitTheme.purple.opacity(0.12))
-                                            .clipShape(Capsule())
-                                            .foregroundColor(OrbitTheme.purple)
                                         }
+                                        .padding(12)
+                                        .background(Color(.systemGray6))
+                                        .cornerRadius(12)
                                     }
-                                    .padding(12)
-                                    .background(Color(.systemGray6))
-                                    .cornerRadius(12)
                                 }
                             }
-                        }
 
-                        Spacer(minLength: 60)
+                            Spacer(minLength: 80)
+                        }
+                        .padding(.horizontal, 24)
+                        .padding(.top, 8)
                     }
-                    .padding(.horizontal, 24)
-                    .padding(.top, 8)
+
+                    // I'm Down button
+                    if !showSignedUp {
+                        Button {
+                            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                            showSignedUp = true
+                            if let viewModel {
+                                viewModel.showToastMessage("You're in!")
+                            } else {
+                                withAnimation(.spring(duration: 0.3)) { localToast = true }
+                            }
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) { dismiss() }
+                        } label: {
+                            Text("I'm Down")
+                                .font(.headline)
+                                .fontWeight(.semibold)
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 16)
+                                .background(OrbitTheme.gradientFill)
+                                .foregroundColor(.white)
+                                .clipShape(RoundedRectangle(cornerRadius: 14))
+                        }
+                        .padding(.horizontal, 24)
+                        .padding(.bottom, 16)
+                    }
                 }
             }
+            .overlay(alignment: .bottom) {
+                if localToast {
+                    Text("You're in!")
+                        .font(.subheadline).fontWeight(.medium)
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 22).padding(.vertical, 12)
+                        .background(Capsule().fill(Color(red: 0.1, green: 0.1, blue: 0.22).opacity(0.95)))
+                        .shadow(color: .black.opacity(0.18), radius: 10, y: 4)
+                        .padding(.bottom, 80)
+                        .transition(.move(edge: .bottom).combined(with: .opacity))
+                }
+            }
+            .animation(.spring(duration: 0.3), value: localToast)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {

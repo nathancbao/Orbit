@@ -434,10 +434,9 @@ def get_history_entry(user_id, event_id):
 #         custom_activity_name (string or None),
 #         min_group_size, max_group_size,
 #         availability [{"date": "<ISO8601>", "time_blocks": ["morning", ...]}],
-#         status (pending_match | matched), created_at
+#         status (pending | active), created_at
 #
-# NOTE: When the Swift MissionsViewModel is wired to this API, AvailabilitySlot
-# will need a CodingKeys mapping for time_blocks ↔ "time_blocks" (snake_case).
+# Swift AvailabilitySlot has CodingKeys mapping timeBlocks ↔ "time_blocks".
 
 def create_mission(data, creator_id):
     mission_id = str(uuid.uuid4())
@@ -473,6 +472,14 @@ def delete_mission(mission_id):
 def list_missions_for_user(user_id, limit=100):
     query = client.query(kind='Mission')
     query.add_filter('creator_id', '=', int(user_id))
+    query.order = ['-created_at']
+    results = list(query.fetch(limit=limit))
+    return [_entity_to_dict(e) for e in results]
+
+
+def list_all_missions(limit=50):
+    """Return all Mission entities, newest first (for discover feed)."""
+    query = client.query(kind='Mission')
     query.order = ['-created_at']
     results = list(query.fetch(limit=limit))
     return [_entity_to_dict(e) for e in results]

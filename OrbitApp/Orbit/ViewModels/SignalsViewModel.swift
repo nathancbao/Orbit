@@ -2,7 +2,7 @@
 //  SignalsViewModel.swift
 //  Orbit
 //
-//  State management for signals (formerly MissionsViewModel).
+//  State management for signals — wired to /api/missions backend.
 //
 
 import Foundation
@@ -12,7 +12,8 @@ import SwiftUI
 @MainActor
 class SignalsViewModel: ObservableObject {
 
-    @Published var signals: [Signal] = []
+    @Published var discoverSignals: [Signal] = []
+    @Published var mySignals: [Signal] = []
     @Published var isLoading: Bool = false
     @Published var isSubmitting: Bool = false
     @Published var errorMessage: String?
@@ -21,27 +22,32 @@ class SignalsViewModel: ObservableObject {
     @Published var showToast: Bool = false
 
     private var toastTask: Task<Void, Never>?
-
-    // MARK: - Computed
-
-    var pendingSignals: [Signal] {
-        signals.filter { $0.status == .pending }
-    }
-
-    var activeSignals: [Signal] {
-        signals.filter { $0.status == .active }
-    }
+    private var hasLoaded = false
 
     // MARK: - Load
 
-    func loadSignals() {
-        guard signals.isEmpty else { return }
+    func loadSignals() async {
+        guard !hasLoaded else { return }
         isLoading = true
-        Task {
-            try? await Task.sleep(for: .milliseconds(300))
-            signals = MockData.mockSignals
-            isLoading = false
-        }
+        defer { isLoading = false }
+
+        async let discover = try? SignalService.shared.discoverSignals()
+        async let mine = try? SignalService.shared.mySignals()
+
+        discoverSignals = await discover ?? []
+        mySignals = await mine ?? []
+        hasLoaded = true
+    }
+
+    func reload() async {
+        isLoading = true
+        defer { isLoading = false }
+
+        async let discover = try? SignalService.shared.discoverSignals()
+        async let mine = try? SignalService.shared.mySignals()
+
+        discoverSignals = await discover ?? []
+        mySignals = await mine ?? []
     }
 
     // MARK: - Create
@@ -53,36 +59,39 @@ class SignalsViewModel: ObservableObject {
         maxGroupSize: Int,
         availability: [AvailabilitySlot],
         description: String
-    ) {
-        let title: String
-        if activityCategory == .custom {
-            title = customActivityName ?? "Custom Activity"
-        } else {
-            title = activityCategory.displayName
-        }
+    ) async {
+        isSubmitting = true
+        defer { isSubmitting = false }
 
-        let signal = Signal(
-            id: UUID().uuidString,
-            title: title,
-            description: description,
-            activityCategory: activityCategory,
-            customActivityName: customActivityName,
-            minGroupSize: minGroupSize,
-            maxGroupSize: maxGroupSize,
-            availability: availability,
-            status: .pending,
-            creatorId: 0,
-            createdAt: ISO8601DateFormatter().string(from: Date())
-        )
-        signals.insert(signal, at: 0)
-        showToastMessage("Signal sent!")
+        do {
+            let created = try await SignalService.shared.createSignal(
+                activityCategory: activityCategory,
+                customActivityName: customActivityName,
+                minGroupSize: minGroupSize,
+                maxGroupSize: maxGroupSize,
+                availability: availability,
+                description: description
+            )
+            // Insert locally for instant feedback, then refresh in background.
+            discoverSignals.insert(created, at: 0)
+            mySignals.insert(created, at: 0)
+            showToastMessage("Signal sent!")
+        } catch {
+            handleError(error)
+        }
     }
 
     // MARK: - Delete
 
-    func deleteSignal(id: String) {
-        signals.removeAll { $0.id == id }
-        showToastMessage("Signal removed")
+    func deleteSignal(id: String) async {
+        do {
+            try await SignalService.shared.deleteSignal(id: id)
+            discoverSignals.removeAll { $0.id == id }
+            mySignals.removeAll { $0.id == id }
+            showToastMessage("Signal removed")
+        } catch {
+            handleError(error)
+        }
     }
 
     // MARK: - Helpers
@@ -90,13 +99,15 @@ class SignalsViewModel: ObservableObject {
     private func handleError(_ error: Error) {
         if let e = error as? SignalError {
             errorMessage = e.errorDescription
+        } else if let e = error as? NetworkError {
+            errorMessage = e.errorDescription
         } else {
             errorMessage = "An unexpected error occurred"
         }
         showError = true
     }
 
-    private func showToastMessage(_ message: String) {
+    func showToastMessage(_ message: String) {
         toastTask?.cancel()
         toastMessage = message
         withAnimation(.spring(duration: 0.3)) { showToast = true }
