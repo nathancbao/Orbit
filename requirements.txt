@@ -9,4 +9,4 @@ python-dotenv==1.0.0
 scikit-learn==1.4.2
 numpy==1.26.4
 fastembed==0.3.6
-lightfm==1.17
+git+https://github.com/lyst/lightfm.git#egg=lightfm
