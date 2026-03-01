@@ -49,7 +49,7 @@ def verify_code(email, code):
             'refresh_token': refresh_token,
             'expires_in': 900,
             'is_new_user': is_new_user,
-            'user_id': user_id,
+            'user_id': int(user_id),
         }, None
 
     # Normal verification (non-demo)
@@ -95,7 +95,7 @@ def verify_code(email, code):
         'refresh_token': refresh_token,
         'expires_in': 900,
         'is_new_user': is_new_user,
-        'user_id': user_id,
+        'user_id': int(user_id),
     }, None
 
 
