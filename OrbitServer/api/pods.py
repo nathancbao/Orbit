@@ -4,7 +4,7 @@ from OrbitServer.utils.responses import success, error
 from OrbitServer.utils.auth import require_auth
 from OrbitServer.models.models import get_event_pod, update_event_pod
 from OrbitServer.services.pod_service import (
-    get_pod_with_members, vote_to_kick, confirm_attendance,
+    get_pod_with_members, vote_to_kick, confirm_attendance, leave_pod,
 )
 from OrbitServer.utils.helpers import safe_int
 
@@ -40,6 +40,16 @@ def rename(pod_id):
 
     updated = update_event_pod(pod_id, {'name': name})
     return success(updated)
+
+
+@pods_bp.route('/<pod_id>/leave', methods=['DELETE'])
+@require_auth
+def leave(pod_id):
+    ok, err = leave_pod(pod_id, g.user_id)
+    if not ok:
+        msg, status_code = err
+        return error(msg, status_code)
+    return success({'message': 'You have left the pod'})
 
 
 @pods_bp.route('/<pod_id>/kick', methods=['POST'])

@@ -4,7 +4,7 @@ from OrbitServer.models.models import (
     get_event, get_event_pod, update_event_pod, create_event_pod,
     find_open_pod_for_event, get_user_pod_for_event,
     list_event_pods, get_profile, record_event_action,
-    adjust_trust_score, transactional_pod_update,
+    adjust_trust_score, transactional_pod_update, delete_event_pod,
 )
 from OrbitServer.utils.helpers import safe_int as _safe_int
 
@@ -132,6 +132,39 @@ def leave_event(event_id, user_id):
         entity['status'] = 'open' if len(member_ids) < entity.get('max_size', 4) else entity.get('status', 'open')
 
     transactional_pod_update(pod['id'], _remove_member)
+    return True, None
+
+
+def leave_pod(pod_id, user_id):
+    """
+    Remove a user from a pod. Deletes the pod entirely if no members remain.
+    Returns (True, None) on success or (False, (error_msg, status_code)) on failure.
+    """
+    uid = _safe_int(user_id)
+    if uid is None:
+        return False, ("Invalid user ID", 400)
+
+    pod = get_event_pod(pod_id)
+    if not pod:
+        return False, ("Pod not found", 404)
+
+    member_ids = pod.get('member_ids') or []
+    if uid not in member_ids:
+        return False, ("You are not a member of this pod", 403)
+
+    def _remove(entity):
+        m_ids = [m for m in (entity.get('member_ids') or []) if m != uid]
+        confirmed = [c for c in (entity.get('confirmed_attendees') or []) if c != uid]
+        entity['member_ids'] = m_ids
+        entity['confirmed_attendees'] = confirmed
+        entity['status'] = 'open' if len(m_ids) < entity.get('max_size', 4) else entity.get('status', 'open')
+        return len(m_ids)
+
+    remaining, _ = transactional_pod_update(pod_id, _remove)
+
+    if remaining == 0:
+        delete_event_pod(pod_id)
+
     return True, None
 
 
