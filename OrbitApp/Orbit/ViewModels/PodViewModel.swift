@@ -77,6 +77,14 @@ class PodViewModel: ObservableObject {
         }
     }
 
+    func renamePod(name: String) async {
+        do {
+            pod = try await PodService.shared.renamePod(podId: podId, name: name)
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
     func confirmAttendance() async {
         do {
             let response = try await PodService.shared.confirmAttendance(podId: podId)

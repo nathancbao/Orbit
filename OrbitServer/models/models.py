@@ -173,7 +173,7 @@ def list_events(filters=None):
 
 
 # ── EventPod ──────────────────────────────────────────────────────────────────
-# Fields: id (UUID string), event_id, member_ids, max_size,
+# Fields: id (UUID string), event_id, member_ids, max_size, name (string, nullable),
 #         status (open|full|meeting_confirmed|completed|cancelled),
 #         scheduled_time (string, nullable), scheduled_place (string, nullable),
 #         confirmed_attendees, kick_votes {target_user_id: [voter_user_ids]},
@@ -189,6 +189,7 @@ def create_event_pod(event_id, max_size=4, first_member_id=None):
         'event_id': int(event_id),
         'member_ids': member_ids,
         'max_size': int(max_size),
+        'name': None,
         'status': 'open',
         'scheduled_time': None,
         'scheduled_place': None,
@@ -214,7 +215,7 @@ def update_event_pod(pod_id, data):
         return None
     allowed = [
         'member_ids', 'status', 'scheduled_time', 'scheduled_place',
-        'confirmed_attendees', 'kick_votes', 'expires_at',
+        'confirmed_attendees', 'kick_votes', 'expires_at', 'name',
     ]
     for field in allowed:
         if field in data:
@@ -500,6 +501,14 @@ def list_all_missions(limit=50):
     return [_entity_to_dict(e) for e in results]
 
 
+def list_rsvped_missions(user_id, limit=100):
+    """Return all Mission entities where user_id is in the rsvps list."""
+    query = client.query(kind='Mission')
+    query.add_filter('rsvps', '=', int(user_id))
+    results = list(query.fetch(limit=limit))
+    return [_entity_to_dict(e) for e in results]
+
+
 def update_mission_status(mission_id, status):
     """Update signal/mission status. Valid values: 'pending' | 'active'."""
     key = client.key('Mission', str(mission_id))
@@ -543,7 +552,7 @@ def transactional_mission_rsvp(mission_id, user_id):
 # ── EventPod user membership query ────────────────────────────────────────────
 
 def get_user_pods(user_id, limit=100):
-    """Return all EventPod entities the user is a member of.
+    """Return all EventPod entities the user is a member of, enriched with event_title.
 
     Datastore automatically builds single-property indexes for array fields,
     so filtering member_ids by equality works without a composite index.
@@ -551,7 +560,18 @@ def get_user_pods(user_id, limit=100):
     query = client.query(kind='EventPod')
     query.add_filter('member_ids', '=', int(user_id))
     results = list(query.fetch(limit=limit))
-    return [_entity_to_dict(e) for e in results]
+    pods = [_entity_to_dict(e) for e in results]
+
+    # Enrich each pod with its event title
+    for pod in pods:
+        event_id = pod.get('event_id')
+        if event_id is not None:
+            event = get_event(int(event_id))
+            pod['event_title'] = event.get('title', 'Untitled') if event else 'Untitled'
+        else:
+            pod['event_title'] = 'Untitled'
+
+    return pods
 
 
 # ── RefreshToken ──────────────────────────────────────────────────────────────

@@ -6,8 +6,11 @@ import SwiftUI
 struct PodsView: View {
     @Binding var userProfile: Profile
     @State private var pods: [EventPod] = []
+    @State private var rsvpedSignals: [Signal] = []
     @State private var isLoading = false
     @State private var showProfile = false
+
+    private var isEmpty: Bool { pods.isEmpty && rsvpedSignals.isEmpty }
 
     var body: some View {
         NavigationStack {
@@ -18,7 +21,7 @@ struct PodsView: View {
                     ProgressView()
                         .tint(OrbitTheme.purple)
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
-                } else if pods.isEmpty {
+                } else if isEmpty {
                     VStack(spacing: 16) {
                         Image(systemName: "person.3")
                             .font(.system(size: 48))
@@ -35,14 +38,21 @@ struct PodsView: View {
                     ScrollView {
                         VStack(spacing: 14) {
                             ForEach(pods) { pod in
-                                PodRowCard(pod: pod, eventTitle: "Mission")
+                                PodRowCard(pod: pod, eventTitle: pod.displayName)
                                     .padding(.horizontal, 20)
+                            }
+
+                            if !rsvpedSignals.isEmpty {
+                                ForEach(rsvpedSignals) { signal in
+                                    SignalRsvpCard(signal: signal)
+                                        .padding(.horizontal, 20)
+                                }
                             }
                         }
                         .padding(.top, 16)
                         .padding(.bottom, 80)
                     }
-                    .refreshable { await loadPods() }
+                    .refreshable { await loadData() }
                 }
             }
             .navigationTitle("Pods")
@@ -69,15 +79,21 @@ struct PodsView: View {
                 onProfileUpdated: { updated in userProfile = updated }
             )
         }
-        .task { await loadPods() }
+        .task { await loadData() }
     }
 
-    private func loadPods() async {
+    private func loadData() async {
         isLoading = true
-        pods = (try? await APIService.shared.request(
+        async let podsResult: [EventPod]? = try? APIService.shared.request(
             endpoint: Constants.API.Endpoints.myPods,
             authenticated: true
-        )) ?? []
+        )
+        async let rsvpsResult: [Signal]? = try? APIService.shared.request(
+            endpoint: Constants.API.Endpoints.myRsvps,
+            authenticated: true
+        )
+        pods = await podsResult ?? []
+        rsvpedSignals = await rsvpsResult ?? []
         isLoading = false
     }
 }
@@ -141,6 +157,90 @@ struct PodRowCard: View {
         .buttonStyle(.plain)
         .sheet(isPresented: $showPod) {
             PodView(podId: pod.id, eventTitle: eventTitle)
+        }
+    }
+}
+
+// MARK: - Signal RSVP Card (Black Theme)
+
+struct SignalRsvpCard: View {
+    let signal: Signal
+    @State private var showDetail = false
+
+    var body: some View {
+        Button(action: { showDetail = true }) {
+            HStack(spacing: 14) {
+                Rectangle()
+                    .fill(Color.white.opacity(0.5))
+                    .frame(width: 4)
+                    .cornerRadius(2)
+
+                VStack(alignment: .leading, spacing: 6) {
+                    HStack(spacing: 8) {
+                        Image(systemName: signal.activityCategory.icon)
+                            .font(.caption)
+                            .foregroundColor(.white.opacity(0.8))
+                        Text(signal.displayTitle)
+                            .font(.headline)
+                            .foregroundColor(.white)
+                    }
+
+                    HStack(spacing: 4) {
+                        Image(systemName: "person.2.fill")
+                            .font(.caption2)
+                        Text(signal.groupSizeLabel)
+                            .font(.caption)
+                    }
+                    .foregroundColor(.white.opacity(0.6))
+
+                    HStack(spacing: 4) {
+                        Image(systemName: "calendar")
+                            .font(.caption2)
+                        Text(signal.availabilitySummary)
+                            .font(.caption)
+                    }
+                    .foregroundColor(.white.opacity(0.6))
+
+                    SignalStatusBadgeDark(status: signal.status)
+                }
+
+                Spacer()
+
+                Image(systemName: "antenna.radiowaves.left.and.right")
+                    .foregroundColor(.white.opacity(0.5))
+            }
+            .padding(16)
+            .background(Color(red: 0.1, green: 0.1, blue: 0.14))
+            .cornerRadius(16)
+            .shadow(color: .black.opacity(0.15), radius: 8, x: 0, y: 2)
+        }
+        .buttonStyle(.plain)
+        .sheet(isPresented: $showDetail) {
+            SignalDetailView(signal: signal)
+        }
+    }
+}
+
+// MARK: - Signal Status Badge (Dark)
+
+struct SignalStatusBadgeDark: View {
+    let status: SignalStatus
+
+    var body: some View {
+        Text(status.label)
+            .font(.caption2)
+            .fontWeight(.semibold)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 3)
+            .background(statusColor.opacity(0.25))
+            .foregroundColor(statusColor)
+            .clipShape(Capsule())
+    }
+
+    private var statusColor: Color {
+        switch status {
+        case .pending: return .orange
+        case .active:  return .green
         }
     }
 }

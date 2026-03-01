@@ -20,6 +20,7 @@ enum Constants {
             // User / Profile
             static let me = "/users/me"
             static let myPods = "/users/me/pods"
+            static let myRsvps = "/users/me/rsvps"
             static let uploadPhoto = "/users/me/photo"
 
             // Events
@@ -34,11 +35,13 @@ enum Constants {
             static func pod(_ id: String) -> String { "/pods/\(id)" }
             static func podKick(_ id: String) -> String { "/pods/\(id)/kick" }
             static func podConfirm(_ id: String) -> String { "/pods/\(id)/confirm-attendance" }
+            static func podRename(_ id: String) -> String { "/pods/\(id)/name" }
 
             // Signals (backend: /api/missions)
             static let signals = "/missions"
             static let discoverSignals = "/missions/discover"
             static func signal(_ id: String) -> String { "/missions/\(id)" }
+            static func rsvpSignal(_ id: String) -> String { "/missions/\(id)/rsvp" }
 
             // Chat
             static func podMessages(_ id: String) -> String { "/pods/\(id)/messages" }
