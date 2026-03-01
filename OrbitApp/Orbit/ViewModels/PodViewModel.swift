@@ -8,6 +8,8 @@ class PodViewModel: ObservableObject {
     @Published var votes: [Vote] = []
     @Published var isLoading = false
     @Published var isSending = false
+    @Published var isLeaving = false
+    @Published var didLeave = false
     @Published var errorMessage: String?
     @Published var messageText: String = ""
 
@@ -75,6 +77,17 @@ class PodViewModel: ObservableObject {
         } catch {
             errorMessage = error.localizedDescription
         }
+    }
+
+    func leavePod() async {
+        isLeaving = true
+        do {
+            try await PodService.shared.leavePod(podId: podId)
+            didLeave = true
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+        isLeaving = false
     }
 
     func renamePod(name: String) async {

@@ -38,7 +38,9 @@ struct PodsView: View {
                     ScrollView {
                         VStack(spacing: 14) {
                             ForEach(pods) { pod in
-                                PodRowCard(pod: pod, eventTitle: pod.displayName)
+                                PodRowCard(pod: pod, eventTitle: pod.displayName) {
+                                    Task { await loadData() }
+                                }
                                     .padding(.horizontal, 20)
                             }
 
@@ -103,6 +105,7 @@ struct PodsView: View {
 struct PodRowCard: View {
     let pod: EventPod
     let eventTitle: String
+    var onDismiss: (() -> Void)? = nil
     @State private var showPod = false
 
     var body: some View {
@@ -155,7 +158,9 @@ struct PodRowCard: View {
             .shadow(color: .black.opacity(0.06), radius: 8, x: 0, y: 2)
         }
         .buttonStyle(.plain)
-        .sheet(isPresented: $showPod) {
+        .sheet(isPresented: $showPod, onDismiss: {
+            onDismiss?()
+        }) {
             PodView(podId: pod.id, eventTitle: eventTitle)
         }
     }

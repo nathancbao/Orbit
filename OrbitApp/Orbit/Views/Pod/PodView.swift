@@ -14,6 +14,7 @@ struct PodView: View {
     @State private var kickTarget: PodMember?
     @State private var showRenameAlert = false
     @State private var renameText = ""
+    @State private var showLeaveAlert = false
     @Environment(\.dismiss) private var dismiss
 
     // Retrieve current user id from keychain (simple approach)
@@ -119,6 +120,19 @@ struct PodView: View {
             } message: {
                 Text(viewModel.errorMessage ?? "")
             }
+            .alert("Leave Pod?", isPresented: $showLeaveAlert) {
+                Button("Leave", role: .destructive) {
+                    Task { await viewModel.leavePod() }
+                }
+                Button("Cancel", role: .cancel) {}
+            } message: {
+                Text("You will no longer be able to see this pod's chat or votes.")
+            }
+            .onChange(of: viewModel.didLeave) {
+                if viewModel.didLeave {
+                    dismiss()
+                }
+            }
             .task { await viewModel.load() }
         }
     }
@@ -145,6 +159,9 @@ struct PodView: View {
                     ActionChip(icon: "checkmark.seal", label: "I showed up!") {
                         Task { await viewModel.confirmAttendance() }
                     }
+                }
+                ActionChip(icon: "rectangle.portrait.and.arrow.right", label: "Leave Pod") {
+                    showLeaveAlert = true
                 }
             }
             .padding(.horizontal, 16)

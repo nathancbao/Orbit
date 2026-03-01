@@ -21,6 +21,14 @@ class PodService {
         )
     }
 
+    func leavePod(podId: String) async throws {
+        let _: EmptyResponse = try await APIService.shared.request(
+            endpoint: Constants.API.Endpoints.podLeave(podId),
+            method: "DELETE",
+            authenticated: true
+        )
+    }
+
     func renamePod(podId: String, name: String) async throws -> EventPod {
         let body: [String: Any] = ["name": name]
         return try await APIService.shared.request(
