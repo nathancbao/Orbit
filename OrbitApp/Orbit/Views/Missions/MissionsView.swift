@@ -152,7 +152,9 @@ struct MissionsView: View {
                 selectedMission = nil
             })
         }
-        .sheet(isPresented: $showCreate) {
+        .sheet(isPresented: $showCreate, onDismiss: {
+            Task { await viewModel.reload() }
+        }) {
             MissionCreateView()
         }
         .sheet(isPresented: $showProfile) {

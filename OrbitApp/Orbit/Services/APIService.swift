@@ -107,6 +107,22 @@ class APIService {
         body: [String: Any]? = nil,
         authenticated: Bool = false
     ) async throws -> T {
+        return try await performRequest(
+            endpoint: endpoint, method: method, body: body,
+            authenticated: authenticated, isRetry: false
+        )
+    }
+
+    /// Flag to prevent concurrent refresh attempts.
+    private var isRefreshing = false
+
+    private func performRequest<T: Codable>(
+        endpoint: String,
+        method: String,
+        body: [String: Any]?,
+        authenticated: Bool,
+        isRetry: Bool
+    ) async throws -> T {
         // Build URL
         guard let url = URL(string: baseURL + endpoint) else {
             throw NetworkError.invalidURL
@@ -136,8 +152,22 @@ class APIService {
                 throw NetworkError.noData
             }
 
-            // Handle 401 Unauthorized
+            // Handle 401 Unauthorized — attempt token refresh once
             if httpResponse.statusCode == 401 {
+                if authenticated && !isRetry && !isRefreshing {
+                    isRefreshing = true
+                    defer { isRefreshing = false }
+                    do {
+                        _ = try await AuthService.shared.refreshToken()
+                        // Retry the original request with the new token
+                        return try await performRequest(
+                            endpoint: endpoint, method: method, body: body,
+                            authenticated: authenticated, isRetry: true
+                        )
+                    } catch {
+                        throw NetworkError.unauthorized
+                    }
+                }
                 throw NetworkError.unauthorized
             }
 

@@ -189,6 +189,8 @@ struct SignalDetailView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var showSignedUp = false
     @State private var localToast = false
+    @State private var isRsvping = false
+    @State private var rsvpError: String?
 
     var body: some View {
         NavigationStack {
@@ -297,25 +299,33 @@ struct SignalDetailView: View {
                     if !showSignedUp {
                         Button {
                             UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-                            showSignedUp = true
-                            if let viewModel {
-                                viewModel.showToastMessage("You're in!")
-                            } else {
-                                withAnimation(.spring(duration: 0.3)) { localToast = true }
-                            }
-                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) { dismiss() }
+                            rsvpSignal()
                         } label: {
-                            Text("I'm Down")
-                                .font(.headline)
-                                .fontWeight(.semibold)
-                                .frame(maxWidth: .infinity)
-                                .padding(.vertical, 16)
-                                .background(OrbitTheme.gradientFill)
-                                .foregroundColor(.white)
-                                .clipShape(RoundedRectangle(cornerRadius: 14))
+                            ZStack {
+                                if isRsvping {
+                                    ProgressView().tint(.white)
+                                } else {
+                                    Text("I'm Down")
+                                        .font(.headline)
+                                        .fontWeight(.semibold)
+                                }
+                            }
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 16)
+                            .background(OrbitTheme.gradientFill)
+                            .foregroundColor(.white)
+                            .clipShape(RoundedRectangle(cornerRadius: 14))
                         }
+                        .disabled(isRsvping)
                         .padding(.horizontal, 24)
                         .padding(.bottom, 16)
+
+                        if let error = rsvpError {
+                            Text(error)
+                                .font(.caption)
+                                .foregroundColor(.red)
+                                .padding(.horizontal, 24)
+                        }
                     }
                 }
             }
@@ -336,6 +346,31 @@ struct SignalDetailView: View {
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button("Done") { dismiss() }
+                }
+            }
+        }
+    }
+
+    private func rsvpSignal() {
+        isRsvping = true
+        rsvpError = nil
+        Task {
+            do {
+                _ = try await SignalService.shared.rsvpSignal(id: signal.id)
+                await MainActor.run {
+                    isRsvping = false
+                    showSignedUp = true
+                    if let viewModel {
+                        viewModel.showToastMessage("You're in!")
+                    } else {
+                        withAnimation(.spring(duration: 0.3)) { localToast = true }
+                    }
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) { dismiss() }
+                }
+            } catch {
+                await MainActor.run {
+                    isRsvping = false
+                    rsvpError = error.localizedDescription
                 }
             }
         }

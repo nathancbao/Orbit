@@ -21,6 +21,16 @@ class PodService {
         )
     }
 
+    func renamePod(podId: String, name: String) async throws -> EventPod {
+        let body: [String: Any] = ["name": name]
+        return try await APIService.shared.request(
+            endpoint: Constants.API.Endpoints.podRename(podId),
+            method: "PUT",
+            body: body,
+            authenticated: true
+        )
+    }
+
     func confirmAttendance(podId: String) async throws -> ConfirmResponse {
         return try await APIService.shared.request(
             endpoint: Constants.API.Endpoints.podConfirm(podId),

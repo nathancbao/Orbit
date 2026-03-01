@@ -45,11 +45,8 @@ class MissionsViewModel: ObservableObject {
             year: showMyYearOnly ? userYear : nil
         )
 
-        var fetchedSuggested = await suggested ?? []
-        var fetchedAll = await all ?? []
-
-        if fetchedAll.isEmpty { fetchedAll = MockData.mockMissions }
-        if fetchedSuggested.isEmpty { fetchedSuggested = MockData.mockMissions }
+        let fetchedSuggested = await suggested ?? []
+        let fetchedAll = await all ?? []
 
         suggestedMissions = fetchedSuggested
         allMissions = fetchedAll

@@ -12,6 +12,8 @@ struct PodView: View {
     @State private var voteSheetType: String = "time"
     @State private var showKickSheet = false
     @State private var kickTarget: PodMember?
+    @State private var showRenameAlert = false
+    @State private var renameText = ""
     @Environment(\.dismiss) private var dismiss
 
     // Retrieve current user id from keychain (simple approach)
@@ -19,6 +21,10 @@ struct PodView: View {
         // AuthService stores userId in UserDefaults during login
         UserDefaults.standard.integer(forKey: "orbit_user_id")
     }()
+
+    private var displayTitle: String {
+        viewModel.pod?.name ?? eventTitle
+    }
 
     init(podId: String, eventTitle: String) {
         self.podId = podId
@@ -58,12 +64,33 @@ struct PodView: View {
                     inputBar
                 }
             }
-            .navigationTitle(eventTitle)
+            .navigationTitle(displayTitle)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
                     Button("Close") { dismiss() }
                 }
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button {
+                        renameText = viewModel.pod?.name ?? ""
+                        showRenameAlert = true
+                    } label: {
+                        Image(systemName: "pencil")
+                            .font(.subheadline)
+                            .foregroundStyle(OrbitTheme.gradient)
+                    }
+                }
+            }
+            .alert("Rename Pod", isPresented: $showRenameAlert) {
+                TextField("Pod name", text: $renameText)
+                Button("Save") {
+                    let trimmed = renameText.trimmingCharacters(in: .whitespaces)
+                    guard !trimmed.isEmpty else { return }
+                    Task { await viewModel.renamePod(name: trimmed) }
+                }
+                Button("Cancel", role: .cancel) {}
+            } message: {
+                Text("Give your pod a name")
             }
             .sheet(isPresented: $showVoteSheet) {
                 CreateVoteSheet(
@@ -206,7 +233,7 @@ struct PodView: View {
         var components = URLComponents(string: "https://calendar.google.com/calendar/render")!
         var items = [
             URLQueryItem(name: "action", value: "TEMPLATE"),
-            URLQueryItem(name: "text", value: eventTitle),
+            URLQueryItem(name: "text", value: displayTitle),
         ]
         if let place = place { items.append(URLQueryItem(name: "location", value: place)) }
         components.queryItems = items

@@ -139,6 +139,13 @@ class SignalService {
         )
     }
 
+    func rsvpSignal(id: String) async throws -> Signal {
+        return try await APIService.shared.request(
+            endpoint: Constants.API.Endpoints.rsvpSignal(id),
+            method: "POST", authenticated: true
+        )
+    }
+
     func deleteSignal(id: String) async throws {
         let _: EmptyResponse = try await APIService.shared.request(
             endpoint: Constants.API.Endpoints.signal(id),
