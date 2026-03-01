@@ -34,7 +34,10 @@
       "Bash(wc:*)",
       "Bash(xargs:*)",
       "Bash(pip3 show:*)",
-      "Bash(rm:*)"
+      "Bash(rm:*)",
+      "Bash(pip show fastembed lightfm 2>&1)",
+      "Bash(pip index versions lightfm 2>&1 | head -5)",
+      "Bash(git push origin main 2>&1)"
     ]
   }
 }
