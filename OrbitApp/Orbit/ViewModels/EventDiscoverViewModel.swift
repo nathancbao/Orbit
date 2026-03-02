@@ -34,26 +34,33 @@ class MissionsViewModel: ObservableObject {
         allMissions.filter { $0.userPodStatus != "in_pod" }
     }
 
+    private var hasLoaded = false
+
     func load(userYear: String) async {
+        guard !hasLoaded || allMissions.isEmpty else { return }
         self.userYear = userYear
         isLoading = true
         errorMessage = nil
 
-        async let suggested = try? MissionService.shared.suggestedMissions()
-        async let all = try? MissionService.shared.listMissions(
-            tag: filterTag,
-            year: showMyYearOnly ? userYear : nil
-        )
-
-        let fetchedSuggested = await suggested ?? []
-        let fetchedAll = await all ?? []
-
-        suggestedMissions = fetchedSuggested
-        allMissions = fetchedAll
+        // Fetch main list first — show it as soon as it arrives.
+        // Suggested missions load in background (can be slow due to AI matching).
+        do {
+            allMissions = try await MissionService.shared.listMissions(
+                tag: filterTag,
+                year: showMyYearOnly ? userYear : nil
+            )
+        } catch { /* empty list is fine */ }
         isLoading = false
+        hasLoaded = true
+
+        // Suggested missions load after — won't block the main feed.
+        if let suggested = try? await MissionService.shared.suggestedMissions() {
+            suggestedMissions = suggested
+        }
     }
 
     func reload() async {
+        hasLoaded = false
         await load(userYear: userYear)
     }
 
