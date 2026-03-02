@@ -31,7 +31,7 @@ def list_missions():
 @missions_bp.route('/discover', methods=['GET'])
 @require_auth
 def discover():
-    missions, err = get_all_missions()
+    missions, err = get_all_missions(g.user_id)
     if err:
         return error(err, 500)
     return success(missions)
@@ -81,7 +81,10 @@ def delete(mission_id):
 @missions_bp.route('/<mission_id>/rsvp', methods=['POST'])
 @require_auth
 def rsvp(mission_id):
-    mission, err = rsvp_mission(mission_id, g.user_id)
+    try:
+        mission, err = rsvp_mission(mission_id, g.user_id)
+    except Exception:
+        return error("RSVP failed, please try again", 500)
     if err:
         status_code = 404 if "not found" in err.lower() else 409
         return error(err, status_code)

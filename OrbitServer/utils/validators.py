@@ -134,13 +134,34 @@ def validate_mission_data(data):
         elif len(name) > 100:
             errors.append("custom_activity_name must be 100 characters or fewer")
 
+    desc = data.get('description', '')
+    if isinstance(desc, str) and desc.strip():
+        word_count = len(desc.split())
+        if word_count > 250:
+            errors.append("description must be 250 words or fewer")
+
+    links = data.get('links')
+    if links is not None:
+        if not isinstance(links, list):
+            errors.append("links must be a list of URL strings")
+        elif len(links) > 2:
+            errors.append("Maximum 2 links allowed")
+        else:
+            for link in links:
+                if not isinstance(link, str):
+                    errors.append("Each link must be a string")
+                    break
+                if len(link) > 500:
+                    errors.append("Each link must be 500 characters or fewer")
+                    break
+
     try:
         min_gs = int(data['min_group_size'])
         max_gs = int(data['max_group_size'])
-        if min_gs < 2:
-            errors.append("min_group_size must be at least 2")
-        if max_gs > 10:
-            errors.append("max_group_size must be at most 10")
+        if min_gs < 3:
+            errors.append("min_group_size must be at least 3")
+        if max_gs > 8:
+            errors.append("max_group_size must be at most 8")
         if min_gs > max_gs:
             errors.append("min_group_size cannot exceed max_group_size")
     except (KeyError, TypeError, ValueError):

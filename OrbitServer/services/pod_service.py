@@ -272,6 +272,7 @@ def _find_replacement(event_id, pod_id, current_members):
     """
     from OrbitServer.models.models import list_event_pods
     from google.cloud import datastore
+    from google.cloud.datastore.query import PropertyFilter
 
     # Get all members across all pods for this event
     occupied = set()
@@ -282,8 +283,8 @@ def _find_replacement(event_id, pod_id, current_members):
     # Query UserEventHistory for users who joined this event but aren't in any pod
     client = datastore.Client()
     query = client.query(kind='UserEventHistory')
-    query.add_filter('event_id', '=', int(event_id))
-    query.add_filter('action', '=', 'joined')
+    query.add_filter(filter=PropertyFilter('event_id', '=', int(event_id)))
+    query.add_filter(filter=PropertyFilter('action', '=', 'joined'))
     query.order = ['created_at']  # FIFO: earliest joiner gets priority
 
     for record in query.fetch(limit=50):

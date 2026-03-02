@@ -32,5 +32,20 @@ def health():
     return jsonify({"status": "healthy"})
 
 
+@app.route('/_ah/warmup')
+def warmup():
+    """GAE warmup handler — pre-establishes the Datastore gRPC connection
+    so the first real user request doesn't pay cold-start latency."""
+    from OrbitServer.models.models import client
+    try:
+        # Lightweight keys-only query to force gRPC channel init
+        q = client.query(kind='Mission')
+        q.keys_only()
+        list(q.fetch(limit=1))
+    except Exception:
+        pass
+    return jsonify({"status": "warm"})
+
+
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=8080, debug=os.environ.get('FLASK_DEBUG', '0') == '1')

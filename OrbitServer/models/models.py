@@ -2,6 +2,7 @@ import datetime
 import uuid
 
 from google.cloud import datastore
+from google.cloud.datastore.query import PropertyFilter
 
 client = datastore.Client()
 
@@ -46,7 +47,7 @@ def create_user(email):
 
 def get_user_by_email(email):
     query = client.query(kind='User')
-    query.add_filter('email', '=', email)
+    query.add_filter(filter=PropertyFilter('email', '=', email))
     results = list(query.fetch(limit=1))
     return _entity_to_dict(results[0]) if results else None
 
@@ -165,9 +166,9 @@ def delete_event(event_id):
 def list_events(filters=None):
     query = client.query(kind='Event')
     if filters and filters.get('tag'):
-        query.add_filter('tags', '=', filters['tag'])
+        query.add_filter(filter=PropertyFilter('tags', '=', filters['tag']))
     if filters and filters.get('status'):
-        query.add_filter('status', '=', filters['status'])
+        query.add_filter(filter=PropertyFilter('status', '=', filters['status']))
     results = list(query.fetch(limit=100))
     return [_entity_to_dict(e) for e in results]
 
@@ -229,12 +230,12 @@ def delete_event_pod(pod_id):
     client.delete(key)
     # Cascade: delete messages and votes (batched to avoid memory issues)
     query = client.query(kind='ChatMessage')
-    query.add_filter('pod_id', '=', str(pod_id))
+    query.add_filter(filter=PropertyFilter('pod_id', '=', str(pod_id)))
     query.keys_only()
     for msg in query.fetch(limit=1000):
         client.delete(msg.key)
     query2 = client.query(kind='Vote')
-    query2.add_filter('pod_id', '=', str(pod_id))
+    query2.add_filter(filter=PropertyFilter('pod_id', '=', str(pod_id)))
     query2.keys_only()
     for vote in query2.fetch(limit=1000):
         client.delete(vote.key)
@@ -242,7 +243,7 @@ def delete_event_pod(pod_id):
 
 def list_event_pods(event_id, limit=500):
     query = client.query(kind='EventPod')
-    query.add_filter('event_id', '=', int(event_id))
+    query.add_filter(filter=PropertyFilter('event_id', '=', int(event_id)))
     results = list(query.fetch(limit=limit))
     return [_entity_to_dict(e) for e in results]
 
@@ -300,7 +301,7 @@ def create_chat_message(pod_id, user_id, content, message_type='text'):
 
 def list_chat_messages(pod_id, limit=100):
     query = client.query(kind='ChatMessage')
-    query.add_filter('pod_id', '=', str(pod_id))
+    query.add_filter(filter=PropertyFilter('pod_id', '=', str(pod_id)))
     query.order = ['created_at']
     results = list(query.fetch(limit=limit))
     return [_entity_to_dict(e) for e in results]
@@ -368,7 +369,7 @@ def transactional_vote_update(vote_id, update_fn):
 
 def list_votes_for_pod(pod_id, limit=100):
     query = client.query(kind='Vote')
-    query.add_filter('pod_id', '=', str(pod_id))
+    query.add_filter(filter=PropertyFilter('pod_id', '=', str(pod_id)))
     results = list(query.fetch(limit=limit))
     return [_entity_to_dict(e) for e in results]
 
@@ -402,7 +403,7 @@ def record_event_action(user_id, event_id, action, pod_id=None, tags_snapshot=No
 
 def get_user_event_history(user_id, limit=50):
     query = client.query(kind='UserEventHistory')
-    query.add_filter('user_id', '=', int(user_id))
+    query.add_filter(filter=PropertyFilter('user_id', '=', int(user_id)))
     query.order = ['-created_at']
     results = list(query.fetch(limit=limit))
     return [_entity_to_dict(e) for e in results]
@@ -437,8 +438,8 @@ def update_event_history(hist_id, data):
 def get_history_entry(user_id, event_id):
     """Get the most recent history entry for a user/event pair."""
     query = client.query(kind='UserEventHistory')
-    query.add_filter('user_id', '=', int(user_id))
-    query.add_filter('event_id', '=', int(event_id))
+    query.add_filter(filter=PropertyFilter('user_id', '=', int(user_id)))
+    query.add_filter(filter=PropertyFilter('event_id', '=', int(event_id)))
     results = list(query.fetch(limit=1))
     return _entity_to_dict(results[0]) if results else None
 
@@ -447,8 +448,10 @@ def get_history_entry(user_id, event_id):
 # Fields: id (UUID string), creator_id, title, description,
 #         activity_category (matches Swift ActivityCategory raw values),
 #         custom_activity_name (string or None),
-#         min_group_size, max_group_size,
+#         min_group_size (3+), max_group_size (≤8),
 #         availability [{"date": "<ISO8601>", "time_blocks": ["morning", ...]}],
+#         links (list of URL strings, max 2),
+#         pod_ids (list of pod UUID strings, max 2, assigned on RSVP),
 #         status (pending | active), created_at
 #
 # Swift AvailabilitySlot has CodingKeys mapping timeBlocks ↔ "time_blocks".
@@ -456,16 +459,17 @@ def get_history_entry(user_id, event_id):
 def create_mission(data, creator_id):
     mission_id = str(uuid.uuid4())
     key = client.key('Mission', mission_id)
-    entity = datastore.Entity(key=key, exclude_from_indexes=['availability'])
+    entity = datastore.Entity(key=key, exclude_from_indexes=['availability', 'links'])
     entity.update({
         'creator_id': int(creator_id),
         'title': data.get('title', ''),
         'description': data.get('description', ''),
         'activity_category': data.get('activity_category', 'Custom'),
         'custom_activity_name': data.get('custom_activity_name'),
-        'min_group_size': int(data.get('min_group_size', 2)),
+        'min_group_size': int(data.get('min_group_size', 3)),
         'max_group_size': int(data.get('max_group_size', 6)),
         'availability': data.get('availability', []),
+        'links': data.get('links', []),
         'rsvps': [],
         'status': 'pending',   # matches Swift SignalStatus.pending
         'created_at': datetime.datetime.utcnow(),
@@ -487,7 +491,7 @@ def delete_mission(mission_id):
 
 def list_missions_for_user(user_id, limit=100):
     query = client.query(kind='Mission')
-    query.add_filter('creator_id', '=', int(user_id))
+    query.add_filter(filter=PropertyFilter('creator_id', '=', int(user_id)))
     query.order = ['-created_at']
     results = list(query.fetch(limit=limit))
     return [_entity_to_dict(e) for e in results]
@@ -504,7 +508,7 @@ def list_all_missions(limit=50):
 def list_rsvped_missions(user_id, limit=100):
     """Return all Mission entities where user_id is in the rsvps list."""
     query = client.query(kind='Mission')
-    query.add_filter('rsvps', '=', int(user_id))
+    query.add_filter(filter=PropertyFilter('rsvps', '=', int(user_id)))
     results = list(query.fetch(limit=limit))
     return [_entity_to_dict(e) for e in results]
 
@@ -525,28 +529,74 @@ def transactional_mission_rsvp(mission_id, user_id):
 
     Returns (mission_dict, error_string).
     - Rejects duplicate RSVPs.
+    - Caps total RSVPs at 2 × max_group_size (2 pods max).
     - Auto-transitions status to 'active' when rsvps >= min_group_size.
+    - Manages pod_ids list: first pod on first RSVP, second when pod 1 is full.
     """
+    result = None
+    err = None
+
     with client.transaction():
         key = client.key('Mission', str(mission_id))
         entity = client.get(key)
         if not entity:
-            return None, "Mission not found"
+            err = "Mission not found"
+        else:
+            rsvps = list(entity.get('rsvps') or [])
+            uid = int(user_id)
+            max_gs = int(entity.get('max_group_size', 6))
 
-        rsvps = list(entity.get('rsvps') or [])
-        uid = int(user_id)
-        if uid in rsvps:
-            return None, "You have already RSVP'd to this signal"
+            if uid in rsvps:
+                err = "You have already RSVP'd to this signal"
+            elif len(rsvps) >= max_gs * 2:
+                err = "This signal is full"
+            else:
+                rsvps.append(uid)
+                entity['rsvps'] = rsvps
 
-        rsvps.append(uid)
-        entity['rsvps'] = rsvps
+                min_gs = int(entity.get('min_group_size', 3))
+                if len(rsvps) >= min_gs and entity.get('status') == 'pending':
+                    entity['status'] = 'active'
 
-        min_gs = int(entity.get('min_group_size', 2))
-        if len(rsvps) >= min_gs and entity.get('status') == 'pending':
-            entity['status'] = 'active'
+                # Manage pod_ids: first pod on first RSVP, second on overflow
+                pod_ids = list(entity.get('pod_ids') or [])
+                # Migrate from old single pod_id field
+                if not pod_ids and entity.get('pod_id'):
+                    pod_ids = [entity['pod_id']]
+                if not pod_ids:
+                    pod_ids.append(str(uuid.uuid4()))
+                elif len(rsvps) > max_gs and len(pod_ids) < 2:
+                    pod_ids.append(str(uuid.uuid4()))
+                entity['pod_ids'] = pod_ids
 
-        client.put(entity)
-        return _entity_to_dict(entity), None
+                client.put(entity)
+                result = _entity_to_dict(entity)
+
+    return result, err
+
+
+def create_signal_pod(pod_id, mission_id, max_size=6, first_member_id=None):
+    """Create an EventPod linked to a signal/mission (not an event)."""
+    key = client.key('EventPod', str(pod_id))
+    entity = datastore.Entity(key=key)
+    now = datetime.datetime.utcnow()
+    member_ids = [int(first_member_id)] if first_member_id else []
+    entity.update({
+        'event_id': None,
+        'mission_id': str(mission_id),
+        'member_ids': member_ids,
+        'max_size': int(max_size),
+        'name': None,
+        'status': 'open',
+        'scheduled_time': None,
+        'scheduled_place': None,
+        'confirmed_attendees': [],
+        'kick_votes': {},
+        'created_at': now,
+        'expires_at': now + datetime.timedelta(days=2),
+    })
+    client.put(entity)
+    return _entity_to_dict(entity)
 
 
 # ── EventPod user membership query ────────────────────────────────────────────
@@ -558,7 +608,7 @@ def get_user_pods(user_id, limit=100):
     so filtering member_ids by equality works without a composite index.
     """
     query = client.query(kind='EventPod')
-    query.add_filter('member_ids', '=', int(user_id))
+    query.add_filter(filter=PropertyFilter('member_ids', '=', int(user_id)))
     results = list(query.fetch(limit=limit))
     pods = [_entity_to_dict(e) for e in results]
 
