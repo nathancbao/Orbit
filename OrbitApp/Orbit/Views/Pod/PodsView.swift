@@ -46,7 +46,9 @@ struct PodsView: View {
 
                             if !rsvpedSignals.isEmpty {
                                 ForEach(rsvpedSignals) { signal in
-                                    SignalRsvpCard(signal: signal)
+                                    SignalRsvpCard(signal: signal) {
+                                        Task { await loadData() }
+                                    }
                                         .padding(.horizontal, 20)
                                 }
                             }
@@ -170,10 +172,11 @@ struct PodRowCard: View {
 
 struct SignalRsvpCard: View {
     let signal: Signal
-    @State private var showDetail = false
+    var onDismiss: (() -> Void)? = nil
+    @State private var showSheet = false
 
     var body: some View {
-        Button(action: { showDetail = true }) {
+        Button(action: { showSheet = true }) {
             HStack(spacing: 14) {
                 Rectangle()
                     .fill(Color.white.opacity(0.5))
@@ -211,7 +214,7 @@ struct SignalRsvpCard: View {
 
                 Spacer()
 
-                Image(systemName: "antenna.radiowaves.left.and.right")
+                Image(systemName: signal.podId != nil ? "message.fill" : "antenna.radiowaves.left.and.right")
                     .foregroundColor(.white.opacity(0.5))
             }
             .padding(16)
@@ -220,8 +223,14 @@ struct SignalRsvpCard: View {
             .shadow(color: .black.opacity(0.15), radius: 8, x: 0, y: 2)
         }
         .buttonStyle(.plain)
-        .sheet(isPresented: $showDetail) {
-            SignalDetailView(signal: signal)
+        .sheet(isPresented: $showSheet, onDismiss: {
+            onDismiss?()
+        }) {
+            if let podId = signal.podId {
+                PodView(podId: podId, eventTitle: signal.displayTitle)
+            } else {
+                SignalDetailView(signal: signal)
+            }
         }
     }
 }

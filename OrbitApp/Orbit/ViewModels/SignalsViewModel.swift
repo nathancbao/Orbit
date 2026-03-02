@@ -58,7 +58,8 @@ class SignalsViewModel: ObservableObject {
         minGroupSize: Int,
         maxGroupSize: Int,
         availability: [AvailabilitySlot],
-        description: String
+        description: String,
+        links: [String] = []
     ) async {
         isSubmitting = true
         defer { isSubmitting = false }
@@ -70,7 +71,8 @@ class SignalsViewModel: ObservableObject {
                 minGroupSize: minGroupSize,
                 maxGroupSize: maxGroupSize,
                 availability: availability,
-                description: description
+                description: description,
+                links: links
             )
             // Insert locally for instant feedback, then refresh in background.
             discoverSignals.insert(created, at: 0)

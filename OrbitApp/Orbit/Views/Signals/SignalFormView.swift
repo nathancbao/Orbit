@@ -9,16 +9,34 @@ struct SignalFormView: View {
 
     @State private var selectedCategory: ActivityCategory = .hangout
     @State private var selectedSlots: Set<SlotKey> = []
-    @State private var minGroupSize: Int = 2
-    @State private var maxGroupSize: Int = 4
+    @State private var minGroupSize: Int = 3
+    @State private var maxGroupSize: Int = 8
     @State private var customActivityName: String = ""
     @State private var description: String = ""
+    @State private var link1: String = ""
+    @State private var link2: String = ""
+
+    private var wordCount: Int {
+        let trimmed = description.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return 0 }
+        return trimmed.components(separatedBy: .whitespacesAndNewlines)
+            .filter { !$0.isEmpty }.count
+    }
+
+    private var isOverWordLimit: Bool { wordCount > 250 }
 
     private var canSubmit: Bool {
         if selectedCategory == .custom && customActivityName.trimmingCharacters(in: .whitespaces).isEmpty {
             return false
         }
+        if isOverWordLimit { return false }
         return !selectedSlots.isEmpty
+    }
+
+    private var linksArray: [String] {
+        [link1, link2]
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
     }
 
     var body: some View {
@@ -31,7 +49,8 @@ struct SignalFormView: View {
                     }
                     availabilityGridSection
                     groupSizeSection
-                    noteSection
+                    descriptionSection
+                    linksSection
                     submitButton
                 }
                 .padding(.horizontal, 16)
@@ -186,14 +205,14 @@ struct SignalFormView: View {
                     Text("Min")
                         .font(.caption)
                         .foregroundColor(.secondary)
-                    Stepper("\(minGroupSize)", value: $minGroupSize, in: 2...maxGroupSize)
+                    Stepper("\(minGroupSize)", value: $minGroupSize, in: 3...maxGroupSize)
                         .font(.subheadline)
                 }
                 VStack(alignment: .leading, spacing: 4) {
                     Text("Max")
                         .font(.caption)
                         .foregroundColor(.secondary)
-                    Stepper("\(maxGroupSize)", value: $maxGroupSize, in: minGroupSize...20)
+                    Stepper("\(maxGroupSize)", value: $maxGroupSize, in: minGroupSize...8)
                         .font(.subheadline)
                 }
             }
@@ -204,14 +223,41 @@ struct SignalFormView: View {
         }
     }
 
-    // MARK: - Note
+    // MARK: - Description
 
-    private var noteSection: some View {
+    private var descriptionSection: some View {
         VStack(alignment: .leading, spacing: 12) {
-            OrbitSectionHeader(title: "Note")
-            TextField("Add a note (optional)", text: $description, axis: .vertical)
+            OrbitSectionHeader(title: "Description")
+            TextField("Describe the activity (optional)", text: $description, axis: .vertical)
                 .textFieldStyle(.roundedBorder)
-                .lineLimit(2...5)
+                .lineLimit(2...6)
+
+            HStack {
+                Spacer()
+                Text("\(wordCount)/250 words")
+                    .font(.caption2)
+                    .foregroundColor(isOverWordLimit ? .red : .secondary)
+            }
+        }
+    }
+
+    // MARK: - Links
+
+    private var linksSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            OrbitSectionHeader(title: "Links (optional)")
+
+            TextField("Paste a link", text: $link1)
+                .textFieldStyle(.roundedBorder)
+                .keyboardType(.URL)
+                .textInputAutocapitalization(.never)
+                .autocorrectionDisabled()
+
+            TextField("Paste a second link", text: $link2)
+                .textFieldStyle(.roundedBorder)
+                .keyboardType(.URL)
+                .textInputAutocapitalization(.never)
+                .autocorrectionDisabled()
         }
     }
 
@@ -290,7 +336,8 @@ struct SignalFormView: View {
                 minGroupSize: minGroupSize,
                 maxGroupSize: maxGroupSize,
                 availability: slots,
-                description: description.trimmingCharacters(in: .whitespaces)
+                description: description.trimmingCharacters(in: .whitespaces),
+                links: linksArray
             )
             if !viewModel.showError {
                 dismiss()

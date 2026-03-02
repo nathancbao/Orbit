@@ -154,15 +154,18 @@ struct Signal: Codable, Identifiable {
     let status: SignalStatus
     let creatorId: Int
     let createdAt: String?
+    let podId: String?
+    let links: [String]?
 
     enum CodingKeys: String, CodingKey {
-        case id, title, description, availability, status
+        case id, title, description, availability, status, links
         case activityCategory  = "activity_category"
         case customActivityName = "custom_activity_name"
         case minGroupSize      = "min_group_size"
         case maxGroupSize      = "max_group_size"
         case creatorId         = "creator_id"
         case createdAt         = "created_at"
+        case podId             = "pod_id"
     }
 
     var displayTitle: String {

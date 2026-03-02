@@ -101,7 +101,8 @@ class SignalService {
         minGroupSize: Int,
         maxGroupSize: Int,
         availability: [AvailabilitySlot],
-        description: String
+        description: String,
+        links: [String] = []
     ) async throws -> Signal {
         let dateFormatter = DateFormatter()
         dateFormatter.dateFormat = "yyyy-MM-dd"
@@ -131,6 +132,9 @@ class SignalService {
         ]
         if let name = customActivityName, !name.isEmpty {
             body["custom_activity_name"] = name
+        }
+        if !links.isEmpty {
+            body["links"] = links
         }
 
         return try await APIService.shared.request(

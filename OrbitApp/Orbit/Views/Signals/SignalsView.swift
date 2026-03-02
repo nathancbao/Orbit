@@ -202,6 +202,16 @@ struct SignalCard: View {
                             .foregroundColor(.white.opacity(0.5))
                             .lineLimit(2)
                     }
+
+                    if let links = signal.links, !links.isEmpty {
+                        HStack(spacing: 5) {
+                            Image(systemName: "link")
+                                .font(.caption)
+                            Text(links.count == 1 ? "1 link" : "\(links.count) links")
+                                .font(.caption)
+                        }
+                        .foregroundColor(.white.opacity(0.7))
+                    }
                 }
                 .padding(14)
             }

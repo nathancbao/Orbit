@@ -191,6 +191,8 @@ struct SignalDetailView: View {
     @State private var localToast = false
     @State private var isRsvping = false
     @State private var rsvpError: String?
+    @State private var joinedPodId: String?
+    @State private var showPod = false
 
     var body: some View {
         NavigationStack {
@@ -249,6 +251,29 @@ struct SignalDetailView: View {
                                     .lineSpacing(4)
                             }
 
+                            // Links
+                            if let links = signal.links, !links.isEmpty {
+                                VStack(alignment: .leading, spacing: 8) {
+                                    ForEach(links, id: \.self) { link in
+                                        if let url = URL(string: link) {
+                                            Button {
+                                                UIApplication.shared.open(url)
+                                            } label: {
+                                                HStack(spacing: 6) {
+                                                    Image(systemName: "link")
+                                                        .font(.caption)
+                                                    Text(link)
+                                                        .font(.subheadline)
+                                                        .lineLimit(1)
+                                                        .truncationMode(.middle)
+                                                }
+                                                .foregroundColor(OrbitTheme.blue)
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+
                             Divider()
 
                             // Availability Section
@@ -295,8 +320,33 @@ struct SignalDetailView: View {
                         .padding(.top, 8)
                     }
 
-                    // I'm Down button
-                    if !showSignedUp {
+                    // Action button area
+                    if showSignedUp {
+                        if joinedPodId != nil {
+                            // Open pod button (like Missions)
+                            Button(action: { showPod = true }) {
+                                Label("open your pod", systemImage: "person.3.fill")
+                                    .font(.headline)
+                                    .fontWeight(.semibold)
+                                    .frame(maxWidth: .infinity)
+                                    .padding(.vertical, 16)
+                                    .background(OrbitTheme.gradientFill)
+                                    .foregroundColor(.white)
+                                    .clipShape(RoundedRectangle(cornerRadius: 14))
+                            }
+                            .padding(.horizontal, 24)
+                            .padding(.bottom, 16)
+                        } else {
+                            // Fallback when backend hasn't added pod_id yet
+                            Text("You already signed up for this event!")
+                                .font(.subheadline)
+                                .foregroundColor(.secondary)
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 16)
+                                .padding(.horizontal, 24)
+                                .padding(.bottom, 16)
+                        }
+                    } else {
                         Button {
                             UIImpactFeedbackGenerator(style: .medium).impactOccurred()
                             rsvpSignal()
@@ -348,6 +398,18 @@ struct SignalDetailView: View {
                     Button("Done") { dismiss() }
                 }
             }
+            .sheet(isPresented: $showPod) {
+                if let podId = joinedPodId {
+                    PodView(podId: podId, eventTitle: signal.displayTitle)
+                }
+            }
+            .onAppear {
+                // If the signal already has a pod_id, user already RSVP'd
+                if let podId = signal.podId {
+                    showSignedUp = true
+                    joinedPodId = podId
+                }
+            }
         }
     }
 
@@ -356,21 +418,32 @@ struct SignalDetailView: View {
         rsvpError = nil
         Task {
             do {
-                _ = try await SignalService.shared.rsvpSignal(id: signal.id)
+                let rsvpedSignal = try await SignalService.shared.rsvpSignal(id: signal.id)
                 await MainActor.run {
                     isRsvping = false
                     showSignedUp = true
+                    joinedPodId = rsvpedSignal.podId
                     if let viewModel {
                         viewModel.showToastMessage("You're in!")
                     } else {
                         withAnimation(.spring(duration: 0.3)) { localToast = true }
                     }
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) { dismiss() }
+                    // If we got a pod, don't auto-dismiss — let user open the pod
+                    if rsvpedSignal.podId == nil {
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) { dismiss() }
+                    }
                 }
             } catch {
                 await MainActor.run {
                     isRsvping = false
-                    rsvpError = error.localizedDescription
+                    let message = error.localizedDescription
+                    if message.localizedCaseInsensitiveContains("already") {
+                        // User already RSVP'd — treat as success
+                        showSignedUp = true
+                        joinedPodId = signal.podId
+                    } else {
+                        rsvpError = message
+                    }
                 }
             }
         }
