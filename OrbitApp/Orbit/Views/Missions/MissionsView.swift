@@ -169,7 +169,7 @@ struct MissionsView: View {
         }
         .onAppear {
             // Retry if previous load returned empty (e.g. network wasn't ready)
-            if viewModel.allMissions.isEmpty && viewModel.suggestedMissions.isEmpty && !viewModel.isLoading {
+            if viewModel.allMissions.isEmpty && !viewModel.isLoading {
                 Task { await viewModel.load(userYear: userProfile.collegeYear) }
             }
         }
