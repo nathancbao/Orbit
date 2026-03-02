@@ -136,9 +136,9 @@ class TestValidateMissionData:
         valid, errors = validate_mission_data({"description": "Fun"})
         assert valid is False
 
-    def test_rejects_missing_description(self):
+    def test_accepts_missing_description(self):
         valid, errors = validate_mission_data({"title": "Hike"})
-        assert valid is False
+        assert valid is True
 
     def test_rejects_long_title(self):
         valid, errors = validate_mission_data({"title": "x" * 201, "description": "Fun"})

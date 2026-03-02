@@ -19,7 +19,7 @@ class TestListMissions:
     @patch('OrbitServer.api.missions.list_pods')
     @patch('OrbitServer.api.missions.get_missions_for_user')
     def test_returns_missions(self, mock_list, mock_pods, mock_user_pod, client):
-        mock_list.return_value = [{"id": 1, "title": "Hike", "max_pod_size": 4}]
+        mock_list.return_value = ([{"id": 1, "title": "Hike", "max_pod_size": 4}], None)
         mock_user_pod.return_value = None
         mock_pods.return_value = []
         resp = client.get('/api/missions', headers=auth_header())
@@ -32,7 +32,7 @@ class TestListMissions:
     @patch('OrbitServer.api.missions.list_pods')
     @patch('OrbitServer.api.missions.get_missions_for_user')
     def test_annotates_user_pod_status(self, mock_list, mock_pods, mock_user_pod, client):
-        mock_list.return_value = [{"id": 1, "title": "Hike", "max_pod_size": 4}]
+        mock_list.return_value = ([{"id": 1, "title": "Hike", "max_pod_size": 4}], None)
         mock_user_pod.return_value = {"id": "pod-abc"}
         resp = client.get('/api/missions', headers=auth_header())
         body = json.loads(resp.data)
@@ -71,9 +71,11 @@ class TestCreateMission:
         resp = client.post('/api/missions', headers=auth_header(), json={"description": "Fun"})
         assert resp.status_code == 400
 
-    def test_rejects_missing_description(self, client):
+    @patch('OrbitServer.api.missions.create_new_mission')
+    def test_accepts_missing_description(self, mock_create, client):
+        mock_create.return_value = {"id": 1, "title": "Hike", "status": "open"}
         resp = client.post('/api/missions', headers=auth_header(), json={"title": "Hike"})
-        assert resp.status_code == 400
+        assert resp.status_code == 201
 
     def test_rejects_long_title(self, client):
         resp = client.post('/api/missions', headers=auth_header(),

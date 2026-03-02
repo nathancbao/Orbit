@@ -1,3 +1,4 @@
+import logging
 import threading
 
 from OrbitServer.models.models import (
@@ -7,22 +8,25 @@ from OrbitServer.models.models import (
 from OrbitServer.services.ai_suggestion_service import score_mission_for_user
 from OrbitServer.services.embedding_service import invalidate_cache, get_or_create_mission_embedding
 
+logger = logging.getLogger(__name__)
+
 
 def get_missions_for_user(user_id, filters=None):
-    """Return all open missions, scored by relevance for the user."""
-    missions = list_missions(filters={'status': 'open', **(filters or {})})
+    """Return all open missions, scored by relevance for the user. Returns (list, error)."""
+    try:
+        missions = list_missions(filters={'status': 'open', **(filters or {})})
+    except Exception as e:
+        logger.exception("Failed to list missions")
+        return [], str(e)
+
     user = get_user(user_id) or {}
     user_interests = set(user.get('interests') or [])
-
-    # Optionally filter by college year
-    if filters and filters.get('year'):
-        pass
 
     for mission in missions:
         mission['match_score'] = score_mission_for_user(mission, user_interests)
 
     missions.sort(key=lambda m: m.get('match_score', 0), reverse=True)
-    return missions
+    return missions, None
 
 
 def create_new_mission(data, creator_id, creator_type='user'):

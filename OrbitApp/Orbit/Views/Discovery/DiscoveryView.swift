@@ -703,6 +703,9 @@ struct DiscoveryView: View {
     @State private var planetPositions: [UUID: CGPoint] = [:]
     @State private var selectedMission: Mission? = nil
     @State private var selectedSignal: Signal? = nil
+    @State private var missions: [Mission] = []
+    @State private var signals: [Signal] = []
+    @State private var dataLoaded = false
 
     private let minRadius: CGFloat = 110
     private let maxRadius: CGFloat = 170
@@ -815,6 +818,14 @@ struct DiscoveryView: View {
             }
             .onAppear {
                 generateStars(in: geometry.size)
+            }
+            .task {
+                guard !dataLoaded else { return }
+                async let fetchedMissions = try? MissionService.shared.listMissions()
+                async let fetchedSignals = try? SignalService.shared.discoverSignals()
+                missions = await fetchedMissions ?? []
+                signals = await fetchedSignals ?? []
+                dataLoaded = true
                 generatePlanets()
             }
             .sheet(item: $selectedMission) { mission in
@@ -851,7 +862,7 @@ struct DiscoveryView: View {
         let minAngleSeparation = 0.6
 
         // Add missions (fixed-date activities)
-        for (index, mission) in MockData.mockMissions.enumerated() {
+        for (index, mission) in missions.enumerated() {
             let angle = findAvailableAngle(usedAngles: &usedAngles, minSeparation: minAngleSeparation)
             let color = DiscoveryTheme.missionColors[index % DiscoveryTheme.missionColors.count]
 
@@ -866,7 +877,7 @@ struct DiscoveryView: View {
         }
 
         // Add signals (spontaneous activity requests)
-        for (index, signal) in MockData.mockSignals.enumerated() {
+        for (index, signal) in signals.enumerated() {
             let angle = findAvailableAngle(usedAngles: &usedAngles, minSeparation: minAngleSeparation)
             let color = DiscoveryTheme.signalColors[index % DiscoveryTheme.signalColors.count]
 

@@ -62,10 +62,8 @@ def validate_mission_data(data, is_update=False):
     errors = []
 
     if not is_update:
-        required = ['title', 'description']
-        for field in required:
-            if field not in data or not data[field]:
-                errors.append(f"{field} is required")
+        if 'title' not in data or not data['title']:
+            errors.append("title is required")
 
     if 'title' in data and isinstance(data['title'], str):
         if len(data['title']) > 200:

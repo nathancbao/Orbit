@@ -1,3 +1,4 @@
+import logging
 import threading
 
 from flask import Blueprint, request, g
@@ -15,6 +16,8 @@ from OrbitServer.services.embedding_service import get_or_create_mission_embeddi
 from OrbitServer.models.models import (
     list_pods, get_user_pod_for_mission, record_action,
 )
+
+logger = logging.getLogger(__name__)
 
 missions_bp = Blueprint('missions', __name__, url_prefix='/api/missions')
 
@@ -37,20 +40,25 @@ def _annotate_pod_status(mission, user_id):
         "not_joined" -- user hasn't joined yet and at least one open pod has room
         "pod_full"   -- every pod is full or no pods exist with room
     """
-    mission_id = mission['id']
-    user_pod = get_user_pod_for_mission(mission_id, user_id)
-    if user_pod:
-        mission['user_pod_status'] = 'in_pod'
-        mission['user_pod_id'] = user_pod['id']
-        return
+    try:
+        mission_id = mission['id']
+        user_pod = get_user_pod_for_mission(mission_id, user_id)
+        if user_pod:
+            mission['user_pod_status'] = 'in_pod'
+            mission['user_pod_id'] = user_pod['id']
+            return
 
-    pods = list_pods(mission_id)
-    has_room = not pods or any(
-        p['status'] == 'open' and len(p.get('member_ids') or []) < p.get('max_size', 4)
-        for p in pods
-    )
-    mission['user_pod_status'] = 'not_joined' if has_room else 'pod_full'
-    mission['user_pod_id'] = None
+        pods = list_pods(mission_id)
+        has_room = not pods or any(
+            p['status'] == 'open' and len(p.get('member_ids') or []) < p.get('max_size', 4)
+            for p in pods
+        )
+        mission['user_pod_status'] = 'not_joined' if has_room else 'pod_full'
+        mission['user_pod_id'] = None
+    except Exception:
+        logger.exception("Failed to annotate pod status for mission %s", mission.get('id'))
+        mission['user_pod_status'] = 'not_joined'
+        mission['user_pod_id'] = None
 
 
 # ── GET /missions ────────────────────────────────────────────────────────────
@@ -66,7 +74,9 @@ def list_all():
     if year:
         filters['year'] = year
 
-    missions = get_missions_for_user(g.user_id, filters if filters else None)
+    missions, err = get_missions_for_user(g.user_id, filters if filters else None)
+    if err:
+        return error(err, 500)
 
     for mission in missions:
         _annotate_pod_status(mission, g.user_id)
@@ -83,7 +93,11 @@ def suggested():
         limit = min(int(request.args.get('limit', 5)), 10)
     except (TypeError, ValueError):
         limit = 5
-    missions = get_suggested_missions(g.user_id, limit=limit)
+    try:
+        missions = get_suggested_missions(g.user_id, limit=limit)
+    except Exception:
+        logger.exception("Failed to get suggested missions")
+        return success([])
 
     for mission in missions:
         _annotate_pod_status(mission, g.user_id)

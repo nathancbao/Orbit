@@ -119,7 +119,7 @@ def create_mission(data, creator_id, creator_type='user'):
     entity = datastore.Entity(key=key)
     entity.update({
         'title': data['title'],
-        'description': data['description'],
+        'description': data.get('description', ''),
         'tags': data.get('tags', []),
         'location': data.get('location', ''),
         'date': data.get('date', ''),
