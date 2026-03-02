@@ -21,23 +21,6 @@ sys.modules['google.cloud.datastore'] = mock_datastore
 sys.modules['google.cloud.datastore.query'] = mock_datastore.query
 sys.modules['google.cloud.storage'] = mock_storage
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 # Mock optional ML dependencies only when they cannot be imported.
 # If the real package is installed and compatible, leave it alone so that
 # lightfm-specific tests can exercise the real Dataset class.
@@ -63,4 +46,3 @@ def app():
 @pytest.fixture
 def client(app):
     return app.test_client()
-ddddddddddd
