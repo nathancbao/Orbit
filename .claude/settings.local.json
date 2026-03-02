@@ -37,7 +37,9 @@
       "Bash(rm:*)",
       "Bash(pip show fastembed lightfm 2>&1)",
       "Bash(pip index versions lightfm 2>&1 | head -5)",
-      "Bash(git push origin main 2>&1)"
+      "Bash(git push origin main 2>&1)",
+      "Bash(git config user.name && git config user.email)",
+      "Bash(git log --oneline -1 --format=\"%H %an <%ae>\" && git push -u origin push_notifs)"
     ]
   }
 }
