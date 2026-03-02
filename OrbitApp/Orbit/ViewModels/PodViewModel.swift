@@ -22,16 +22,17 @@ class PodViewModel: ObservableObject {
 
     func load() async {
         isLoading = true
-        do {
-            async let podResult = PodService.shared.getPod(id: podId)
-            async let msgsResult = ChatService.shared.getMessages(podId: podId)
-            async let votesResult = ChatService.shared.getVotes(podId: podId)
-            pod = try await podResult
-            messages = try await msgsResult
-            votes = try await votesResult
-        } catch {
-            errorMessage = error.localizedDescription
-        }
+
+        // Each request is independent — one failure must not block the others.
+        do { pod = try await PodService.shared.getPod(id: podId) }
+        catch { errorMessage = error.localizedDescription }
+
+        do { messages = try await ChatService.shared.getMessages(podId: podId) }
+        catch { /* empty messages is fine for a new pod */ }
+
+        do { votes = try await ChatService.shared.getVotes(podId: podId) }
+        catch { /* empty votes is fine for a new pod */ }
+
         isLoading = false
     }
 

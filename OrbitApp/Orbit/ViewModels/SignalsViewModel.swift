@@ -27,7 +27,8 @@ class SignalsViewModel: ObservableObject {
     // MARK: - Load
 
     func loadSignals() async {
-        guard !hasLoaded else { return }
+        // Only skip if we already have data. If previous load failed (empty), retry.
+        guard !hasLoaded || (discoverSignals.isEmpty && mySignals.isEmpty) else { return }
         isLoading = true
         defer { isLoading = false }
 

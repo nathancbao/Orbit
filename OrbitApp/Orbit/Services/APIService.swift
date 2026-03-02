@@ -192,8 +192,7 @@ class APIService {
 
         } catch let error as NetworkError {
             throw error
-        } catch let error as DecodingError {
-            print("Decoding error: \(error)")  // Helpful for debugging
+        } catch is DecodingError {
             throw NetworkError.decodingError
         } catch {
             throw NetworkError.networkError(error)

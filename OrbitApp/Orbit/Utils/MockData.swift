@@ -58,7 +58,9 @@ enum MockData {
                 ],
                 status: .pending,
                 creatorId: 0,
-                createdAt: ISO8601DateFormatter().string(from: today)
+                createdAt: ISO8601DateFormatter().string(from: today),
+                podId: nil,
+                links: nil
             ),
             Signal(
                 id: "mock-signal-2",
@@ -66,7 +68,7 @@ enum MockData {
                 description: "Chill study session, bring your laptop",
                 activityCategory: .study,
                 customActivityName: nil,
-                minGroupSize: 2,
+                minGroupSize: 3,
                 maxGroupSize: 5,
                 availability: [
                     AvailabilitySlot(date: today.addingDays(0), timeBlocks: [.afternoon]),
@@ -76,7 +78,9 @@ enum MockData {
                 ],
                 status: .active,
                 creatorId: 1,
-                createdAt: ISO8601DateFormatter().string(from: today.addingDays(-1))
+                createdAt: ISO8601DateFormatter().string(from: today.addingDays(-1)),
+                podId: nil,
+                links: ["https://example.com/study-group"]
             ),
             Signal(
                 id: "mock-signal-3",
@@ -93,7 +97,9 @@ enum MockData {
                 ],
                 status: .pending,
                 creatorId: 0,
-                createdAt: ISO8601DateFormatter().string(from: today)
+                createdAt: ISO8601DateFormatter().string(from: today),
+                podId: nil,
+                links: nil
             ),
         ]
     }

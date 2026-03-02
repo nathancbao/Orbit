@@ -17,6 +17,16 @@ struct ChatMessage: Codable, Identifiable {
         case createdAt = "created_at"
     }
 
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = (try? container.decode(String.self, forKey: .id)) ?? UUID().uuidString
+        podId = (try? container.decode(String.self, forKey: .podId)) ?? ""
+        userId = (try? container.decode(Int.self, forKey: .userId)) ?? 0
+        content = (try? container.decode(String.self, forKey: .content)) ?? ""
+        messageType = (try? container.decode(String.self, forKey: .messageType)) ?? "text"
+        createdAt = (try? container.decode(String.self, forKey: .createdAt)) ?? ""
+    }
+
     var isSystemMessage: Bool {
         messageType != "text"
     }
@@ -40,5 +50,18 @@ struct Vote: Codable, Identifiable {
         case voteType = "vote_type"
         case options, votes, status, result
         case createdAt = "created_at"
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = (try? container.decode(String.self, forKey: .id)) ?? UUID().uuidString
+        podId = (try? container.decode(String.self, forKey: .podId)) ?? ""
+        createdBy = (try? container.decode(Int.self, forKey: .createdBy)) ?? 0
+        voteType = (try? container.decode(String.self, forKey: .voteType)) ?? "time"
+        options = (try? container.decode([String].self, forKey: .options)) ?? []
+        votes = (try? container.decode([String: Int].self, forKey: .votes)) ?? [:]
+        status = (try? container.decode(String.self, forKey: .status)) ?? "open"
+        result = try? container.decodeIfPresent(String.self, forKey: .result)
+        createdAt = (try? container.decode(String.self, forKey: .createdAt)) ?? ""
     }
 }
