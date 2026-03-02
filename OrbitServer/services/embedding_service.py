@@ -1,10 +1,10 @@
 """
-Embedding service — local fastembed model, no external API.
+Embedding service -- local fastembed model, no external API.
 
 Uses BAAI/bge-small-en-v1.5 (~24MB, ONNX Runtime) for semantic embeddings.
 No API keys required. Model is lazy-loaded on first call and kept in memory.
 
-Event embeddings are generated once and persisted to Datastore, then cached
+Mission embeddings are generated once and persisted to Datastore, then cached
 in-process. User embeddings are generated fresh per request from interests.
 
 cosine_similarity() is exposed as a shared math helper for other services.
@@ -16,11 +16,11 @@ from typing import Optional
 
 import numpy as np
 
-from OrbitServer.models.models import get_event, store_event_embedding
+from OrbitServer.models.models import get_mission, store_mission_embedding
 
 logger = logging.getLogger(__name__)
 
-# In-process cache: event_id (int) -> np.ndarray
+# In-process cache: mission_id (int) -> np.ndarray
 _embedding_cache: dict = {}
 _cache_lock = threading.Lock()
 
@@ -50,11 +50,11 @@ def _generate_embedding(text: str) -> Optional[np.ndarray]:
         return None
 
 
-def _build_event_text(event: dict) -> str:
-    """Combine event fields into a document string."""
-    title = event.get('title', '').strip()
-    description = event.get('description', '').strip()
-    tags = event.get('tags') or []
+def _build_mission_text(mission: dict) -> str:
+    """Combine mission fields into a document string."""
+    title = mission.get('title', '').strip()
+    description = mission.get('description', '').strip()
+    tags = mission.get('tags') or []
     tag_str = ', '.join(tags) if tags else ''
     parts = [p for p in [title, description, f"Tags: {tag_str}" if tag_str else ''] if p]
     return '. '.join(parts)
@@ -65,42 +65,42 @@ def _build_user_text(interests: list) -> str:
     return f"Interests: {', '.join(interests)}" if interests else "No interests specified"
 
 
-def get_or_create_event_embedding(event_id: int) -> Optional[np.ndarray]:
+def get_or_create_mission_embedding(mission_id: int) -> Optional[np.ndarray]:
     """
-    Return the embedding for an event, generating and persisting it if needed.
+    Return the embedding for a mission, generating and persisting it if needed.
 
     Lookup order:
-      L1 — in-process cache
-      L2 — Datastore (already stored from a previous request)
-      L3 — generate with fastembed, store to Datastore, cache in-process
+      L1 -- in-process cache
+      L2 -- Datastore (already stored from a previous request)
+      L3 -- generate with fastembed, store to Datastore, cache in-process
 
-    Returns None if the event doesn't exist or generation fails.
+    Returns None if the mission doesn't exist or generation fails.
     """
-    event_id = int(event_id)
+    mission_id = int(mission_id)
 
     # L1: in-process cache
     with _cache_lock:
-        if event_id in _embedding_cache:
-            return _embedding_cache[event_id]
+        if mission_id in _embedding_cache:
+            return _embedding_cache[mission_id]
 
     # L2: Datastore
-    event = get_event(event_id)
-    if not event:
+    mission = get_mission(mission_id)
+    if not mission:
         return None
 
-    stored = event.get('embedding')
+    stored = mission.get('embedding')
     if stored and len(stored) > 0:
         vec = np.array(stored, dtype=np.float32)
         with _cache_lock:
-            _embedding_cache[event_id] = vec
+            _embedding_cache[mission_id] = vec
         return vec
 
     # L3: generate, persist, cache
-    vec = _generate_embedding(_build_event_text(event))
+    vec = _generate_embedding(_build_mission_text(mission))
     if vec is not None:
-        store_event_embedding(event_id, vec.tolist())
+        store_mission_embedding(mission_id, vec.tolist())
         with _cache_lock:
-            _embedding_cache[event_id] = vec
+            _embedding_cache[mission_id] = vec
     return vec
 
 
@@ -118,7 +118,7 @@ def cosine_similarity(a: np.ndarray, b: np.ndarray) -> float:
     return float(np.dot(a, b) / (norm_a * norm_b))
 
 
-def invalidate_cache(event_id: int) -> None:
-    """Remove an event from the in-process cache."""
+def invalidate_cache(mission_id: int) -> None:
+    """Remove a mission from the in-process cache."""
     with _cache_lock:
-        _embedding_cache.pop(int(event_id), None)
+        _embedding_cache.pop(int(mission_id), None)

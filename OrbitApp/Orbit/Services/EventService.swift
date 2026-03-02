@@ -12,7 +12,7 @@ class MissionService {
     private init() {}
 
     func listMissions(tag: String? = nil, year: String? = nil) async throws -> [Mission] {
-        var endpoint = Constants.API.Endpoints.events
+        var endpoint = Constants.API.Endpoints.missions
         var params: [String] = []
         if let tag = tag { params.append("tag=\(tag)") }
         if let year = year { params.append("year=\(year)") }
@@ -22,14 +22,14 @@ class MissionService {
 
     func suggestedMissions() async throws -> [Mission] {
         return try await APIService.shared.request(
-            endpoint: Constants.API.Endpoints.suggestedEvents,
+            endpoint: Constants.API.Endpoints.suggestedMissions,
             authenticated: true
         )
     }
 
     func getMission(id: String) async throws -> Mission {
         return try await APIService.shared.request(
-            endpoint: Constants.API.Endpoints.event(id),
+            endpoint: Constants.API.Endpoints.mission(id),
             authenticated: true
         )
     }
@@ -42,28 +42,28 @@ class MissionService {
             "date": date, "max_pod_size": maxPodSize,
         ]
         return try await APIService.shared.request(
-            endpoint: Constants.API.Endpoints.events,
+            endpoint: Constants.API.Endpoints.missions,
             method: "POST", body: body, authenticated: true
         )
     }
 
-    func joinMission(id: String) async throws -> EventPod {
+    func joinMission(id: String) async throws -> Pod {
         return try await APIService.shared.request(
-            endpoint: Constants.API.Endpoints.joinEvent(id),
+            endpoint: Constants.API.Endpoints.joinMission(id),
             method: "POST", authenticated: true
         )
     }
 
     func leaveMission(id: String) async throws {
         let _: EmptyResponse = try await APIService.shared.request(
-            endpoint: Constants.API.Endpoints.leaveEvent(id),
+            endpoint: Constants.API.Endpoints.leaveMission(id),
             method: "DELETE", authenticated: true
         )
     }
 
     func skipMission(id: String) async throws {
         let _: EmptyResponse = try await APIService.shared.request(
-            endpoint: Constants.API.Endpoints.skipEvent(id),
+            endpoint: Constants.API.Endpoints.skipMission(id),
             method: "POST", authenticated: true
         )
     }
@@ -75,7 +75,7 @@ struct EmptyResponse: Codable {
 
 
 // MARK: - Signal Service
-// API client for signals (backend: /api/missions).
+// API client for signals (backend: /api/signals).
 
 class SignalService {
     static let shared = SignalService()

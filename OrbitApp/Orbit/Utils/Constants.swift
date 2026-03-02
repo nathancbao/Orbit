@@ -23,13 +23,13 @@ enum Constants {
             static let myRsvps = "/users/me/rsvps"
             static let uploadPhoto = "/users/me/photo"
 
-            // Events
-            static let events = "/events"
-            static let suggestedEvents = "/events/suggested"
-            static func event(_ id: String) -> String { "/events/\(id)" }
-            static func joinEvent(_ id: String) -> String { "/events/\(id)/join" }
-            static func leaveEvent(_ id: String) -> String { "/events/\(id)/leave" }
-            static func skipEvent(_ id: String) -> String { "/events/\(id)/skip" }
+            // Missions (fixed-date events)
+            static let missions = "/missions"
+            static let suggestedMissions = "/missions/suggested"
+            static func mission(_ id: String) -> String { "/missions/\(id)" }
+            static func joinMission(_ id: String) -> String { "/missions/\(id)/join" }
+            static func leaveMission(_ id: String) -> String { "/missions/\(id)/leave" }
+            static func skipMission(_ id: String) -> String { "/missions/\(id)/skip" }
 
             // Pods
             static func pod(_ id: String) -> String { "/pods/\(id)" }
@@ -38,11 +38,11 @@ enum Constants {
             static func podRename(_ id: String) -> String { "/pods/\(id)/name" }
             static func podLeave(_ id: String) -> String { "/pods/\(id)/leave" }
 
-            // Signals (backend: /api/missions)
-            static let signals = "/missions"
-            static let discoverSignals = "/missions/discover"
-            static func signal(_ id: String) -> String { "/missions/\(id)" }
-            static func rsvpSignal(_ id: String) -> String { "/missions/\(id)/rsvp" }
+            // Signals (spontaneous activity requests)
+            static let signals = "/signals"
+            static let discoverSignals = "/signals/discover"
+            static func signal(_ id: String) -> String { "/signals/\(id)" }
+            static func rsvpSignal(_ id: String) -> String { "/signals/\(id)/rsvp" }
 
             // Chat
             static func podMessages(_ id: String) -> String { "/pods/\(id)/messages" }

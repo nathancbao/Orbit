@@ -18,7 +18,13 @@ mock_google.cloud.storage = mock_storage
 sys.modules['google'] = mock_google
 sys.modules['google.cloud'] = mock_google.cloud
 sys.modules['google.cloud.datastore'] = mock_datastore
+sys.modules['google.cloud.datastore.query'] = mock_datastore.query
 sys.modules['google.cloud.storage'] = mock_storage
+
+# Mock optional ML dependencies that may not be installed in test env
+for mod_name in ('lightfm', 'lightfm.data', 'fastembed'):
+    if mod_name not in sys.modules:
+        sys.modules[mod_name] = MagicMock()
 
 # Now the datastore.Client() call in models/models.py will return a MagicMock,
 # and datastore.Entity will also be a MagicMock.

@@ -5,7 +5,7 @@ import SwiftUI
 
 struct PodsView: View {
     @Binding var userProfile: Profile
-    @State private var pods: [EventPod] = []
+    @State private var pods: [Pod] = []
     @State private var rsvpedSignals: [Signal] = []
     @State private var isLoading = false
     @State private var showProfile = false
@@ -38,7 +38,7 @@ struct PodsView: View {
                     ScrollView {
                         VStack(spacing: 14) {
                             ForEach(pods) { pod in
-                                PodRowCard(pod: pod, eventTitle: pod.displayName) {
+                                PodRowCard(pod: pod, title: pod.displayName) {
                                     Task { await loadData() }
                                 }
                                     .padding(.horizontal, 20)
@@ -88,7 +88,7 @@ struct PodsView: View {
 
     private func loadData() async {
         isLoading = true
-        async let podsResult: [EventPod]? = try? APIService.shared.request(
+        async let podsResult: [Pod]? = try? APIService.shared.request(
             endpoint: Constants.API.Endpoints.myPods,
             authenticated: true
         )
@@ -105,8 +105,8 @@ struct PodsView: View {
 // MARK: - Pod Row Card
 
 struct PodRowCard: View {
-    let pod: EventPod
-    let eventTitle: String
+    let pod: Pod
+    let title: String
     var onDismiss: (() -> Void)? = nil
     @State private var showPod = false
 
@@ -124,7 +124,7 @@ struct PodRowCard: View {
                     .cornerRadius(2)
 
                 VStack(alignment: .leading, spacing: 6) {
-                    Text(eventTitle)
+                    Text(title)
                         .font(.headline)
                         .foregroundColor(.primary)
 
@@ -163,7 +163,7 @@ struct PodRowCard: View {
         .sheet(isPresented: $showPod, onDismiss: {
             onDismiss?()
         }) {
-            PodView(podId: pod.id, eventTitle: eventTitle)
+            PodView(podId: pod.id, title: title)
         }
     }
 }
@@ -227,7 +227,7 @@ struct SignalRsvpCard: View {
             onDismiss?()
         }) {
             if let podId = signal.podId {
-                PodView(podId: podId, eventTitle: signal.displayTitle)
+                PodView(podId: podId, title: signal.displayTitle)
             } else {
                 SignalDetailView(signal: signal)
             }

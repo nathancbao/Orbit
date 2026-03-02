@@ -1,15 +1,15 @@
 import datetime
 
 from OrbitServer.models.models import (
-    get_event_pod, create_chat_message, list_chat_messages,
+    get_pod, create_chat_message, list_chat_messages,
     create_vote, get_vote, update_vote, list_votes_for_pod,
-    update_event_pod, transactional_vote_update,
+    update_pod, transactional_vote_update,
 )
 from OrbitServer.utils.profanity import filter_message
 
 
 def get_messages(pod_id, requesting_user_id):
-    pod = get_event_pod(pod_id)
+    pod = get_pod(pod_id)
     if not pod:
         return None, "Pod not found"
     if int(requesting_user_id) not in (pod.get('member_ids') or []):
@@ -19,7 +19,7 @@ def get_messages(pod_id, requesting_user_id):
 
 
 def send_message(pod_id, user_id, content):
-    pod = get_event_pod(pod_id)
+    pod = get_pod(pod_id)
     if not pod:
         return None, "Pod not found"
     if int(user_id) not in (pod.get('member_ids') or []):
@@ -34,7 +34,7 @@ def send_message(pod_id, user_id, content):
 
 
 def create_poll(pod_id, user_id, vote_type, options):
-    pod = get_event_pod(pod_id)
+    pod = get_pod(pod_id)
     if not pod:
         return None, "Pod not found"
     member_ids = pod.get('member_ids') or []
@@ -53,14 +53,14 @@ def create_poll(pod_id, user_id, vote_type, options):
     # Post a system message announcing the vote
     create_chat_message(
         pod_id, user_id,
-        f"📊 New vote: pick a {vote_type}! Vote ID: {vote['id']}",
+        f"\U0001f4ca New vote: pick a {vote_type}! Vote ID: {vote['id']}",
         message_type='vote_created',
     )
     return vote, None
 
 
 def respond_to_vote(pod_id, vote_id, user_id, option_index):
-    pod = get_event_pod(pod_id)
+    pod = get_pod(pod_id)
     if not pod:
         return None, "Pod not found"
     member_ids = pod.get('member_ids') or []
@@ -86,7 +86,6 @@ def respond_to_vote(pod_id, vote_id, user_id, option_index):
         entity['votes'] = votes_map
 
         # Auto-close when all expected voters have voted
-        # Use expected_voters from vote creation time to avoid race conditions
         expected_voters = entity.get('expected_voters') or len(member_ids)
         if len(votes_map) >= expected_voters:
             opts = entity.get('options') or []
@@ -101,7 +100,7 @@ def respond_to_vote(pod_id, vote_id, user_id, option_index):
 
     if close_result['should_close']:
         pod_field = 'scheduled_time' if close_result['vote_type'] == 'time' else 'scheduled_place'
-        update_event_pod(pod_id, {pod_field: close_result['winner']})
+        update_pod(pod_id, {pod_field: close_result['winner']})
         create_chat_message(
             pod_id, user_id,
             f"Vote closed! {close_result['vote_type'].capitalize()} set to: {close_result['winner']}",
@@ -130,7 +129,7 @@ def _tally_votes(votes_map, options):
 
 
 def get_votes_for_pod(pod_id, requesting_user_id):
-    pod = get_event_pod(pod_id)
+    pod = get_pod(pod_id)
     if not pod:
         return None, "Pod not found"
     if int(requesting_user_id) not in (pod.get('member_ids') or []):

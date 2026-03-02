@@ -5,7 +5,7 @@ import SwiftUI
 
 struct PodView: View {
     let podId: String
-    let eventTitle: String
+    let title: String
 
     @StateObject private var viewModel: PodViewModel
     @State private var showVoteSheet = false
@@ -24,12 +24,12 @@ struct PodView: View {
     }()
 
     private var displayTitle: String {
-        viewModel.pod?.name ?? eventTitle
+        viewModel.pod?.name ?? title
     }
 
-    init(podId: String, eventTitle: String) {
+    init(podId: String, title: String) {
         self.podId = podId
-        self.eventTitle = eventTitle
+        self.title = title
         _viewModel = StateObject(wrappedValue: PodViewModel(podId: podId))
     }
 

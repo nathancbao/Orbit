@@ -2,7 +2,7 @@ from flask import Blueprint, request, g
 
 from OrbitServer.utils.responses import success, error
 from OrbitServer.utils.auth import require_auth
-from OrbitServer.models.models import get_event_pod, update_event_pod
+from OrbitServer.models.models import get_pod, update_pod
 from OrbitServer.services.pod_service import (
     get_pod_with_members, vote_to_kick, confirm_attendance, leave_pod,
 )
@@ -13,7 +13,7 @@ pods_bp = Blueprint('pods', __name__, url_prefix='/api/pods')
 
 @pods_bp.route('/<pod_id>', methods=['GET'])
 @require_auth
-def get_pod(pod_id):
+def get_pod_detail(pod_id):
     pod, err, status_code = get_pod_with_members(pod_id, g.user_id)
     if err:
         return error(err, status_code)
@@ -30,7 +30,7 @@ def rename(pod_id):
     if len(name) > 100:
         return error("name must be 100 characters or fewer", 400)
 
-    pod = get_event_pod(pod_id)
+    pod = get_pod(pod_id)
     if not pod:
         return error("Pod not found", 404)
 
@@ -38,7 +38,7 @@ def rename(pod_id):
     if uid not in (pod.get('member_ids') or []):
         return error("You are not a member of this pod", 403)
 
-    updated = update_event_pod(pod_id, {'name': name})
+    updated = update_pod(pod_id, {'name': name})
     return success(updated)
 
 

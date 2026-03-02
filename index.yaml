@@ -1,20 +1,20 @@
 indexes:
 
-  # ── UserEventHistory ─────────────────────────────────────────────────────────
-  # get_user_event_history: filter by user_id, ORDER BY created_at DESC
-  # Used by the ML recommendation engine (get_suggested_events)
-  - kind: UserEventHistory
+  # ── UserHistory ─────────────────────────────────────────────────────────────
+  # get_user_history: filter by user_id, ORDER BY created_at DESC
+  # Used by the ML recommendation engine (get_suggested_missions)
+  - kind: UserHistory
     properties:
       - name: user_id
       - name: created_at
         direction: desc
 
-  # get_history_entry: filter by user_id AND event_id (two equality filters)
-  # Used to check if a user already interacted with a specific event
-  - kind: UserEventHistory
+  # get_history_entry: filter by user_id AND mission_id (two equality filters)
+  # Used to check if a user already interacted with a specific mission
+  - kind: UserHistory
     properties:
       - name: user_id
-      - name: event_id
+      - name: mission_id
 
   # ── ChatMessage ───────────────────────────────────────────────────────────────
   # list_chat_messages: filter by pod_id, ORDER BY created_at ASC
@@ -24,18 +24,18 @@ indexes:
       - name: pod_id
       - name: created_at
 
-  # ── Mission (Signal / activity request) ──────────────────────────────────────
-  # list_missions_for_user: filter by creator_id, ORDER BY created_at DESC
-  # Used by GET /api/missions
-  - kind: Mission
+  # ── Signal (activity request) ─────────────────────────────────────────────────
+  # list_signals_for_user: filter by creator_id, ORDER BY created_at DESC
+  # Used by GET /api/signals
+  - kind: Signal
     properties:
       - name: creator_id
       - name: created_at
         direction: desc
 
-  # ── Event ─────────────────────────────────────────────────────────────────────
-  # list_events with tag + status filter: used by GET /events?tag=X
-  - kind: Event
+  # ── Mission (fixed-date activities) ────────────────────────────────────────────
+  # list_missions with tag + status filter: used by GET /missions?tag=X
+  - kind: Mission
     properties:
       - name: tags
       - name: status

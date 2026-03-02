@@ -22,11 +22,11 @@ enum DiscoveryTheme {
     static let textMuted = Color(hex: "94A3B8")
     static let glow = Color(hex: "3B82F6").opacity(0.08)
 
-    // Mission planets: bold, structured tones (blue, teal, green) — events with dates
-    static let eventColors: [Color] = [accentBlue, accentTeal, accentGreen]
+    // Mission planets: bold, structured tones (blue, teal, green) — fixed-date activities
+    static let missionColors: [Color] = [accentBlue, accentTeal, accentGreen]
 
     // Signal planets: warm, spontaneous tones (amber, pink, lavender) — anyone down?
-    static let missionColors: [Color] = [accentAmber, accentPink, accentLavender]
+    static let signalColors: [Color] = [accentAmber, accentPink, accentLavender]
 }
 
 // MARK: - Color Extension
@@ -850,10 +850,10 @@ struct DiscoveryView: View {
         var usedAngles: [Double] = []
         let minAngleSeparation = 0.6
 
-        // Add missions (fixed-date events)
+        // Add missions (fixed-date activities)
         for (index, mission) in MockData.mockMissions.enumerated() {
             let angle = findAvailableAngle(usedAngles: &usedAngles, minSeparation: minAngleSeparation)
-            let color = DiscoveryTheme.eventColors[index % DiscoveryTheme.eventColors.count]
+            let color = DiscoveryTheme.missionColors[index % DiscoveryTheme.missionColors.count]
 
             allPlanets.append(PlanetNode(
                 type: .mission(mission),
@@ -868,7 +868,7 @@ struct DiscoveryView: View {
         // Add signals (spontaneous activity requests)
         for (index, signal) in MockData.mockSignals.enumerated() {
             let angle = findAvailableAngle(usedAngles: &usedAngles, minSeparation: minAngleSeparation)
-            let color = DiscoveryTheme.missionColors[index % DiscoveryTheme.missionColors.count]
+            let color = DiscoveryTheme.signalColors[index % DiscoveryTheme.signalColors.count]
 
             allPlanets.append(PlanetNode(
                 type: .signal(signal),

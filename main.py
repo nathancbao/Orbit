@@ -5,10 +5,10 @@ from flask import Flask, jsonify
 from OrbitServer.utils.rate_limit import limiter
 from OrbitServer.api.auth import auth_bp
 from OrbitServer.api.users import users_bp
-from OrbitServer.api.events import events_bp
+from OrbitServer.api.missions import missions_bp
 from OrbitServer.api.pods import pods_bp
 from OrbitServer.api.chat import chat_bp
-from OrbitServer.api.missions import missions_bp
+from OrbitServer.api.signals import signals_bp
 
 app = Flask(__name__)
 
@@ -16,10 +16,10 @@ limiter.init_app(app)
 
 app.register_blueprint(auth_bp)
 app.register_blueprint(users_bp)
-app.register_blueprint(events_bp)
+app.register_blueprint(missions_bp)
 app.register_blueprint(pods_bp)
 app.register_blueprint(chat_bp)
-app.register_blueprint(missions_bp)
+app.register_blueprint(signals_bp)
 
 
 @app.route('/')
@@ -34,12 +34,12 @@ def health():
 
 @app.route('/_ah/warmup')
 def warmup():
-    """GAE warmup handler — pre-establishes the Datastore gRPC connection
+    """GAE warmup handler -- pre-establishes the Datastore gRPC connection
     so the first real user request doesn't pay cold-start latency."""
     from OrbitServer.models.models import client
     try:
         # Lightweight keys-only query to force gRPC channel init
-        q = client.query(kind='Mission')
+        q = client.query(kind='Signal')
         q.keys_only()
         list(q.fetch(limit=1))
     except Exception:

@@ -4,7 +4,7 @@ class PodService {
     static let shared = PodService()
     private init() {}
 
-    func getPod(id: String) async throws -> EventPod {
+    func getPod(id: String) async throws -> Pod {
         return try await APIService.shared.request(
             endpoint: Constants.API.Endpoints.pod(id),
             authenticated: true
@@ -29,7 +29,7 @@ class PodService {
         )
     }
 
-    func renamePod(podId: String, name: String) async throws -> EventPod {
+    func renamePod(podId: String, name: String) async throws -> Pod {
         let body: [String: Any] = ["name": name]
         return try await APIService.shared.request(
             endpoint: Constants.API.Endpoints.podRename(podId),
@@ -49,12 +49,12 @@ class PodService {
 }
 
 struct KickResponse: Codable {
-    var pod: EventPod
+    var pod: Pod
     var kicked: Bool
     var message: String
 }
 
 struct ConfirmResponse: Codable {
-    var pod: EventPod
+    var pod: Pod
     var message: String
 }

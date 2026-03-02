@@ -11,10 +11,6 @@ def validate_edu_email(email):
     # Check max length (RFC 5321)
     if len(email) > 254:
         return False, "Email address too long"
-    # More robust email regex:
-    # - No consecutive dots
-    # - No leading/trailing dots in local part
-    # - Reasonable character restrictions
     if not re.match(r'^[a-zA-Z0-9]([a-zA-Z0-9._%+-]*[a-zA-Z0-9])?@[a-zA-Z0-9]([a-zA-Z0-9.-]*[a-zA-Z0-9])?\.[a-zA-Z]{2,}$', email):
         return False, "Invalid email format"
     # Reject consecutive dots
@@ -62,7 +58,7 @@ def validate_profile_data(data):
     return True, None
 
 
-def validate_event_data(data, is_update=False):
+def validate_mission_data(data, is_update=False):
     errors = []
 
     if not is_update:
@@ -104,7 +100,7 @@ def validate_event_data(data, is_update=False):
     return True, None
 
 
-# ── Mission / Signal validation ───────────────────────────────────────────────
+# ── Signal validation ────────────────────────────────────────────────────────
 # Must match Swift ActivityCategory raw values exactly:
 #   case sports  = "Sports"
 #   case food    = "Food"
@@ -120,7 +116,7 @@ _ACTIVITY_CATEGORIES = {
 _TIME_BLOCKS = {'morning', 'afternoon', 'evening'}
 
 
-def validate_mission_data(data):
+def validate_signal_data(data):
     errors = []
 
     category = data.get('activity_category')

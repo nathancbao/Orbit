@@ -1,18 +1,18 @@
 """
-Hybrid multi-signal recommendation engine for Orbit events.
+Hybrid multi-signal recommendation engine for Orbit missions.
 
 Scoring formula (all signals normalized to [0, 1] before weighting):
-    score = 0.30 * tfidf_cosine      — keyword/tag content similarity
-          + 0.20 * semantic_cosine   — meaning-level similarity via fastembed
-          + 0.25 * lightfm_score     — collaborative filtering (learned from all users)
-          + 0.15 * behavioral_decay  — weighted join/skip history with temporal decay
-          + 0.10 * trust_weight      — user reliability signal
+    score = 0.30 * tfidf_cosine      -- keyword/tag content similarity
+          + 0.20 * semantic_cosine   -- meaning-level similarity via fastembed
+          + 0.25 * lightfm_score     -- collaborative filtering (learned from all users)
+          + 0.15 * behavioral_decay  -- weighted join/skip history with temporal decay
+          + 0.10 * trust_weight      -- user reliability signal
 
 Degrades gracefully:
-  - No interaction history → behavioral_decay = 0.0
-  - No interests → tfidf_cosine = 0.0
-  - fastembed unavailable → semantic_cosine = 0.0
-  - LightFM not yet trained or user unknown → lightfm_score = 0.0
+  - No interaction history -> behavioral_decay = 0.0
+  - No interests -> tfidf_cosine = 0.0
+  - fastembed unavailable -> semantic_cosine = 0.0
+  - LightFM not yet trained or user unknown -> lightfm_score = 0.0
 """
 
 import datetime
@@ -24,9 +24,9 @@ import numpy as np
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity as sk_cosine
 
-from OrbitServer.models.models import list_events, get_profile, get_user_event_history
+from OrbitServer.models.models import list_missions, get_user, get_user_history
 from OrbitServer.services.embedding_service import (
-    get_or_create_event_embedding, get_user_embedding, cosine_similarity,
+    get_or_create_mission_embedding, get_user_embedding, cosine_similarity,
 )
 from OrbitServer.services.lightfm_service import get_lightfm_scores
 
@@ -40,7 +40,7 @@ W_BEHAVIORAL = 0.15
 W_TRUST      = 0.10
 
 # ── Behavioral decay parameters ────────────────────────────────────────────────
-DECAY_LAMBDA = 0.05   # exp(-0.05 * days), half-life ≈ 14 days
+DECAY_LAMBDA = 0.05   # exp(-0.05 * days), half-life ~ 14 days
 EPSILON = 1e-8
 
 ACTION_SCORES = {
@@ -53,10 +53,10 @@ ATTENDED_BONUS = 0.2  # added to 'joined' score when attended=True
 
 # ── TF-IDF helpers ─────────────────────────────────────────────────────────────
 
-def _event_to_doc(event: dict) -> str:
-    title = event.get('title', '')
-    desc = event.get('description', '')
-    tags = event.get('tags') or []
+def _mission_to_doc(mission: dict) -> str:
+    title = mission.get('title', '')
+    desc = mission.get('description', '')
+    tags = mission.get('tags') or []
     tag_str = ' '.join(tags * 2)  # double-weight tags
     return f"{title} {desc} {tag_str}".strip()
 
@@ -65,17 +65,17 @@ def _interests_to_doc(interests: list) -> str:
     return ' '.join(list(interests) * 2)  # double-weight
 
 
-def _compute_tfidf_scores(user_interests: list, events: list) -> dict:
+def _compute_tfidf_scores(user_interests: list, missions: list) -> dict:
     """
-    Build TF-IDF corpus from events, add user interest doc, return
-    {event_id: cosine_similarity_with_user} for each event.
+    Build TF-IDF corpus from missions, add user interest doc, return
+    {mission_id: cosine_similarity_with_user} for each mission.
     """
-    if not events or not user_interests:
-        return {e['id']: 0.0 for e in events}
+    if not missions or not user_interests:
+        return {m['id']: 0.0 for m in missions}
 
     user_doc = _interests_to_doc(user_interests)
-    event_docs = [_event_to_doc(e) for e in events]
-    all_docs = event_docs + [user_doc]  # user doc is last
+    mission_docs = [_mission_to_doc(m) for m in missions]
+    all_docs = mission_docs + [user_doc]  # user doc is last
 
     try:
         vectorizer = TfidfVectorizer(
@@ -88,12 +88,12 @@ def _compute_tfidf_scores(user_interests: list, events: list) -> dict:
         )
         tfidf_matrix = vectorizer.fit_transform(all_docs)
         user_vec = tfidf_matrix[-1]
-        event_vecs = tfidf_matrix[:-1]
-        sims = sk_cosine(event_vecs, user_vec).flatten()
-        return {events[i]['id']: float(sims[i]) for i in range(len(events))}
+        mission_vecs = tfidf_matrix[:-1]
+        sims = sk_cosine(mission_vecs, user_vec).flatten()
+        return {missions[i]['id']: float(sims[i]) for i in range(len(missions))}
     except Exception as e:
         logger.warning(f"TF-IDF computation failed: {e}")
-        return {e['id']: 0.0 for e in events}
+        return {m['id']: 0.0 for m in missions}
 
 
 # ── Behavioral decay signal ────────────────────────────────────────────────────
@@ -108,7 +108,6 @@ def _action_score(action: str, attended) -> float:
 def _decay_weight(created_at) -> float:
     if created_at is None:
         return 0.0
-    # _entity_to_dict converts datetimes to ISO strings — parse back if needed
     if isinstance(created_at, str):
         try:
             created_at = datetime.datetime.fromisoformat(created_at.replace('Z', '+00:00'))
@@ -124,7 +123,7 @@ def _decay_weight(created_at) -> float:
 def _build_behavioral_profile(history: list) -> list:
     """
     Convert history to list of (tags_set, effective_weight) for positive-signal entries.
-    Skipped events are excluded (already filtered from candidates).
+    Skipped missions are excluded (already filtered from candidates).
     Legacy records without tags_snapshot are skipped silently.
     """
     profile = []
@@ -150,19 +149,19 @@ def _jaccard(set_a: set, set_b: set) -> float:
     return len(set_a & set_b) / union if union else 0.0
 
 
-def _compute_behavioral_score(event_tags: set, behavioral_profile: list) -> float:
+def _compute_behavioral_score(mission_tags: set, behavioral_profile: list) -> float:
     """
-    Weighted-average Jaccard similarity between event tags and history tag profile.
-    Formula: Σ(weight * jaccard(history_tags, event_tags)) / Σ(weights)
+    Weighted-average Jaccard similarity between mission tags and history tag profile.
+    Formula: sum(weight * jaccard(history_tags, mission_tags)) / sum(weights)
     Clamped to [0, 1].
     """
-    if not behavioral_profile or not event_tags:
+    if not behavioral_profile or not mission_tags:
         return 0.0
 
     weighted_sum = 0.0
     weight_total = 0.0
     for (hist_tags, weight) in behavioral_profile:
-        weighted_sum += weight * _jaccard(hist_tags, event_tags)
+        weighted_sum += weight * _jaccard(hist_tags, mission_tags)
         weight_total += weight
 
     if weight_total < EPSILON:
@@ -182,12 +181,12 @@ def _normalize_trust(trust_score) -> float:
 
 # ── Reason generation ──────────────────────────────────────────────────────────
 
-def _build_reason(event: dict, user_interests: set, behav_score: float) -> str:
-    event_tags = set(event.get('tags') or [])
-    overlap = user_interests & event_tags
+def _build_reason(mission: dict, user_interests: set, behav_score: float) -> str:
+    mission_tags = set(mission.get('tags') or [])
+    overlap = user_interests & mission_tags
 
     if behav_score > 0.4:
-        return "Based on events you've joined"
+        return "Based on missions you've joined"
     if overlap:
         tag_str = ', '.join(sorted(overlap)[:2])
         return f"Because you like {tag_str}"
@@ -196,48 +195,48 @@ def _build_reason(event: dict, user_interests: set, behav_score: float) -> str:
 
 # ── Public API ─────────────────────────────────────────────────────────────────
 
-def score_event_for_user(event: dict, user_interests: set, history_tags: set = None) -> float:
+def score_mission_for_user(mission: dict, user_interests: set, history_tags: set = None) -> float:
     """
-    Fast single-event scorer used by event_service.get_events_for_user (list view).
-    Uses Jaccard + tiny noise — no API calls — so it scales to N events without latency.
-    The full hybrid scorer is reserved for get_suggested_events().
+    Fast single-mission scorer used by mission_service.get_missions_for_user (list view).
+    Uses Jaccard + tiny noise -- no API calls -- so it scales to N missions without latency.
+    The full hybrid scorer is reserved for get_suggested_missions().
     history_tags parameter kept for backward compatibility.
     """
-    event_tags = set(event.get('tags') or [])
-    score = _jaccard(user_interests, event_tags)
+    mission_tags = set(mission.get('tags') or [])
+    score = _jaccard(user_interests, mission_tags)
     return min(1.0, score + random.uniform(0, 0.05))
 
 
-def get_suggested_events(user_id, limit=5) -> list:
+def get_suggested_missions(user_id, limit=5) -> list:
     """
-    Return up to `limit` suggested events with multi-signal hybrid scoring.
+    Return up to `limit` suggested missions with multi-signal hybrid scoring.
 
     Pipeline:
-      1. Load profile (interests, trust_score)
-      2. Load history → joined/skipped ID sets + behavioral profile
-      3. Load open events, filter already-acted-on
+      1. Load user (interests, trust_score)
+      2. Load history -> joined/skipped ID sets + behavioral profile
+      3. Load open missions, filter already-acted-on
       4. Batch TF-IDF cosine similarities
       5. Generate user embedding for semantic scoring
       6. Batch LightFM collaborative scores
-      7. Per-event: behavioral decay + semantic cosine + LightFM scores
-      8. Combine → sort → return top-limit with match_score + suggestion_reason
+      7. Per-mission: behavioral decay + semantic cosine + LightFM scores
+      8. Combine -> sort -> return top-limit with match_score + suggestion_reason
     """
-    # 1. Profile
-    profile = get_profile(user_id) or {}
-    interests_list = list(profile.get('interests') or [])
-    trust_weight = _normalize_trust(profile.get('trust_score', 0.0))
+    # 1. User
+    user = get_user(user_id) or {}
+    interests_list = list(user.get('interests') or [])
+    trust_weight = _normalize_trust(user.get('trust_score', 0.0))
 
     # 2. History
-    history = get_user_event_history(user_id)
-    joined_ids = {h['event_id'] for h in history if h.get('action') == 'joined'}
-    skipped_ids = {h['event_id'] for h in history if h.get('action') == 'skipped'}
+    history = get_user_history(user_id)
+    joined_ids = {h['mission_id'] for h in history if h.get('action') == 'joined'}
+    skipped_ids = {h['mission_id'] for h in history if h.get('action') == 'skipped'}
     behavioral_profile = _build_behavioral_profile(history)
 
-    # 3. Candidate events (open, not yet acted on)
-    all_events = list_events(filters={'status': 'open'})
+    # 3. Candidate missions (open, not yet acted on)
+    all_missions = list_missions(filters={'status': 'open'})
     candidates = [
-        e for e in all_events
-        if e['id'] not in joined_ids and e['id'] not in skipped_ids
+        m for m in all_missions
+        if m['id'] not in joined_ids and m['id'] not in skipped_ids
     ]
     if not candidates:
         return []
@@ -249,24 +248,24 @@ def get_suggested_events(user_id, limit=5) -> list:
     user_vec = get_user_embedding(interests_list)
 
     # 6. LightFM collaborative scores (batch)
-    lightfm_scores = get_lightfm_scores(user_id, [e['id'] for e in candidates])
+    lightfm_scores = get_lightfm_scores(user_id, [m['id'] for m in candidates])
 
     # 7. Score each candidate
     scored = []
     user_interests_set = set(interests_list)
-    for event in candidates:
-        eid = event['id']
-        event_tags = set(event.get('tags') or [])
+    for mission in candidates:
+        mid = mission['id']
+        mission_tags = set(mission.get('tags') or [])
 
-        tfidf_s = tfidf_scores.get(eid, 0.0)
-        behav_s = _compute_behavioral_score(event_tags, behavioral_profile)
-        lightfm_s = lightfm_scores.get(eid, 0.0)
+        tfidf_s = tfidf_scores.get(mid, 0.0)
+        behav_s = _compute_behavioral_score(mission_tags, behavioral_profile)
+        lightfm_s = lightfm_scores.get(mid, 0.0)
 
         semantic_s = 0.0
         if user_vec is not None:
-            event_vec = get_or_create_event_embedding(eid)
-            if event_vec is not None:
-                semantic_s = max(0.0, min(1.0, cosine_similarity(user_vec, event_vec)))
+            mission_vec = get_or_create_mission_embedding(mid)
+            if mission_vec is not None:
+                semantic_s = max(0.0, min(1.0, cosine_similarity(user_vec, mission_vec)))
 
         final = (
             W_TFIDF      * tfidf_s     +
@@ -278,10 +277,10 @@ def get_suggested_events(user_id, limit=5) -> list:
         final = min(1.0, max(0.0, final))
 
         scored.append({
-            **event,
+            **mission,
             'match_score': round(final, 4),
-            'suggestion_reason': _build_reason(event, user_interests_set, behav_s),
+            'suggestion_reason': _build_reason(mission, user_interests_set, behav_s),
         })
 
-    scored.sort(key=lambda e: e['match_score'], reverse=True)
+    scored.sort(key=lambda m: m['match_score'], reverse=True)
     return scored[:limit]

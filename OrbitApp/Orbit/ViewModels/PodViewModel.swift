@@ -3,7 +3,7 @@ import Combine
 
 @MainActor
 class PodViewModel: ObservableObject {
-    @Published var pod: EventPod?
+    @Published var pod: Pod?
     @Published var messages: [ChatMessage] = []
     @Published var votes: [Vote] = []
     @Published var isLoading = false

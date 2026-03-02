@@ -4,6 +4,8 @@ import uuid
 from google.cloud import datastore
 from google.cloud.datastore.query import PropertyFilter
 
+from OrbitServer.utils.cache import mission_cache, pod_cache, user_cache
+
 client = datastore.Client()
 
 COLLEGE_YEARS = {'freshman', 'sophomore', 'junior', 'senior', 'grad'}
@@ -12,8 +14,6 @@ COLLEGE_YEARS = {'freshman', 'sophomore', 'junior', 'senior', 'grad'}
 def _deep_convert(obj):
     """Recursively convert embedded Datastore entities and datetimes to JSON-safe types."""
     if isinstance(obj, datetime.datetime):
-        # Always emit ISO-8601 (with Z suffix) so Swift's .iso8601 decoder strategy
-        # can parse it and the string is human-readable everywhere else.
         return obj.replace(tzinfo=None).isoformat() + 'Z'
     if isinstance(obj, datetime.date):
         return obj.isoformat()
@@ -32,14 +32,22 @@ def _entity_to_dict(entity):
     return d
 
 
-# ── User ──────────────────────────────────────────────────────────────────────
+# ── User (merged with Profile) ──────────────────────────────────────────────
+# Fields: email, name, college_year, interests, photo, trust_score,
+#         created_at, updated_at
 
 def create_user(email):
     key = client.key('User')
     entity = datastore.Entity(key=key)
     entity.update({
         'email': email,
+        'name': '',
+        'college_year': '',
+        'interests': [],
+        'photo': None,
+        'trust_score': 0.0,
         'created_at': datetime.datetime.utcnow(),
+        'updated_at': datetime.datetime.utcnow(),
     })
     client.put(entity)
     return _entity_to_dict(entity)
@@ -53,32 +61,28 @@ def get_user_by_email(email):
 
 
 def get_user(user_id):
+    cached = user_cache.get(int(user_id))
+    if cached is not None:
+        return cached
     key = client.key('User', int(user_id))
     entity = client.get(key)
-    return _entity_to_dict(entity)
+    result = _entity_to_dict(entity)
+    if result is not None:
+        user_cache.set(int(user_id), result)
+    return result
 
 
-# ── Profile ───────────────────────────────────────────────────────────────────
-# Fields: user_id, name, college_year, interests, trust_score, photo, email,
-#         created_at, updated_at
-
-def get_profile(user_id):
-    key = client.key('Profile', int(user_id))
-    entity = client.get(key)
-    return _entity_to_dict(entity)
-
-
-def upsert_profile(user_id, data):
-    key = client.key('Profile', int(user_id))
+def update_user(user_id, data):
+    key = client.key('User', int(user_id))
     entity = client.get(key)
     if entity is None:
         entity = datastore.Entity(key=key)
-        entity['user_id'] = int(user_id)
         entity['trust_score'] = 0.0
         entity['created_at'] = datetime.datetime.utcnow()
     entity.update(data)
     entity['updated_at'] = datetime.datetime.utcnow()
     client.put(entity)
+    user_cache.invalidate(int(user_id))
     return _entity_to_dict(entity)
 
 
@@ -86,24 +90,32 @@ def adjust_trust_score(user_id, delta):
     """Add delta to a user's trust_score, clamped to [0.0, 5.0].
     Uses a transaction to avoid lost updates from concurrent adjustments."""
     with client.transaction():
-        key = client.key('Profile', int(user_id))
+        key = client.key('User', int(user_id))
         entity = client.get(key)
         if entity:
             current = float(entity.get('trust_score', 0.0))
             entity['trust_score'] = max(0.0, min(5.0, current + delta))
             entity['updated_at'] = datetime.datetime.utcnow()
             client.put(entity)
+    user_cache.invalidate(int(user_id))
 
 
-# ── Event ─────────────────────────────────────────────────────────────────────
-# Replaces Mission.
+def list_all_users(limit=10000):
+    """Fetch all User records for model training."""
+    query = client.query(kind='User')
+    results = list(query.fetch(limit=limit))
+    return [_entity_to_dict(e) for e in results]
+
+
+# ── Mission (was Event) ─────────────────────────────────────────────────────
+# Fixed-date activities. Browseable in the discovery feed.
 # Fields: id, title, description, tags, location, date (YYYY-MM-DD),
 #         creator_id, creator_type (user|seeded|ai_suggested),
 #         max_pod_size (default 4), status (open|completed|cancelled),
 #         created_at, updated_at
 
-def create_event(data, creator_id, creator_type='user'):
-    key = client.key('Event')
+def create_mission(data, creator_id, creator_type='user'):
+    key = client.key('Mission')
     entity = datastore.Entity(key=key)
     entity.update({
         'title': data['title'],
@@ -123,14 +135,20 @@ def create_event(data, creator_id, creator_type='user'):
     return _entity_to_dict(entity)
 
 
-def get_event(event_id):
-    key = client.key('Event', int(event_id))
+def get_mission(mission_id):
+    cached = mission_cache.get(int(mission_id))
+    if cached is not None:
+        return cached
+    key = client.key('Mission', int(mission_id))
     entity = client.get(key)
-    return _entity_to_dict(entity)
+    result = _entity_to_dict(entity)
+    if result is not None:
+        mission_cache.set(int(mission_id), result)
+    return result
 
 
-def update_event(event_id, data):
-    key = client.key('Event', int(event_id))
+def update_mission(mission_id, data):
+    key = client.key('Mission', int(mission_id))
     entity = client.get(key)
     if not entity:
         return None
@@ -140,12 +158,13 @@ def update_event(event_id, data):
             entity[field] = data[field]
     entity['updated_at'] = datetime.datetime.utcnow()
     client.put(entity)
+    mission_cache.invalidate(int(mission_id))
     return _entity_to_dict(entity)
 
 
-def store_event_embedding(event_id, embedding: list):
-    """Persist a float embedding vector to an Event entity."""
-    key = client.key('Event', int(event_id))
+def store_mission_embedding(mission_id, embedding: list):
+    """Persist a float embedding vector to a Mission entity."""
+    key = client.key('Mission', int(mission_id))
     entity = client.get(key)
     if not entity:
         return None
@@ -155,16 +174,17 @@ def store_event_embedding(event_id, embedding: list):
     return True
 
 
-def delete_event(event_id):
-    key = client.key('Event', int(event_id))
+def delete_mission(mission_id):
+    key = client.key('Mission', int(mission_id))
     client.delete(key)
-    # Cascade: delete all pods for this event
-    for pod in list_event_pods(event_id):
-        delete_event_pod(pod['id'])
+    mission_cache.invalidate(int(mission_id))
+    # Cascade: delete all pods for this mission
+    for pod in list_pods(mission_id):
+        delete_pod(pod['id'])
 
 
-def list_events(filters=None):
-    query = client.query(kind='Event')
+def list_missions(filters=None):
+    query = client.query(kind='Mission')
     if filters and filters.get('tag'):
         query.add_filter(filter=PropertyFilter('tags', '=', filters['tag']))
     if filters and filters.get('status'):
@@ -173,21 +193,21 @@ def list_events(filters=None):
     return [_entity_to_dict(e) for e in results]
 
 
-# ── EventPod ──────────────────────────────────────────────────────────────────
-# Fields: id (UUID string), event_id, member_ids, max_size, name (string, nullable),
+# ── Pod (was EventPod) ──────────────────────────────────────────────────────
+# Fields: id (UUID string), mission_id, member_ids, max_size, name (string, nullable),
 #         status (open|full|meeting_confirmed|completed|cancelled),
 #         scheduled_time (string, nullable), scheduled_place (string, nullable),
 #         confirmed_attendees, kick_votes {target_user_id: [voter_user_ids]},
 #         created_at, expires_at
 
-def create_event_pod(event_id, max_size=4, first_member_id=None):
+def create_pod(mission_id, max_size=4, first_member_id=None):
     pod_id = str(uuid.uuid4())
-    key = client.key('EventPod', pod_id)
+    key = client.key('Pod', pod_id)
     entity = datastore.Entity(key=key)
     now = datetime.datetime.utcnow()
     member_ids = [int(first_member_id)] if first_member_id else []
     entity.update({
-        'event_id': int(event_id),
+        'mission_id': int(mission_id),
         'member_ids': member_ids,
         'max_size': int(max_size),
         'name': None,
@@ -197,20 +217,26 @@ def create_event_pod(event_id, max_size=4, first_member_id=None):
         'confirmed_attendees': [],
         'kick_votes': {},
         'created_at': now,
-        'expires_at': now + datetime.timedelta(days=2),  # updated when time is set
+        'expires_at': now + datetime.timedelta(days=2),
     })
     client.put(entity)
     return _entity_to_dict(entity)
 
 
-def get_event_pod(pod_id):
-    key = client.key('EventPod', str(pod_id))
+def get_pod(pod_id):
+    cached = pod_cache.get(str(pod_id))
+    if cached is not None:
+        return cached
+    key = client.key('Pod', str(pod_id))
     entity = client.get(key)
-    return _entity_to_dict(entity)
+    result = _entity_to_dict(entity)
+    if result is not None:
+        pod_cache.set(str(pod_id), result)
+    return result
 
 
-def update_event_pod(pod_id, data):
-    key = client.key('EventPod', str(pod_id))
+def update_pod(pod_id, data):
+    key = client.key('Pod', str(pod_id))
     entity = client.get(key)
     if not entity:
         return None
@@ -222,12 +248,14 @@ def update_event_pod(pod_id, data):
         if field in data:
             entity[field] = data[field]
     client.put(entity)
+    pod_cache.invalidate(str(pod_id))
     return _entity_to_dict(entity)
 
 
-def delete_event_pod(pod_id):
-    key = client.key('EventPod', str(pod_id))
+def delete_pod(pod_id):
+    key = client.key('Pod', str(pod_id))
     client.delete(key)
+    pod_cache.invalidate(str(pod_id))
     # Cascade: delete messages and votes (batched to avoid memory issues)
     query = client.query(kind='ChatMessage')
     query.add_filter(filter=PropertyFilter('pod_id', '=', str(pod_id)))
@@ -241,44 +269,45 @@ def delete_event_pod(pod_id):
         client.delete(vote.key)
 
 
-def list_event_pods(event_id, limit=500):
-    query = client.query(kind='EventPod')
-    query.add_filter(filter=PropertyFilter('event_id', '=', int(event_id)))
+def list_pods(mission_id, limit=500):
+    query = client.query(kind='Pod')
+    query.add_filter(filter=PropertyFilter('mission_id', '=', int(mission_id)))
     results = list(query.fetch(limit=limit))
     return [_entity_to_dict(e) for e in results]
 
 
-def get_user_pod_for_event(event_id, user_id):
-    """Return the pod this user belongs to for a given event, or None."""
-    for pod in list_event_pods(event_id):
+def get_user_pod_for_mission(mission_id, user_id):
+    """Return the pod this user belongs to for a given mission, or None."""
+    for pod in list_pods(mission_id):
         if int(user_id) in (pod.get('member_ids') or []):
             return pod
     return None
 
 
-def find_open_pod_for_event(event_id):
+def find_open_pod_for_mission(mission_id):
     """Return the first open pod with room, or None."""
-    for pod in list_event_pods(event_id):
+    for pod in list_pods(mission_id):
         if pod['status'] == 'open' and len(pod.get('member_ids') or []) < pod['max_size']:
             return pod
     return None
 
 
 def transactional_pod_update(pod_id, update_fn):
-    """Atomically read-modify-write an EventPod inside a Datastore transaction.
+    """Atomically read-modify-write a Pod inside a Datastore transaction.
 
     update_fn(entity) is called with the raw Datastore entity.
     It should mutate the entity in place and return a result value.
     Returns (result, updated_pod_dict) or (None, None) if pod not found.
     """
     with client.transaction():
-        key = client.key('EventPod', str(pod_id))
+        key = client.key('Pod', str(pod_id))
         entity = client.get(key)
         if not entity:
             return None, None
         result = update_fn(entity)
         client.put(entity)
-        return result, _entity_to_dict(entity)
+    pod_cache.invalidate(str(pod_id))
+    return result, _entity_to_dict(entity)
 
 
 # ── ChatMessage ───────────────────────────────────────────────────────────────
@@ -374,22 +403,22 @@ def list_votes_for_pod(pod_id, limit=100):
     return [_entity_to_dict(e) for e in results]
 
 
-# ── UserEventHistory ──────────────────────────────────────────────────────────
-# Fields: id (UUID), user_id, event_id, pod_id, action, attended, points_earned,
+# ── UserHistory (was UserEventHistory) ────────────────────────────────────────
+# Fields: id (UUID), user_id, mission_id, pod_id, action, attended, points_earned,
 #         created_at
 
-def record_event_action(user_id, event_id, action, pod_id=None, tags_snapshot=None):
-    """Record that a user interacted with an event (joined/browsed/skipped).
+def record_action(user_id, mission_id, action, pod_id=None, tags_snapshot=None):
+    """Record that a user interacted with a mission (joined/browsed/skipped).
 
-    tags_snapshot: list of tags from the event at interaction time, used by the
+    tags_snapshot: list of tags from the mission at interaction time, used by the
     ML recommendation engine for behavioral decay scoring.
     """
     hist_id = str(uuid.uuid4())
-    key = client.key('UserEventHistory', hist_id)
+    key = client.key('UserHistory', hist_id)
     entity = datastore.Entity(key=key)
     entity.update({
         'user_id': int(user_id),
-        'event_id': int(event_id),
+        'mission_id': int(mission_id),
         'pod_id': str(pod_id) if pod_id else None,
         'action': action,
         'attended': None,
@@ -401,30 +430,23 @@ def record_event_action(user_id, event_id, action, pod_id=None, tags_snapshot=No
     return _entity_to_dict(entity)
 
 
-def get_user_event_history(user_id, limit=50):
-    query = client.query(kind='UserEventHistory')
+def get_user_history(user_id, limit=50):
+    query = client.query(kind='UserHistory')
     query.add_filter(filter=PropertyFilter('user_id', '=', int(user_id)))
     query.order = ['-created_at']
     results = list(query.fetch(limit=limit))
     return [_entity_to_dict(e) for e in results]
 
 
-def list_all_event_history(limit=10000):
-    """Fetch all UserEventHistory records for model training."""
-    query = client.query(kind='UserEventHistory')
+def list_all_history(limit=10000):
+    """Fetch all UserHistory records for model training."""
+    query = client.query(kind='UserHistory')
     results = list(query.fetch(limit=limit))
     return [_entity_to_dict(e) for e in results]
 
 
-def list_all_profiles(limit=10000):
-    """Fetch all Profile records for model training."""
-    query = client.query(kind='Profile')
-    results = list(query.fetch(limit=limit))
-    return [_entity_to_dict(e) for e in results]
-
-
-def update_event_history(hist_id, data):
-    key = client.key('UserEventHistory', str(hist_id))
+def update_history(hist_id, data):
+    key = client.key('UserHistory', str(hist_id))
     entity = client.get(key)
     if not entity:
         return None
@@ -435,30 +457,28 @@ def update_event_history(hist_id, data):
     return _entity_to_dict(entity)
 
 
-def get_history_entry(user_id, event_id):
-    """Get the most recent history entry for a user/event pair."""
-    query = client.query(kind='UserEventHistory')
+def get_history_entry(user_id, mission_id):
+    """Get the most recent history entry for a user/mission pair."""
+    query = client.query(kind='UserHistory')
     query.add_filter(filter=PropertyFilter('user_id', '=', int(user_id)))
-    query.add_filter(filter=PropertyFilter('event_id', '=', int(event_id)))
+    query.add_filter(filter=PropertyFilter('mission_id', '=', int(mission_id)))
     results = list(query.fetch(limit=1))
     return _entity_to_dict(results[0]) if results else None
 
 
-# ── Mission (Activity Request) ────────────────────────────────────────────────
+# ── Signal (was Mission — spontaneous activity requests) ──────────────────────
 # Fields: id (UUID string), creator_id, title, description,
 #         activity_category (matches Swift ActivityCategory raw values),
 #         custom_activity_name (string or None),
-#         min_group_size (3+), max_group_size (≤8),
+#         min_group_size (3+), max_group_size (<=8),
 #         availability [{"date": "<ISO8601>", "time_blocks": ["morning", ...]}],
 #         links (list of URL strings, max 2),
 #         pod_ids (list of pod UUID strings, max 2, assigned on RSVP),
 #         status (pending | active), created_at
-#
-# Swift AvailabilitySlot has CodingKeys mapping timeBlocks ↔ "time_blocks".
 
-def create_mission(data, creator_id):
-    mission_id = str(uuid.uuid4())
-    key = client.key('Mission', mission_id)
+def create_signal(data, creator_id):
+    signal_id = str(uuid.uuid4())
+    key = client.key('Signal', signal_id)
     entity = datastore.Entity(key=key, exclude_from_indexes=['availability', 'links'])
     entity.update({
         'creator_id': int(creator_id),
@@ -471,51 +491,51 @@ def create_mission(data, creator_id):
         'availability': data.get('availability', []),
         'links': data.get('links', []),
         'rsvps': [],
-        'status': 'pending',   # matches Swift SignalStatus.pending
+        'status': 'pending',
         'created_at': datetime.datetime.utcnow(),
     })
     client.put(entity)
     return _entity_to_dict(entity)
 
 
-def get_mission(mission_id):
-    key = client.key('Mission', str(mission_id))
+def get_signal(signal_id):
+    key = client.key('Signal', str(signal_id))
     entity = client.get(key)
     return _entity_to_dict(entity)
 
 
-def delete_mission(mission_id):
-    key = client.key('Mission', str(mission_id))
+def delete_signal(signal_id):
+    key = client.key('Signal', str(signal_id))
     client.delete(key)
 
 
-def list_missions_for_user(user_id, limit=100):
-    query = client.query(kind='Mission')
+def list_signals_for_user(user_id, limit=100):
+    query = client.query(kind='Signal')
     query.add_filter(filter=PropertyFilter('creator_id', '=', int(user_id)))
     query.order = ['-created_at']
     results = list(query.fetch(limit=limit))
     return [_entity_to_dict(e) for e in results]
 
 
-def list_all_missions(limit=50):
-    """Return all Mission entities, newest first (for discover feed)."""
-    query = client.query(kind='Mission')
+def list_all_signals(limit=50):
+    """Return all Signal entities, newest first (for discover feed)."""
+    query = client.query(kind='Signal')
     query.order = ['-created_at']
     results = list(query.fetch(limit=limit))
     return [_entity_to_dict(e) for e in results]
 
 
-def list_rsvped_missions(user_id, limit=100):
-    """Return all Mission entities where user_id is in the rsvps list."""
-    query = client.query(kind='Mission')
+def list_rsvped_signals(user_id, limit=100):
+    """Return all Signal entities where user_id is in the rsvps list."""
+    query = client.query(kind='Signal')
     query.add_filter(filter=PropertyFilter('rsvps', '=', int(user_id)))
     results = list(query.fetch(limit=limit))
     return [_entity_to_dict(e) for e in results]
 
 
-def update_mission_status(mission_id, status):
-    """Update signal/mission status. Valid values: 'pending' | 'active'."""
-    key = client.key('Mission', str(mission_id))
+def update_signal_status(signal_id, status):
+    """Update signal status. Valid values: 'pending' | 'active'."""
+    key = client.key('Signal', str(signal_id))
     entity = client.get(key)
     if not entity:
         return None
@@ -524,12 +544,12 @@ def update_mission_status(mission_id, status):
     return _entity_to_dict(entity)
 
 
-def transactional_mission_rsvp(mission_id, user_id):
-    """Atomically add a user to a mission's rsvps list.
+def transactional_signal_rsvp(signal_id, user_id):
+    """Atomically add a user to a signal's rsvps list.
 
-    Returns (mission_dict, error_string).
+    Returns (signal_dict, error_string).
     - Rejects duplicate RSVPs.
-    - Caps total RSVPs at 2 × max_group_size (2 pods max).
+    - Caps total RSVPs at 2 x max_group_size (2 pods max).
     - Auto-transitions status to 'active' when rsvps >= min_group_size.
     - Manages pod_ids list: first pod on first RSVP, second when pod 1 is full.
     """
@@ -537,10 +557,10 @@ def transactional_mission_rsvp(mission_id, user_id):
     err = None
 
     with client.transaction():
-        key = client.key('Mission', str(mission_id))
+        key = client.key('Signal', str(signal_id))
         entity = client.get(key)
         if not entity:
-            err = "Mission not found"
+            err = "Signal not found"
         else:
             rsvps = list(entity.get('rsvps') or [])
             uid = int(user_id)
@@ -575,15 +595,15 @@ def transactional_mission_rsvp(mission_id, user_id):
     return result, err
 
 
-def create_signal_pod(pod_id, mission_id, max_size=6, first_member_id=None):
-    """Create an EventPod linked to a signal/mission (not an event)."""
-    key = client.key('EventPod', str(pod_id))
+def create_signal_pod(pod_id, signal_id, max_size=6, first_member_id=None):
+    """Create a Pod linked to a signal (not a mission)."""
+    key = client.key('Pod', str(pod_id))
     entity = datastore.Entity(key=key)
     now = datetime.datetime.utcnow()
     member_ids = [int(first_member_id)] if first_member_id else []
     entity.update({
-        'event_id': None,
-        'mission_id': str(mission_id),
+        'mission_id': None,
+        'signal_id': str(signal_id),
         'member_ids': member_ids,
         'max_size': int(max_size),
         'name': None,
@@ -599,27 +619,27 @@ def create_signal_pod(pod_id, mission_id, max_size=6, first_member_id=None):
     return _entity_to_dict(entity)
 
 
-# ── EventPod user membership query ────────────────────────────────────────────
+# ── Pod user membership query ────────────────────────────────────────────────
 
 def get_user_pods(user_id, limit=100):
-    """Return all EventPod entities the user is a member of, enriched with event_title.
+    """Return all Pod entities the user is a member of, enriched with mission_title.
 
     Datastore automatically builds single-property indexes for array fields,
     so filtering member_ids by equality works without a composite index.
     """
-    query = client.query(kind='EventPod')
+    query = client.query(kind='Pod')
     query.add_filter(filter=PropertyFilter('member_ids', '=', int(user_id)))
     results = list(query.fetch(limit=limit))
     pods = [_entity_to_dict(e) for e in results]
 
-    # Enrich each pod with its event title
+    # Enrich each pod with its mission title
     for pod in pods:
-        event_id = pod.get('event_id')
-        if event_id is not None:
-            event = get_event(int(event_id))
-            pod['event_title'] = event.get('title', 'Untitled') if event else 'Untitled'
+        mission_id = pod.get('mission_id')
+        if mission_id is not None:
+            mission = get_mission(int(mission_id))
+            pod['mission_title'] = mission.get('title', 'Untitled') if mission else 'Untitled'
         else:
-            pod['event_title'] = 'Untitled'
+            pod['mission_title'] = 'Untitled'
 
     return pods
 

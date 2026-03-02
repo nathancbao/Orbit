@@ -4,7 +4,7 @@ from OrbitServer.utils.responses import success, error
 from OrbitServer.utils.auth import require_auth
 from OrbitServer.utils.validators import validate_profile_data
 from OrbitServer.services.user_service import get_user_profile, update_user_profile, upload_photo
-from OrbitServer.services.mission_service import get_rsvped_missions
+from OrbitServer.services.signal_service import get_rsvped_signals
 from OrbitServer.models.models import get_user_pods
 
 users_bp = Blueprint('users', __name__, url_prefix='/api/users')
@@ -57,8 +57,7 @@ def upload_me_photo():
 def list_my_pods():
     """
     GET /api/users/me/pods
-    Return all EventPod entities the authenticated user belongs to.
-    Used by Swift PodsView to populate the Pods tab.
+    Return all Pod entities the authenticated user belongs to.
     """
     pods = get_user_pods(g.user_id)
     return success(pods)
@@ -69,10 +68,10 @@ def list_my_pods():
 def list_my_rsvps():
     """
     GET /api/users/me/rsvps
-    Return all Mission/Signal entities the user has RSVPed to.
+    Return all Signal entities the user has RSVPed to.
     Includes pod_id so the frontend can open the signal's pod.
     """
-    signals, _ = get_rsvped_missions(g.user_id)
+    signals, _ = get_rsvped_signals(g.user_id)
     return success(signals)
 
 

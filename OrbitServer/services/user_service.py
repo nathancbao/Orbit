@@ -1,4 +1,4 @@
-from OrbitServer.models.models import get_profile, upsert_profile, get_user, COLLEGE_YEARS
+from OrbitServer.models.models import get_user, update_user, COLLEGE_YEARS
 from OrbitServer.services.storage_service import upload_file
 
 
@@ -15,7 +15,7 @@ DEFAULT_PROFILE = {
 
 
 def _format_profile(raw):
-    """Extract only the app Profile fields from a raw Datastore profile dict."""
+    """Extract only the app-relevant profile fields from a raw User dict."""
     profile = {}
     for field in PROFILE_FIELDS:
         if field in raw:
@@ -26,7 +26,7 @@ def _format_profile(raw):
 
 
 def _is_profile_complete(profile):
-    """A profile is complete when it has a name, valid college_year, and ≥3 interests."""
+    """A profile is complete when it has a name, valid college_year, and >=3 interests."""
     name = profile.get('name', '')
     college_year = profile.get('college_year', '')
     interests = profile.get('interests', [])
@@ -38,14 +38,11 @@ def _is_profile_complete(profile):
 
 
 def get_user_profile(user_id):
-    profile_data = get_profile(user_id)
-    if not profile_data:
-        user = get_user(user_id)
-        if not user:
-            return None, "User not found"
-        return None, "Profile not found"
+    user_data = get_user(user_id)
+    if not user_data:
+        return None, "User not found"
 
-    profile = _format_profile(profile_data)
+    profile = _format_profile(user_data)
     return {
         'profile': profile,
         'profile_complete': _is_profile_complete(profile),
@@ -57,8 +54,8 @@ def update_user_profile(user_id, data):
     if user and user.get('email'):
         data['email'] = user['email']
 
-    profile_data = upsert_profile(user_id, data)
-    profile = _format_profile(profile_data)
+    user_data = update_user(user_id, data)
+    profile = _format_profile(user_data)
     return {
         'profile': profile,
         'profile_complete': _is_profile_complete(profile),
@@ -73,8 +70,8 @@ def upload_photo(user_id, file):
     except RuntimeError as e:
         return None, str(e)
 
-    profile_data = upsert_profile(user_id, {'photo': url})
-    profile = _format_profile(profile_data)
+    user_data = update_user(user_id, {'photo': url})
+    profile = _format_profile(user_data)
     return {
         'profile': profile,
         'profile_complete': _is_profile_complete(profile),

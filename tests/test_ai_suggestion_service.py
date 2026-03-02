@@ -25,7 +25,7 @@ class TestJaccard:
     def test_partial_overlap(self):
         from OrbitServer.services.ai_suggestion_service import _jaccard
         score = _jaccard({'a', 'b', 'c'}, {'b', 'c', 'd'})
-        # intersection=2, union=4 → 0.5
+        # intersection=2, union=4 -> 0.5
         assert abs(score - 0.5) < 1e-6
 
 
@@ -40,7 +40,7 @@ class TestDecayWeight:
         from OrbitServer.services.ai_suggestion_service import _decay_weight
         past = datetime.datetime.utcnow() - datetime.timedelta(days=14)
         w = _decay_weight(past)
-        expected = math.exp(-0.05 * 14)  # ≈ 0.496
+        expected = math.exp(-0.05 * 14)  # ~= 0.496
         assert abs(w - expected) < 0.01
 
     def test_none_created_at_returns_zero(self):
@@ -84,7 +84,7 @@ class TestBuildBehavioralProfile:
                     'created_at': datetime.datetime.utcnow()}]
         assert _build_behavioral_profile(history) == []
 
-    def test_recent_joined_event_has_high_weight(self):
+    def test_recent_joined_mission_has_high_weight(self):
         from OrbitServer.services.ai_suggestion_service import _build_behavioral_profile
         history = [{'action': 'joined', 'tags_snapshot': ['hiking'], 'attended': None,
                     'created_at': datetime.datetime.utcnow()}]
@@ -100,7 +100,7 @@ class TestComputeBehavioralScore:
         from OrbitServer.services.ai_suggestion_service import _compute_behavioral_score
         assert _compute_behavioral_score({'hiking'}, []) == 0.0
 
-    def test_no_event_tags_returns_zero(self):
+    def test_no_mission_tags_returns_zero(self):
         from OrbitServer.services.ai_suggestion_service import _compute_behavioral_score
         profile = [({'hiking'}, 0.8)]
         assert _compute_behavioral_score(set(), profile) == 0.0
@@ -142,14 +142,14 @@ class TestNormalizeTrust:
         assert _normalize_trust(None) == 0.0
 
 
-class TestGetSuggestedEvents:
-    def _make_event(self, eid, tags):
-        return {'id': eid, 'title': f'Event {eid}', 'description': '', 'tags': tags, 'status': 'open'}
+class TestGetSuggestedMissions:
+    def _make_mission(self, mid, tags):
+        return {'id': mid, 'title': f'Mission {mid}', 'description': '', 'tags': tags, 'status': 'open'}
 
-    # Shared mocks — degrade all learned signals to 0.0 so tests focus on pipeline logic
+    # Shared mocks -- degrade all learned signals to 0.0 so tests focus on pipeline logic
     _emb_patches = [
         patch('OrbitServer.services.ai_suggestion_service.get_user_embedding', return_value=None),
-        patch('OrbitServer.services.ai_suggestion_service.get_or_create_event_embedding', return_value=None),
+        patch('OrbitServer.services.ai_suggestion_service.get_or_create_mission_embedding', return_value=None),
         patch('OrbitServer.services.ai_suggestion_service.get_lightfm_scores', return_value={}),
     ]
 
@@ -161,151 +161,151 @@ class TestGetSuggestedEvents:
         for p in self._emb_patches:
             p.stop()
 
-    @patch('OrbitServer.services.ai_suggestion_service.list_events')
-    @patch('OrbitServer.services.ai_suggestion_service.get_user_event_history')
-    @patch('OrbitServer.services.ai_suggestion_service.get_profile')
-    def test_returns_events(self, mock_profile, mock_history, mock_list):
-        mock_profile.return_value = {'interests': ['hiking'], 'trust_score': 3.0}
+    @patch('OrbitServer.services.ai_suggestion_service.list_missions')
+    @patch('OrbitServer.services.ai_suggestion_service.get_user_history')
+    @patch('OrbitServer.services.ai_suggestion_service.get_user')
+    def test_returns_missions(self, mock_user, mock_history, mock_list):
+        mock_user.return_value = {'interests': ['hiking'], 'trust_score': 3.0}
         mock_history.return_value = []
-        mock_list.return_value = [self._make_event(1, ['hiking'])]
+        mock_list.return_value = [self._make_mission(1, ['hiking'])]
 
-        from OrbitServer.services.ai_suggestion_service import get_suggested_events
-        result = get_suggested_events(user_id=1)
+        from OrbitServer.services.ai_suggestion_service import get_suggested_missions
+        result = get_suggested_missions(user_id=1)
         assert len(result) == 1
 
-    @patch('OrbitServer.services.ai_suggestion_service.list_events')
-    @patch('OrbitServer.services.ai_suggestion_service.get_user_event_history')
-    @patch('OrbitServer.services.ai_suggestion_service.get_profile')
-    def test_excludes_joined_events(self, mock_profile, mock_history, mock_list):
-        mock_profile.return_value = {'interests': ['hiking'], 'trust_score': 3.0}
-        mock_history.return_value = [{'event_id': 1, 'action': 'joined', 'tags_snapshot': [], 'attended': None, 'created_at': None}]
-        mock_list.return_value = [self._make_event(1, ['hiking']), self._make_event(2, ['outdoors'])]
+    @patch('OrbitServer.services.ai_suggestion_service.list_missions')
+    @patch('OrbitServer.services.ai_suggestion_service.get_user_history')
+    @patch('OrbitServer.services.ai_suggestion_service.get_user')
+    def test_excludes_joined_missions(self, mock_user, mock_history, mock_list):
+        mock_user.return_value = {'interests': ['hiking'], 'trust_score': 3.0}
+        mock_history.return_value = [{'mission_id': 1, 'action': 'joined', 'tags_snapshot': [], 'attended': None, 'created_at': None}]
+        mock_list.return_value = [self._make_mission(1, ['hiking']), self._make_mission(2, ['outdoors'])]
 
-        from OrbitServer.services.ai_suggestion_service import get_suggested_events
-        result = get_suggested_events(user_id=1)
+        from OrbitServer.services.ai_suggestion_service import get_suggested_missions
+        result = get_suggested_missions(user_id=1)
         ids = [e['id'] for e in result]
         assert 1 not in ids
         assert 2 in ids
 
-    @patch('OrbitServer.services.ai_suggestion_service.list_events')
-    @patch('OrbitServer.services.ai_suggestion_service.get_user_event_history')
-    @patch('OrbitServer.services.ai_suggestion_service.get_profile')
-    def test_excludes_skipped_events(self, mock_profile, mock_history, mock_list):
-        mock_profile.return_value = {'interests': ['hiking'], 'trust_score': 3.0}
-        mock_history.return_value = [{'event_id': 3, 'action': 'skipped', 'tags_snapshot': [], 'attended': None, 'created_at': None}]
-        mock_list.return_value = [self._make_event(3, ['hiking']), self._make_event(4, ['coffee'])]
+    @patch('OrbitServer.services.ai_suggestion_service.list_missions')
+    @patch('OrbitServer.services.ai_suggestion_service.get_user_history')
+    @patch('OrbitServer.services.ai_suggestion_service.get_user')
+    def test_excludes_skipped_missions(self, mock_user, mock_history, mock_list):
+        mock_user.return_value = {'interests': ['hiking'], 'trust_score': 3.0}
+        mock_history.return_value = [{'mission_id': 3, 'action': 'skipped', 'tags_snapshot': [], 'attended': None, 'created_at': None}]
+        mock_list.return_value = [self._make_mission(3, ['hiking']), self._make_mission(4, ['coffee'])]
 
-        from OrbitServer.services.ai_suggestion_service import get_suggested_events
-        result = get_suggested_events(user_id=1)
+        from OrbitServer.services.ai_suggestion_service import get_suggested_missions
+        result = get_suggested_missions(user_id=1)
         ids = [e['id'] for e in result]
         assert 3 not in ids
         assert 4 in ids
 
-    @patch('OrbitServer.services.ai_suggestion_service.list_events')
-    @patch('OrbitServer.services.ai_suggestion_service.get_user_event_history')
-    @patch('OrbitServer.services.ai_suggestion_service.get_profile')
-    def test_respects_limit(self, mock_profile, mock_history, mock_list):
-        mock_profile.return_value = {'interests': ['hiking'], 'trust_score': 3.0}
+    @patch('OrbitServer.services.ai_suggestion_service.list_missions')
+    @patch('OrbitServer.services.ai_suggestion_service.get_user_history')
+    @patch('OrbitServer.services.ai_suggestion_service.get_user')
+    def test_respects_limit(self, mock_user, mock_history, mock_list):
+        mock_user.return_value = {'interests': ['hiking'], 'trust_score': 3.0}
         mock_history.return_value = []
-        mock_list.return_value = [self._make_event(i, ['hiking']) for i in range(10)]
+        mock_list.return_value = [self._make_mission(i, ['hiking']) for i in range(10)]
 
-        from OrbitServer.services.ai_suggestion_service import get_suggested_events
-        result = get_suggested_events(user_id=1, limit=3)
+        from OrbitServer.services.ai_suggestion_service import get_suggested_missions
+        result = get_suggested_missions(user_id=1, limit=3)
         assert len(result) <= 3
 
-    @patch('OrbitServer.services.ai_suggestion_service.list_events')
-    @patch('OrbitServer.services.ai_suggestion_service.get_user_event_history')
-    @patch('OrbitServer.services.ai_suggestion_service.get_profile')
-    def test_events_sorted_descending(self, mock_profile, mock_history, mock_list):
-        mock_profile.return_value = {'interests': ['hiking'], 'trust_score': 3.0}
+    @patch('OrbitServer.services.ai_suggestion_service.list_missions')
+    @patch('OrbitServer.services.ai_suggestion_service.get_user_history')
+    @patch('OrbitServer.services.ai_suggestion_service.get_user')
+    def test_missions_sorted_descending(self, mock_user, mock_history, mock_list):
+        mock_user.return_value = {'interests': ['hiking'], 'trust_score': 3.0}
         mock_history.return_value = []
         mock_list.return_value = [
-            self._make_event(1, ['coffee']),   # no overlap
-            self._make_event(2, ['hiking']),   # full overlap
+            self._make_mission(1, ['coffee']),   # no overlap
+            self._make_mission(2, ['hiking']),   # full overlap
         ]
 
-        from OrbitServer.services.ai_suggestion_service import get_suggested_events
-        result = get_suggested_events(user_id=1, limit=5)
+        from OrbitServer.services.ai_suggestion_service import get_suggested_missions
+        result = get_suggested_missions(user_id=1, limit=5)
         scores = [e['match_score'] for e in result]
         assert scores == sorted(scores, reverse=True)
 
-    @patch('OrbitServer.services.ai_suggestion_service.list_events')
-    @patch('OrbitServer.services.ai_suggestion_service.get_user_event_history')
-    @patch('OrbitServer.services.ai_suggestion_service.get_profile')
-    def test_match_score_in_zero_one_range(self, mock_profile, mock_history, mock_list):
-        mock_profile.return_value = {'interests': ['hiking'], 'trust_score': 5.0}
+    @patch('OrbitServer.services.ai_suggestion_service.list_missions')
+    @patch('OrbitServer.services.ai_suggestion_service.get_user_history')
+    @patch('OrbitServer.services.ai_suggestion_service.get_user')
+    def test_match_score_in_zero_one_range(self, mock_user, mock_history, mock_list):
+        mock_user.return_value = {'interests': ['hiking'], 'trust_score': 5.0}
         mock_history.return_value = []
-        mock_list.return_value = [self._make_event(1, ['hiking'])]
+        mock_list.return_value = [self._make_mission(1, ['hiking'])]
 
-        from OrbitServer.services.ai_suggestion_service import get_suggested_events
-        result = get_suggested_events(user_id=1)
-        for event in result:
-            assert 0.0 <= event['match_score'] <= 1.0
+        from OrbitServer.services.ai_suggestion_service import get_suggested_missions
+        result = get_suggested_missions(user_id=1)
+        for mission in result:
+            assert 0.0 <= mission['match_score'] <= 1.0
 
-    @patch('OrbitServer.services.ai_suggestion_service.list_events')
-    @patch('OrbitServer.services.ai_suggestion_service.get_user_event_history')
-    @patch('OrbitServer.services.ai_suggestion_service.get_profile')
-    def test_suggestion_reason_is_string(self, mock_profile, mock_history, mock_list):
-        mock_profile.return_value = {'interests': ['hiking'], 'trust_score': 3.0}
+    @patch('OrbitServer.services.ai_suggestion_service.list_missions')
+    @patch('OrbitServer.services.ai_suggestion_service.get_user_history')
+    @patch('OrbitServer.services.ai_suggestion_service.get_user')
+    def test_suggestion_reason_is_string(self, mock_user, mock_history, mock_list):
+        mock_user.return_value = {'interests': ['hiking'], 'trust_score': 3.0}
         mock_history.return_value = []
-        mock_list.return_value = [self._make_event(1, ['hiking'])]
+        mock_list.return_value = [self._make_mission(1, ['hiking'])]
 
-        from OrbitServer.services.ai_suggestion_service import get_suggested_events
-        result = get_suggested_events(user_id=1)
+        from OrbitServer.services.ai_suggestion_service import get_suggested_missions
+        result = get_suggested_missions(user_id=1)
         assert isinstance(result[0]['suggestion_reason'], str)
         assert len(result[0]['suggestion_reason']) > 0
 
-    @patch('OrbitServer.services.ai_suggestion_service.list_events')
-    @patch('OrbitServer.services.ai_suggestion_service.get_user_event_history')
-    @patch('OrbitServer.services.ai_suggestion_service.get_profile')
-    def test_empty_candidates_returns_empty(self, mock_profile, mock_history, mock_list):
-        mock_profile.return_value = {'interests': ['hiking'], 'trust_score': 3.0}
+    @patch('OrbitServer.services.ai_suggestion_service.list_missions')
+    @patch('OrbitServer.services.ai_suggestion_service.get_user_history')
+    @patch('OrbitServer.services.ai_suggestion_service.get_user')
+    def test_empty_candidates_returns_empty(self, mock_user, mock_history, mock_list):
+        mock_user.return_value = {'interests': ['hiking'], 'trust_score': 3.0}
         mock_history.return_value = []
         mock_list.return_value = []
 
-        from OrbitServer.services.ai_suggestion_service import get_suggested_events
-        assert get_suggested_events(user_id=1) == []
+        from OrbitServer.services.ai_suggestion_service import get_suggested_missions
+        assert get_suggested_missions(user_id=1) == []
 
     @patch('OrbitServer.services.ai_suggestion_service.get_lightfm_scores')
-    @patch('OrbitServer.services.ai_suggestion_service.list_events')
-    @patch('OrbitServer.services.ai_suggestion_service.get_user_event_history')
-    @patch('OrbitServer.services.ai_suggestion_service.get_profile')
-    def test_lightfm_score_contributes_to_final(self, mock_profile, mock_history,
+    @patch('OrbitServer.services.ai_suggestion_service.list_missions')
+    @patch('OrbitServer.services.ai_suggestion_service.get_user_history')
+    @patch('OrbitServer.services.ai_suggestion_service.get_user')
+    def test_lightfm_score_contributes_to_final(self, mock_user, mock_history,
                                                 mock_list, mock_lightfm):
-        """LightFM score of 1.0 on an event with no other signal should produce W_LIGHTFM score."""
-        from OrbitServer.services.ai_suggestion_service import get_suggested_events, W_LIGHTFM
-        mock_profile.return_value = {'interests': [], 'trust_score': 0.0}
+        """LightFM score of 1.0 on a mission with no other signal should produce W_LIGHTFM score."""
+        from OrbitServer.services.ai_suggestion_service import get_suggested_missions, W_LIGHTFM
+        mock_user.return_value = {'interests': [], 'trust_score': 0.0}
         mock_history.return_value = []
-        mock_list.return_value = [self._make_event(1, [])]  # no tags → tfidf=0, behav=0
+        mock_list.return_value = [self._make_mission(1, [])]  # no tags -> tfidf=0, behav=0
         mock_lightfm.return_value = {1: 1.0}
 
-        result = get_suggested_events(user_id=1)
+        result = get_suggested_missions(user_id=1)
         assert len(result) == 1
         assert abs(result[0]['match_score'] - W_LIGHTFM) < 1e-3
 
-    @patch('OrbitServer.services.ai_suggestion_service.get_or_create_event_embedding')
+    @patch('OrbitServer.services.ai_suggestion_service.get_or_create_mission_embedding')
     @patch('OrbitServer.services.ai_suggestion_service.get_user_embedding')
-    @patch('OrbitServer.services.ai_suggestion_service.list_events')
-    @patch('OrbitServer.services.ai_suggestion_service.get_user_event_history')
-    @patch('OrbitServer.services.ai_suggestion_service.get_profile')
-    def test_semantic_score_raises_match_score(self, mock_profile, mock_history, mock_list,
-                                               mock_user_emb, mock_event_emb):
+    @patch('OrbitServer.services.ai_suggestion_service.list_missions')
+    @patch('OrbitServer.services.ai_suggestion_service.get_user_history')
+    @patch('OrbitServer.services.ai_suggestion_service.get_user')
+    def test_semantic_score_raises_match_score(self, mock_user, mock_history, mock_list,
+                                               mock_user_emb, mock_mission_emb):
         """A non-None semantic embedding should produce a higher score than None (all else equal)."""
-        from OrbitServer.services.ai_suggestion_service import get_suggested_events, W_SEMANTIC
-        mock_profile.return_value = {'interests': ['hiking'], 'trust_score': 0.0}
+        from OrbitServer.services.ai_suggestion_service import get_suggested_missions, W_SEMANTIC
+        mock_user.return_value = {'interests': ['hiking'], 'trust_score': 0.0}
         mock_history.return_value = []
-        mock_list.return_value = [self._make_event(1, [])]  # no tags → tfidf=0, behav=0
+        mock_list.return_value = [self._make_mission(1, [])]  # no tags -> tfidf=0, behav=0
 
         # Without semantic signal
         mock_user_emb.return_value = None
-        mock_event_emb.return_value = None
-        result_no_sem = get_suggested_events(user_id=1)
+        mock_mission_emb.return_value = None
+        result_no_sem = get_suggested_missions(user_id=1)
 
-        # With identical vectors → cosine = 1.0
+        # With identical vectors -> cosine = 1.0
         vec = np.array([1.0, 0.0, 0.0], dtype=np.float32)
         mock_user_emb.return_value = vec
-        mock_event_emb.return_value = vec
-        result_with_sem = get_suggested_events(user_id=1)
+        mock_mission_emb.return_value = vec
+        result_with_sem = get_suggested_missions(user_id=1)
 
         score_no_sem = result_no_sem[0]['match_score']
         score_with_sem = result_with_sem[0]['match_score']

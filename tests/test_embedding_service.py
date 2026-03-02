@@ -5,27 +5,27 @@ import pytest
 from unittest.mock import patch, MagicMock
 
 
-class TestBuildEventText:
+class TestBuildMissionText:
     def test_combines_title_desc_tags(self):
-        from OrbitServer.services.embedding_service import _build_event_text
-        event = {'title': 'Morning Run', 'description': 'Easy jog', 'tags': ['fitness', 'outdoors']}
-        text = _build_event_text(event)
+        from OrbitServer.services.embedding_service import _build_mission_text
+        mission = {'title': 'Morning Run', 'description': 'Easy jog', 'tags': ['fitness', 'outdoors']}
+        text = _build_mission_text(mission)
         assert 'Morning Run' in text
         assert 'Easy jog' in text
         assert 'fitness' in text
         assert 'outdoors' in text
 
     def test_handles_missing_tags(self):
-        from OrbitServer.services.embedding_service import _build_event_text
-        event = {'title': 'Study', 'description': 'Library session', 'tags': []}
-        text = _build_event_text(event)
+        from OrbitServer.services.embedding_service import _build_mission_text
+        mission = {'title': 'Study', 'description': 'Library session', 'tags': []}
+        text = _build_mission_text(mission)
         assert 'Study' in text
         assert 'Library session' in text
 
     def test_handles_empty_description(self):
-        from OrbitServer.services.embedding_service import _build_event_text
-        event = {'title': 'Yoga', 'description': '', 'tags': ['wellness']}
-        text = _build_event_text(event)
+        from OrbitServer.services.embedding_service import _build_mission_text
+        mission = {'title': 'Yoga', 'description': '', 'tags': ['wellness']}
+        text = _build_mission_text(mission)
         assert 'Yoga' in text
         assert 'wellness' in text
 
@@ -56,22 +56,22 @@ class TestCosineSimilarity:
         assert 0.0 < sim < 1.0
 
 
-class TestGetOrCreateEventEmbedding:
-    def test_returns_none_for_missing_event(self):
+class TestGetOrCreateMissionEmbedding:
+    def test_returns_none_for_missing_mission(self):
         from OrbitServer.services import embedding_service
-        with patch.object(embedding_service, 'get_event', return_value=None):
+        with patch.object(embedding_service, 'get_mission', return_value=None):
             # Clear in-process cache
             embedding_service._embedding_cache.clear()
-            result = embedding_service.get_or_create_event_embedding(999)
+            result = embedding_service.get_or_create_mission_embedding(999)
             assert result is None
 
     def test_uses_cached_embedding_from_datastore(self):
         from OrbitServer.services import embedding_service
         stored_vec = [0.1, 0.2, 0.3]
-        event = {'id': 1, 'title': 'Test', 'embedding': stored_vec, 'tags': []}
+        mission = {'id': 1, 'title': 'Test', 'embedding': stored_vec, 'tags': []}
         embedding_service._embedding_cache.clear()
-        with patch.object(embedding_service, 'get_event', return_value=event):
-            result = embedding_service.get_or_create_event_embedding(1)
+        with patch.object(embedding_service, 'get_mission', return_value=mission):
+            result = embedding_service.get_or_create_mission_embedding(1)
             assert result is not None
             assert len(result) == 3
 
@@ -79,8 +79,8 @@ class TestGetOrCreateEventEmbedding:
         from OrbitServer.services import embedding_service
         cached_vec = np.array([0.5, 0.6, 0.7], dtype=np.float32)
         embedding_service._embedding_cache[42] = cached_vec
-        with patch.object(embedding_service, 'get_event') as mock_get:
-            result = embedding_service.get_or_create_event_embedding(42)
+        with patch.object(embedding_service, 'get_mission') as mock_get:
+            result = embedding_service.get_or_create_mission_embedding(42)
             mock_get.assert_not_called()
             assert result is not None
         # Cleanup
@@ -88,22 +88,22 @@ class TestGetOrCreateEventEmbedding:
 
     def test_returns_none_when_generation_fails(self):
         from OrbitServer.services import embedding_service
-        event = {'id': 5, 'title': 'Hike', 'description': 'Trail', 'tags': ['outdoors'], 'embedding': None}
+        mission = {'id': 5, 'title': 'Hike', 'description': 'Trail', 'tags': ['outdoors'], 'embedding': None}
         embedding_service._embedding_cache.clear()
-        with patch.object(embedding_service, 'get_event', return_value=event):
+        with patch.object(embedding_service, 'get_mission', return_value=mission):
             with patch.object(embedding_service, '_generate_embedding', return_value=None):
-                result = embedding_service.get_or_create_event_embedding(5)
+                result = embedding_service.get_or_create_mission_embedding(5)
                 assert result is None
 
     def test_generates_and_stores_when_missing(self):
         from OrbitServer.services import embedding_service
-        event = {'id': 7, 'title': 'Board Games', 'description': 'Fun', 'tags': ['games'], 'embedding': None}
+        mission = {'id': 7, 'title': 'Board Games', 'description': 'Fun', 'tags': ['games'], 'embedding': None}
         fake_vec = np.array([0.1, 0.2, 0.3], dtype=np.float32)
         embedding_service._embedding_cache.clear()
-        with patch.object(embedding_service, 'get_event', return_value=event):
+        with patch.object(embedding_service, 'get_mission', return_value=mission):
             with patch.object(embedding_service, '_generate_embedding', return_value=fake_vec):
-                with patch.object(embedding_service, 'store_event_embedding') as mock_store:
-                    result = embedding_service.get_or_create_event_embedding(7)
+                with patch.object(embedding_service, 'store_mission_embedding') as mock_store:
+                    result = embedding_service.get_or_create_mission_embedding(7)
                     assert result is not None
                     assert np.allclose(result, fake_vec)
                     mock_store.assert_called_once_with(7, fake_vec.tolist())
@@ -146,7 +146,7 @@ class TestGenerateEmbedding:
 
 
 class TestInvalidateCache:
-    def test_removes_event_from_cache(self):
+    def test_removes_mission_from_cache(self):
         from OrbitServer.services import embedding_service
         embedding_service._embedding_cache[99] = np.array([1.0, 2.0])
         embedding_service.invalidate_cache(99)

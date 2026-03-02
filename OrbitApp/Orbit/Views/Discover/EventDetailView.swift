@@ -9,7 +9,7 @@ struct MissionDetailView: View {
     let onJoined: () -> Void
 
     @State private var isJoining = false
-    @State private var joinedPod: EventPod?
+    @State private var joinedPod: Pod?
     @State private var errorMessage: String?
     @Environment(\.dismiss) private var dismiss
 
@@ -102,7 +102,7 @@ struct MissionDetailView: View {
             }
         }
         .sheet(item: $joinedPod) { pod in
-            PodView(podId: pod.id, eventTitle: mission.title)
+            PodView(podId: pod.id, title: mission.title)
                 .onDisappear {
                     onJoined()
                     dismiss()
@@ -400,7 +400,7 @@ struct SignalDetailView: View {
             }
             .sheet(isPresented: $showPod) {
                 if let podId = joinedPodId {
-                    PodView(podId: podId, eventTitle: signal.displayTitle)
+                    PodView(podId: podId, title: signal.displayTitle)
                 }
             }
             .onAppear {

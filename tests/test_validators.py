@@ -3,7 +3,7 @@
 from OrbitServer.utils.validators import (
     validate_edu_email,
     validate_profile_data,
-    validate_event_data,
+    validate_mission_data,
     validate_message_data,
     validate_vote_data,
 )
@@ -125,68 +125,68 @@ class TestValidateProfileData:
         assert len(errors) >= 2
 
 
-# ── Event Validation ─────────────────────────────────────────────────────────
+# ── Mission Validation ────────────────────────────────────────────────────────
 
-class TestValidateEventData:
+class TestValidateMissionData:
     def test_valid_event(self):
-        valid, errors = validate_event_data({"title": "Hike", "description": "Trail run"})
+        valid, errors = validate_mission_data({"title": "Hike", "description": "Trail run"})
         assert valid is True
 
     def test_rejects_missing_title(self):
-        valid, errors = validate_event_data({"description": "Fun"})
+        valid, errors = validate_mission_data({"description": "Fun"})
         assert valid is False
 
     def test_rejects_missing_description(self):
-        valid, errors = validate_event_data({"title": "Hike"})
+        valid, errors = validate_mission_data({"title": "Hike"})
         assert valid is False
 
     def test_rejects_long_title(self):
-        valid, errors = validate_event_data({"title": "x" * 201, "description": "Fun"})
+        valid, errors = validate_mission_data({"title": "x" * 201, "description": "Fun"})
         assert valid is False
 
     def test_rejects_long_description(self):
-        valid, errors = validate_event_data({"title": "Hike", "description": "x" * 2001})
+        valid, errors = validate_mission_data({"title": "Hike", "description": "x" * 2001})
         assert valid is False
 
     def test_rejects_too_many_tags(self):
-        valid, errors = validate_event_data({
+        valid, errors = validate_mission_data({
             "title": "Hike", "description": "Fun",
             "tags": ["tag"] * 11
         })
         assert valid is False
 
     def test_rejects_non_list_tags(self):
-        valid, errors = validate_event_data({
+        valid, errors = validate_mission_data({
             "title": "Hike", "description": "Fun", "tags": "not a list"
         })
         assert valid is False
 
     def test_rejects_invalid_pod_size(self):
-        valid, errors = validate_event_data({
+        valid, errors = validate_mission_data({
             "title": "Hike", "description": "Fun", "max_pod_size": 1
         })
         assert valid is False
 
     def test_accepts_valid_pod_size(self):
-        valid, errors = validate_event_data({
+        valid, errors = validate_mission_data({
             "title": "Hike", "description": "Fun", "max_pod_size": 4
         })
         assert valid is True
 
     def test_rejects_bad_date_format(self):
-        valid, errors = validate_event_data({
+        valid, errors = validate_mission_data({
             "title": "Hike", "description": "Fun", "date": "not-a-date"
         })
         assert valid is False
 
     def test_accepts_valid_date(self):
-        valid, errors = validate_event_data({
+        valid, errors = validate_mission_data({
             "title": "Hike", "description": "Fun", "date": "2026-06-15"
         })
         assert valid is True
 
     def test_update_mode_skips_required_fields(self):
-        valid, errors = validate_event_data({"title": "Updated"}, is_update=True)
+        valid, errors = validate_mission_data({"title": "Updated"}, is_update=True)
         assert valid is True
 
 

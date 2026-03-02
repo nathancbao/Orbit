@@ -18,7 +18,7 @@ class TestGetPod:
     @patch('OrbitServer.api.pods.get_pod_with_members')
     def test_returns_pod(self, mock_get, client):
         mock_get.return_value = (
-            {"id": "pod-1", "event_id": 1, "members": [{"user_id": 1, "name": "Alex"}]},
+            {"id": "pod-1", "mission_id": 1, "members": [{"user_id": 1, "name": "Alex"}]},
             None, None
         )
         resp = client.get('/api/pods/pod-1', headers=auth_header())
