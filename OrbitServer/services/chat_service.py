@@ -30,6 +30,10 @@ def send_message(pod_id, user_id, content):
         return None, reason
 
     msg = create_chat_message(pod_id, user_id, content.strip(), message_type='text')
+
+    from OrbitServer.services.notification_service import notify_chat_message
+    notify_chat_message(pod_id, user_id, content[:100])
+
     return msg, None
 
 

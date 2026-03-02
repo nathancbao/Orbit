@@ -5,11 +5,13 @@ import SwiftUI
 
 struct SignalsView: View {
     @Binding var userProfile: Profile
+    @EnvironmentObject var notificationVM: NotificationViewModel
     @StateObject private var viewModel = SignalsViewModel()
     @State private var segment: SignalSegment = .discover
     @State private var selectedSignal: Signal?
     @State private var showForm = false
     @State private var showProfile = false
+    @State private var showInbox = false
 
     enum SignalSegment: String, CaseIterable {
         case discover = "Discover"
@@ -87,10 +89,21 @@ struct SignalsView: View {
             .navigationBarTitleDisplayMode(.large)
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
-                    Button { } label: {
-                        Image(systemName: "bell")
-                            .fontWeight(.medium)
-                            .foregroundStyle(Color.primary)
+                    Button { showInbox = true } label: {
+                        ZStack(alignment: .topTrailing) {
+                            Image(systemName: "bell")
+                                .fontWeight(.medium)
+                                .foregroundStyle(Color.primary)
+                            if notificationVM.unreadCount > 0 {
+                                Text("\(min(notificationVM.unreadCount, 99))")
+                                    .font(.system(size: 10, weight: .bold))
+                                    .foregroundColor(.white)
+                                    .padding(3)
+                                    .background(Color.red)
+                                    .clipShape(Circle())
+                                    .offset(x: 8, y: -8)
+                            }
+                        }
                     }
                 }
                 ToolbarItem(placement: .navigationBarTrailing) {
@@ -99,6 +112,10 @@ struct SignalsView: View {
                     }
                 }
             }
+        }
+        .sheet(isPresented: $showInbox) {
+            InboxView()
+                .environmentObject(notificationVM)
         }
         .sheet(isPresented: $showProfile) {
             ProfileDisplayView(

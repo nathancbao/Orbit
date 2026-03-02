@@ -109,6 +109,10 @@ def join_event(event_id, user_id):
 
     record_event_action(user_id, event_id, 'joined', pod_id=pod['id'],
                         tags_snapshot=event.get('tags') or [])
+
+    from OrbitServer.services.notification_service import notify_pod_join
+    notify_pod_join(pod['id'], user_id)
+
     return pod, None
 
 
@@ -126,12 +130,18 @@ def leave_event(event_id, user_id):
     if not pod:
         return False, "You are not in a pod for this event"
 
+    remaining_members = [m for m in (pod.get('member_ids') or []) if m != int(user_id)]
+
     def _remove_member(entity):
         member_ids = [m for m in (entity.get('member_ids') or []) if m != int(user_id)]
         entity['member_ids'] = member_ids
         entity['status'] = 'open' if len(member_ids) < entity.get('max_size', 4) else entity.get('status', 'open')
 
     transactional_pod_update(pod['id'], _remove_member)
+
+    from OrbitServer.services.notification_service import notify_pod_leave
+    notify_pod_leave(pod['id'], user_id, remaining_members)
+
     return True, None
 
 
@@ -160,10 +170,15 @@ def leave_pod(pod_id, user_id):
         entity['status'] = 'open' if len(m_ids) < entity.get('max_size', 4) else entity.get('status', 'open')
         return len(m_ids)
 
+    remaining_members = [m for m in member_ids if m != uid]
+
     remaining, _ = transactional_pod_update(pod_id, _remove)
 
     if remaining == 0:
         delete_event_pod(pod_id)
+    elif remaining_members:
+        from OrbitServer.services.notification_service import notify_pod_leave
+        notify_pod_leave(pod_id, user_id, remaining_members)
 
     return True, None
 

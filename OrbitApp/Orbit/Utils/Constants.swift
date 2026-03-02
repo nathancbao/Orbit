@@ -44,6 +44,13 @@ enum Constants {
             static func signal(_ id: String) -> String { "/missions/\(id)" }
             static func rsvpSignal(_ id: String) -> String { "/missions/\(id)/rsvp" }
 
+            // Notifications
+            static let notifications = "/notifications"
+            static let notificationsRead = "/notifications/read"
+            static let notificationsReadAll = "/notifications/read-all"
+            static let notificationsUnreadCount = "/notifications/unread-count"
+            static let devices = "/devices"
+
             // Chat
             static func podMessages(_ id: String) -> String { "/pods/\(id)/messages" }
             static func podVotes(_ id: String) -> String { "/pods/\(id)/votes" }

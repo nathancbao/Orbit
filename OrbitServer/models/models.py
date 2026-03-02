@@ -633,3 +633,94 @@ def get_verification_code(email):
 def delete_verification_code(email):
     key = client.key('VerificationCode', email)
     client.delete(key)
+
+
+# ── Notification ─────────────────────────────────────────────────────────────
+# Fields: id (auto), user_id, type, title, body, data (dict), read, created_at
+
+def create_notification(user_id, notif_type, title, body, data=None):
+    key = client.key('Notification')
+    entity = datastore.Entity(key=key, exclude_from_indexes=['body', 'data'])
+    entity.update({
+        'user_id': int(user_id),
+        'type': notif_type,
+        'title': title,
+        'body': body,
+        'data': data or {},
+        'read': False,
+        'created_at': datetime.datetime.utcnow(),
+    })
+    client.put(entity)
+    return _entity_to_dict(entity)
+
+
+def list_notifications(user_id, limit=50):
+    query = client.query(kind='Notification')
+    query.add_filter('user_id', '=', int(user_id))
+    query.order = ['-created_at']
+    results = list(query.fetch(limit=limit))
+    return [_entity_to_dict(e) for e in results]
+
+
+def mark_notifications_read(user_id, notification_ids):
+    for nid in notification_ids:
+        key = client.key('Notification', int(nid))
+        entity = client.get(key)
+        if entity and entity.get('user_id') == int(user_id):
+            entity['read'] = True
+            client.put(entity)
+
+
+def mark_all_notifications_read(user_id):
+    query = client.query(kind='Notification')
+    query.add_filter('user_id', '=', int(user_id))
+    query.add_filter('read', '=', False)
+    for entity in query.fetch(limit=500):
+        entity['read'] = True
+        client.put(entity)
+
+
+def count_unread_notifications(user_id):
+    query = client.query(kind='Notification')
+    query.add_filter('user_id', '=', int(user_id))
+    query.add_filter('read', '=', False)
+    query.keys_only()
+    return len(list(query.fetch(limit=500)))
+
+
+# ── DeviceToken ──────────────────────────────────────────────────────────────
+# Fields: id (auto), user_id, token, updated_at
+
+def save_device_token(user_id, token):
+    # Upsert: find existing token or create new
+    query = client.query(kind='DeviceToken')
+    query.add_filter('token', '=', token)
+    existing = list(query.fetch(limit=1))
+    if existing:
+        entity = existing[0]
+        entity['user_id'] = int(user_id)
+        entity['updated_at'] = datetime.datetime.utcnow()
+    else:
+        key = client.key('DeviceToken')
+        entity = datastore.Entity(key=key)
+        entity.update({
+            'user_id': int(user_id),
+            'token': token,
+            'updated_at': datetime.datetime.utcnow(),
+        })
+    client.put(entity)
+    return _entity_to_dict(entity)
+
+
+def get_device_tokens(user_id):
+    query = client.query(kind='DeviceToken')
+    query.add_filter('user_id', '=', int(user_id))
+    results = list(query.fetch(limit=10))
+    return [e['token'] for e in results if e.get('token')]
+
+
+def delete_device_token(token):
+    query = client.query(kind='DeviceToken')
+    query.add_filter('token', '=', token)
+    for entity in query.fetch(limit=1):
+        client.delete(entity.key)
