@@ -4,6 +4,25 @@ import numpy as np
 import pytest
 from unittest.mock import patch, MagicMock
 
+# These tests need the *real* lightfm library (not a MagicMock).
+# Skip the whole module when lightfm can't be imported — e.g. on Python
+# versions where the C extension doesn't compile (3.12+).
+try:
+    from lightfm.data import Dataset as _Dataset
+    _ds = _Dataset()
+    _ds.fit(users=[0], items=[0])
+    # Unpack to 4 values — a MagicMock iteration yields 0 items so this
+    # raises ValueError when lightfm is faked by conftest.
+    _a, _b, _c, _d = _ds.mapping()
+    _has_lightfm = True
+except Exception:
+    _has_lightfm = False
+
+pytestmark = pytest.mark.skipif(
+    not _has_lightfm,
+    reason="lightfm not installed or incompatible with this Python version",
+)
+
 
 def _make_dataset(user_ids=(1,), item_ids=(10, 20)):
     """Build a minimal real LightFM Dataset for use in tests."""

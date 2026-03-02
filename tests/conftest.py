@@ -21,10 +21,31 @@ sys.modules['google.cloud.datastore'] = mock_datastore
 sys.modules['google.cloud.datastore.query'] = mock_datastore.query
 sys.modules['google.cloud.storage'] = mock_storage
 
-# Mock optional ML dependencies that may not be installed in test env
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# Mock optional ML dependencies only when they cannot be imported.
+# If the real package is installed and compatible, leave it alone so that
+# lightfm-specific tests can exercise the real Dataset class.
 for mod_name in ('lightfm', 'lightfm.data', 'fastembed'):
-    if mod_name not in sys.modules:
-        sys.modules[mod_name] = MagicMock()
+    try:
+        __import__(mod_name)
+    except Exception:
+        sys.modules.setdefault(mod_name, MagicMock())
 
 # Now the datastore.Client() call in models/models.py will return a MagicMock,
 # and datastore.Entity will also be a MagicMock.
@@ -42,3 +63,4 @@ def app():
 @pytest.fixture
 def client(app):
     return app.test_client()
+ddddddddddd
