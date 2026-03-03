@@ -123,6 +123,8 @@ def create_mission(data, creator_id, creator_type='user'):
         'tags': data.get('tags', []),
         'location': data.get('location', ''),
         'date': data.get('date', ''),
+        'start_time': data.get('start_time'),
+        'end_time': data.get('end_time'),
         'creator_id': int(creator_id),
         'creator_type': creator_type,
         'max_pod_size': int(data.get('max_pod_size', 4)),
@@ -152,7 +154,7 @@ def update_mission(mission_id, data):
     entity = client.get(key)
     if not entity:
         return None
-    allowed = ['title', 'description', 'tags', 'location', 'date', 'max_pod_size', 'status']
+    allowed = ['title', 'description', 'tags', 'location', 'date', 'start_time', 'end_time', 'max_pod_size', 'status']
     for field in allowed:
         if field in data:
             entity[field] = data[field]

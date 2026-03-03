@@ -93,6 +93,20 @@ def validate_mission_data(data, is_update=False):
         except ValueError:
             errors.append("date must be a valid date in YYYY-MM-DD format")
 
+    for time_field in ('start_time', 'end_time'):
+        val = data.get(time_field)
+        if val is not None:
+            if not isinstance(val, str) or not re.match(r'^\d{2}:\d{2}$', val):
+                errors.append(f"{time_field} must be in HH:mm format")
+            else:
+                h, m = int(val[:2]), int(val[3:])
+                if h < 0 or h > 23 or m < 0 or m > 59:
+                    errors.append(f"{time_field} has invalid hour/minute values")
+
+    if data.get('start_time') and data.get('end_time') and not errors:
+        if data['start_time'] >= data['end_time']:
+            errors.append("start_time must be before end_time")
+
     if errors:
         return False, errors
     return True, None
