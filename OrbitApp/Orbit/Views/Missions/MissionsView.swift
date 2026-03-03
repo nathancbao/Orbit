@@ -118,13 +118,18 @@ struct MissionsView: View {
                     UIImpactFeedbackGenerator(style: .medium).impactOccurred()
                     showCreate = true
                 } label: {
-                    Image(systemName: "plus")
-                        .font(.system(size: 22, weight: .semibold))
-                        .foregroundColor(.white)
-                        .padding(18)
-                        .background(OrbitTheme.gradientFill)
-                        .clipShape(Circle())
-                        .shadow(color: OrbitTheme.purple.opacity(0.4), radius: 12, x: 0, y: 6)
+                    HStack(spacing: 8) {
+                        Image(systemName: "plus")
+                            .font(.system(size: 18, weight: .bold))
+                        Text("Create")
+                            .font(.system(size: 16, weight: .semibold))
+                    }
+                    .foregroundColor(.white)
+                    .padding(.horizontal, 22)
+                    .padding(.vertical, 14)
+                    .background(OrbitTheme.gradientFill)
+                    .clipShape(Capsule())
+                    .shadow(color: OrbitTheme.purple.opacity(0.4), radius: 12, x: 0, y: 6)
                 }
                 .padding(.trailing, 24)
                 .padding(.bottom, 32)
@@ -477,7 +482,7 @@ struct MissionCreateView: View {
                 VStack(spacing: 24) {
                     VStack(alignment: .leading, spacing: 8) {
                         OrbitSectionHeader(title: "Mission Title")
-                        TextField("e.g. MMA Club Meeting", text: $title)
+                        TextField("e.g. BBQ Night", text: $title)
                             .textFieldStyle(.roundedBorder)
                     }
 

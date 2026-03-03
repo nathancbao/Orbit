@@ -106,11 +106,19 @@ struct QuickProfileSetupView: View {
                     if let onCancel = onCancel {
                         HStack {
                             Button(action: onCancel) {
-                                HStack(spacing: 4) {
-                                    Image(systemName: "xmark")
+                                HStack(spacing: 6) {
+                                    Image(systemName: "chevron.left")
+                                        .font(.caption)
+                                        .fontWeight(.semibold)
                                     Text("Cancel")
+                                        .fontWeight(.medium)
                                 }
-                                .foregroundColor(.secondary)
+                                .font(.body)
+                                .padding(.horizontal, 14)
+                                .padding(.vertical, 8)
+                                .background(Color(.systemGray5))
+                                .foregroundColor(.primary)
+                                .clipShape(Capsule())
                             }
                             Spacer()
                         }

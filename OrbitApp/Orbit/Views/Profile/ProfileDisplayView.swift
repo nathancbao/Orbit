@@ -211,7 +211,8 @@ struct ProfileDisplayView: View {
                     Button("Edit") {
                         showEdit = true
                     }
-                    .foregroundStyle(OrbitTheme.gradient)
+                    .fontWeight(.semibold)
+                    .foregroundColor(.primary)
                 }
             }
             .navigationDestination(isPresented: $showEdit) {
