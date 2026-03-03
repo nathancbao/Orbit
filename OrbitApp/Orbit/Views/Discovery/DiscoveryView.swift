@@ -760,9 +760,9 @@ struct LegendItem: View {
 // MARK: - Main Discovery View
 
 struct DiscoveryView: View {
-    let userProfile: Profile
     var isActive: Bool = false
 
+    @State private var userProfile: Profile
     @StateObject private var viewModel: DiscoveryViewModel
     @State private var imageStars: [ImageStar] = []
     @State private var planets: [PlanetNode] = []
@@ -777,7 +777,7 @@ struct DiscoveryView: View {
     @State private var showProfile = false
 
     init(userProfile: Profile, isActive: Bool = false) {
-        self.userProfile = userProfile
+        _userProfile = State(initialValue: userProfile)
         self.isActive = isActive
         _viewModel = StateObject(wrappedValue: DiscoveryViewModel(
             userInterests: userProfile.interests
@@ -924,7 +924,7 @@ struct DiscoveryView: View {
             .onChange(of: viewModel.items) {
                 generatePlanets()
             }
-            .onChange(of: isActive) { active in
+            .onChange(of: isActive) { _, active in
                 if active {
                     Task {
                         await viewModel.reload()
@@ -966,7 +966,7 @@ struct DiscoveryView: View {
                 ProfileDisplayView(
                     profile: userProfile,
                     onEdit: { showProfile = false },
-                    onProfileUpdated: { _ in }
+                    onProfileUpdated: { updated in userProfile = updated }
                 )
             }
         }

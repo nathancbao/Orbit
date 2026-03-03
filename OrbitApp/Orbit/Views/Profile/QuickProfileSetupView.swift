@@ -16,6 +16,7 @@ struct QuickProfileSetupView: View {
     @State private var selectedInterests: Set<String> = []
     @State private var customInterestText: String = ""
     @State private var profilePhoto: UIImage?
+    @State private var photoWasChanged = false
     @State private var showPhotoPicker = false
     @State private var isSaving = false
     @State private var errorMessage: String?
@@ -235,8 +236,23 @@ struct QuickProfileSetupView: View {
                 .padding(.top, 60)
             }
         }
-        .sheet(isPresented: $showPhotoPicker) {
+        .sheet(isPresented: $showPhotoPicker, onDismiss: {
+            if profilePhoto != nil { photoWasChanged = true }
+        }) {
             ImagePickerView(selectedImage: $profilePhoto)
+        }
+        .task {
+            // Load existing profile photo from URL when editing
+            if profilePhoto == nil,
+               let urlString = initialProfile?.photo,
+               let url = URL(string: urlString) {
+                do {
+                    let (data, _) = try await URLSession.shared.data(from: url)
+                    if let image = UIImage(data: data) {
+                        profilePhoto = image
+                    }
+                } catch {}
+            }
         }
     }
 
@@ -257,7 +273,7 @@ struct QuickProfileSetupView: View {
             name: name.trimmingCharacters(in: .whitespaces),
             collegeYear: selectedYear,
             interests: Array(selectedInterests),
-            photo: nil,  // photo URL is set after upload
+            photo: initialProfile?.photo,  // preserve existing photo URL
             trustScore: nil,
             email: nil,
             matchScore: nil
@@ -268,15 +284,12 @@ struct QuickProfileSetupView: View {
                 // Save profile text data first
                 _ = try await ProfileService.shared.updateProfile(profile)
 
-                // Upload photo if provided
-                var photoURL: String?
-                if let photo = profilePhoto {
-                    let photoResponse = try await ProfileService.shared.uploadPhoto(photo)
-                    photoURL = photoResponse.profile.photo
-                }
-
+                // Only upload photo if the user picked a new one
                 var finalProfile = profile
-                finalProfile.photo = photoURL
+                if photoWasChanged, let photo = profilePhoto {
+                    let photoResponse = try await ProfileService.shared.uploadPhoto(photo)
+                    finalProfile.photo = photoResponse.profile.photo
+                }
 
                 await MainActor.run {
                     isSaving = false
