@@ -39,6 +39,12 @@ struct QuickProfileSetupView: View {
         "Dancing", "Yoga", "Camping", "Concerts", "Comedy"
     ]
 
+    private var customInterests: [String] {
+        selectedInterests
+            .filter { !availableInterests.contains($0) }
+            .sorted()
+    }
+
     private var isValid: Bool {
         !name.trimmingCharacters(in: .whitespaces).isEmpty &&
         selectedInterests.count >= Constants.Validation.minInterests
@@ -180,9 +186,9 @@ struct QuickProfileSetupView: View {
                             .disabled(customInterestText.trimmingCharacters(in: .whitespaces).isEmpty)
                         }
 
-                        // Interest chips grid
+                        // Interest chips grid (custom interests shown first)
                         InterestChipGrid(
-                            interests: availableInterests,
+                            interests: customInterests + availableInterests,
                             selected: $selectedInterests,
                             maxCount: Constants.Validation.maxInterests
                         )
