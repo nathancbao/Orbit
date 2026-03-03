@@ -35,34 +35,21 @@ struct MissionsView: View {
                     ScrollView {
                         VStack(alignment: .leading, spacing: 24) {
                             if segment == .discover {
-                                // Suggested missions strip (Discover only)
-                                if !viewModel.suggestedMissions.isEmpty {
-                                    VStack(alignment: .leading, spacing: 12) {
-                                        Text("suggested for you")
-                                            .font(.headline)
-                                            .padding(.horizontal, 20)
-
-                                        ScrollView(.horizontal, showsIndicators: false) {
-                                            HStack(spacing: 14) {
-                                                ForEach(viewModel.suggestedMissions) { mission in
-                                                    SuggestedMissionCard(mission: mission) {
-                                                        selectedMission = mission
-                                                    }
-                                                }
-                                            }
-                                            .padding(.horizontal, 20)
-                                        }
-                                    }
-                                }
-
-                                // Tag Filters (Discover only)
+                                // Filters: type + topic (single row)
                                 ScrollView(.horizontal, showsIndicators: false) {
                                     HStack(spacing: 8) {
-                                        TagFilterChip(label: "all", isSelected: viewModel.filterTag == nil && !viewModel.showMyYearOnly) {
+                                        TagFilterChip(label: "all", isSelected: viewModel.filterTag == nil && !viewModel.showMyYearOnly && viewModel.filterMode == nil) {
                                             Task {
+                                                viewModel.applyModeFilter(nil)
                                                 if viewModel.showMyYearOnly { await viewModel.toggleYearFilter() }
                                                 await viewModel.applyTag(nil)
                                             }
+                                        }
+                                        TagFilterChip(label: "set", isSelected: viewModel.filterMode == .set) {
+                                            viewModel.applyModeFilter(viewModel.filterMode == .set ? nil : .set)
+                                        }
+                                        TagFilterChip(label: "flex", isSelected: viewModel.filterMode == .flex) {
+                                            viewModel.applyModeFilter(viewModel.filterMode == .flex ? nil : .flex)
                                         }
                                         TagFilterChip(label: "my year", isSelected: viewModel.showMyYearOnly) {
                                             Task { await viewModel.toggleYearFilter() }
@@ -74,22 +61,6 @@ struct MissionsView: View {
                                             ) {
                                                 Task { await viewModel.applyTag(viewModel.filterTag == tag ? nil : tag) }
                                             }
-                                        }
-                                    }
-                                    .padding(.horizontal, 20)
-                                }
-
-                                // Mode filter chips
-                                ScrollView(.horizontal, showsIndicators: false) {
-                                    HStack(spacing: 8) {
-                                        TagFilterChip(label: "all types", isSelected: viewModel.filterMode == nil) {
-                                            viewModel.applyModeFilter(nil)
-                                        }
-                                        TagFilterChip(label: "set", isSelected: viewModel.filterMode == .set) {
-                                            viewModel.applyModeFilter(viewModel.filterMode == .set ? nil : .set)
-                                        }
-                                        TagFilterChip(label: "flex", isSelected: viewModel.filterMode == .flex) {
-                                            viewModel.applyModeFilter(viewModel.filterMode == .flex ? nil : .flex)
                                         }
                                     }
                                     .padding(.horizontal, 20)
@@ -295,10 +266,25 @@ struct MissionListCard: View {
                     .cornerRadius(2)
 
                 VStack(alignment: .leading, spacing: 6) {
-                    Text(mission.isFlexMode ? mission.displayTitle : mission.title)
-                        .font(.headline)
-                        .foregroundColor(.primary)
-                        .lineLimit(2)
+                    HStack(alignment: .top, spacing: 8) {
+                        Text(mission.isFlexMode ? mission.displayTitle : mission.title)
+                            .font(.headline)
+                            .foregroundColor(.primary)
+                            .lineLimit(2)
+                        Spacer(minLength: 0)
+                        Text(mission.isFlexMode ? "FLEX" : "SET")
+                            .font(.caption2)
+                            .fontWeight(.bold)
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 3)
+                            .background(
+                                mission.isFlexMode
+                                    ? OrbitTheme.purple.opacity(0.15)
+                                    : OrbitTheme.pink.opacity(0.15)
+                            )
+                            .foregroundColor(mission.isFlexMode ? OrbitTheme.purple : OrbitTheme.pink)
+                            .clipShape(Capsule())
+                    }
 
                     if mission.isFlexMode {
                         // Flex mode info
@@ -627,7 +613,7 @@ struct MissionCreateView: View {
             if selectedCategory == .custom && customActivityName.trimmingCharacters(in: .whitespaces).isEmpty {
                 return false
             }
-            return !selectedHours.isEmpty
+            return true
         }
     }
 
@@ -761,17 +747,6 @@ struct MissionCreateView: View {
                     TextField("Name your activity", text: $customActivityName)
                         .textFieldStyle(.roundedBorder)
                 }
-            }
-
-            // Day picker
-            dayPickerSection
-
-            // Time range
-            timeRangeSection
-
-            // Hourly grid
-            if !selectedDays.isEmpty {
-                hourlyGridSection
             }
 
             // Group size
@@ -1158,27 +1133,15 @@ struct MissionCreateView: View {
 
     private func submitFlexMission() {
         guard canSubmit, !viewModel.isSubmitting else { return }
-        let calendar = Calendar.current
-        let today = calendar.startOfDay(for: Date())
-
-        let grouped = Dictionary(grouping: selectedHours) { $0.dayOffset }
-        let slots: [AvailabilitySlot] = grouped.keys.sorted().compactMap { dayOffset in
-            guard let date = calendar.date(byAdding: .day, value: dayOffset, to: today) else { return nil }
-            let hours = grouped[dayOffset]!.map(\.hour).sorted()
-            return AvailabilitySlot(date: date, hours: hours)
-        }
-
         Task {
             await viewModel.createFlexMission(
                 activityCategory: selectedCategory,
                 customActivityName: selectedCategory == .custom ? customActivityName.trimmingCharacters(in: .whitespaces) : nil,
                 minGroupSize: minGroupSize,
                 maxGroupSize: maxGroupSize,
-                availability: slots,
+                availability: [],
                 description: description.trimmingCharacters(in: .whitespaces),
-                links: linksArray,
-                timeRangeStart: timeRangeStart,
-                timeRangeEnd: timeRangeEnd
+                links: linksArray
             )
             if viewModel.errorMessage == nil {
                 onCreated?(viewModel.allFlexMissions.first ?? Mission(title: ""))
@@ -1188,6 +1151,11 @@ struct MissionCreateView: View {
     }
 
     // MARK: - Helpers
+
+    private func hourString(_ hour: Int) -> String {
+        let h = hour % 12 == 0 ? 12 : hour % 12
+        return "\(h)\(hour < 12 ? "am" : "pm")"
+    }
 
     private func toggleHourSlot(_ key: HourSlotKey) {
         if selectedHours.contains(key) {

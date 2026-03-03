@@ -181,7 +181,9 @@ class MissionsViewModel: ObservableObject {
                 timeRangeStart: timeRangeStart,
                 timeRangeEnd: timeRangeEnd
             )
-            allFlexMissions.insert(created, at: 0)
+            // Auto-RSVP the creator so they're in a pod from the start
+            let rsvped = (try? await MissionService.shared.joinFlexMission(id: created.id)) ?? created
+            allFlexMissions.insert(rsvped, at: 0)
             showToastMessage("Mission created!")
         } catch {
             errorMessage = error.localizedDescription
