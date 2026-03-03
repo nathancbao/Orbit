@@ -18,6 +18,7 @@ enum Constants {
             static let logout = "/auth/logout"
 
             // User / Profile
+            static func userProfile(_ id: Int) -> String { "/users/\(id)" }
             static let me = "/users/me"
             static let myPods = "/users/me/pods"
             static let myRsvps = "/users/me/rsvps"

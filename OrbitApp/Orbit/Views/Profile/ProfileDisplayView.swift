@@ -207,12 +207,14 @@ struct ProfileDisplayView: View {
                             .foregroundColor(Color(.systemGray3))
                     }
                 }
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("Edit") {
-                        showEdit = true
+                if onProfileUpdated != nil {
+                    ToolbarItem(placement: .navigationBarTrailing) {
+                        Button("Edit") {
+                            showEdit = true
+                        }
+                        .fontWeight(.semibold)
+                        .foregroundColor(.primary)
                     }
-                    .fontWeight(.semibold)
-                    .foregroundColor(.primary)
                 }
             }
             .navigationDestination(isPresented: $showEdit) {

@@ -15,6 +15,8 @@ struct PodView: View {
     @State private var showRenameAlert = false
     @State private var renameText = ""
     @State private var showLeaveAlert = false
+    @State private var selectedMemberProfile: Profile?
+    @State private var isLoadingProfile = false
     @Environment(\.dismiss) private var dismiss
 
     // Retrieve current user id from keychain (simple approach)
@@ -47,6 +49,9 @@ struct PodView: View {
                             onKick: { member in
                                 kickTarget = member
                                 showKickSheet = true
+                            },
+                            onTapMember: { member in
+                                loadMemberProfile(userId: member.userId)
                             }
                         )
                     }
@@ -133,7 +138,27 @@ struct PodView: View {
                     dismiss()
                 }
             }
+            .sheet(item: $selectedMemberProfile) { profile in
+                ProfileDisplayView(profile: profile)
+            }
             .task { await viewModel.load() }
+        }
+    }
+
+    private func loadMemberProfile(userId: Int) {
+        isLoadingProfile = true
+        Task {
+            do {
+                let profile = try await ProfileService.shared.getUserProfile(id: userId)
+                await MainActor.run {
+                    isLoadingProfile = false
+                    selectedMemberProfile = profile
+                }
+            } catch {
+                await MainActor.run {
+                    isLoadingProfile = false
+                }
+            }
         }
     }
 
@@ -266,36 +291,42 @@ struct MemberStripView: View {
     let members: [PodMember]
     let currentUserId: Int
     let onKick: (PodMember) -> Void
+    var onTapMember: ((PodMember) -> Void)? = nil
 
     var body: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 12) {
                 ForEach(members) { member in
-                    VStack(spacing: 4) {
-                        ZStack {
-                            Circle()
-                                .fill(avatarColor(for: member.name))
-                                .frame(width: 44, height: 44)
-                            Text(String(member.name.prefix(1)).uppercased())
-                                .font(.headline)
-                                .foregroundColor(.white)
+                    Button {
+                        onTapMember?(member)
+                    } label: {
+                        VStack(spacing: 4) {
+                            ZStack {
+                                Circle()
+                                    .fill(avatarColor(for: member.name))
+                                    .frame(width: 44, height: 44)
+                                Text(String(member.name.prefix(1)).uppercased())
+                                    .font(.headline)
+                                    .foregroundColor(.white)
+                            }
+
+                            Text(member.name)
+                                .font(.caption2)
+                                .lineLimit(1)
+                            Text(Profile.displayYear(member.collegeYear))
+                                .font(.caption2)
+                                .foregroundColor(.secondary)
                         }
-                        .contextMenu {
-                            if member.userId != currentUserId {
-                                Button(role: .destructive) {
-                                    onKick(member)
-                                } label: {
-                                    Label("Kick \(member.name)", systemImage: "person.fill.xmark")
-                                }
+                    }
+                    .buttonStyle(.plain)
+                    .contextMenu {
+                        if member.userId != currentUserId {
+                            Button(role: .destructive) {
+                                onKick(member)
+                            } label: {
+                                Label("Kick \(member.name)", systemImage: "person.fill.xmark")
                             }
                         }
-
-                        Text(member.name)
-                            .font(.caption2)
-                            .lineLimit(1)
-                        Text(Profile.displayYear(member.collegeYear))
-                            .font(.caption2)
-                            .foregroundColor(.secondary)
                     }
                 }
             }

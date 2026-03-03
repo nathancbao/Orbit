@@ -33,6 +33,14 @@ class ProfileService {
         return response.profile
     }
 
+    func getUserProfile(id: Int) async throws -> Profile {
+        let response: ProfileResponseData = try await APIService.shared.request(
+            endpoint: Constants.API.Endpoints.userProfile(id),
+            authenticated: true
+        )
+        return response.profile
+    }
+
     /// Downscale an image so its longest side is at most `maxDimension` points.
     private func downscaled(_ image: UIImage, maxDimension: CGFloat = 512) -> UIImage {
         let size = image.size
