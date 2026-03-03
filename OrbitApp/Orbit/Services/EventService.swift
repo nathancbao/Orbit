@@ -74,6 +74,19 @@ struct EmptyResponse: Codable {
 }
 
 
+// MARK: - Signal Discover Response
+// Backend wraps discover signals in {"signals": [...], "next_cursor": ...}.
+
+struct SignalDiscoverResponse: Codable {
+    let signals: [Signal]
+    let nextCursor: String?
+
+    enum CodingKeys: String, CodingKey {
+        case signals
+        case nextCursor = "next_cursor"
+    }
+}
+
 // MARK: - Signal Service
 // API client for signals (backend: /api/signals).
 
@@ -82,10 +95,11 @@ class SignalService {
     private init() {}
 
     func discoverSignals() async throws -> [Signal] {
-        return try await APIService.shared.request(
+        let response: SignalDiscoverResponse = try await APIService.shared.request(
             endpoint: Constants.API.Endpoints.discoverSignals,
             authenticated: true
         )
+        return response.signals
     }
 
     func mySignals() async throws -> [Signal] {
@@ -102,17 +116,26 @@ class SignalService {
         maxGroupSize: Int,
         availability: [AvailabilitySlot],
         description: String,
-        links: [String] = []
+        links: [String] = [],
+        timeRangeStart: Int = 9,
+        timeRangeEnd: Int = 21
     ) async throws -> Signal {
         let dateFormatter = DateFormatter()
         dateFormatter.dateFormat = "yyyy-MM-dd"
         dateFormatter.locale = Locale(identifier: "en_US_POSIX")
 
         let slotsPayload: [[String: Any]] = availability.map { slot in
-            [
-                "date": dateFormatter.string(from: slot.date),
-                "time_blocks": slot.timeBlocks.map(\.rawValue),
-            ]
+            if !slot.hours.isEmpty {
+                return [
+                    "date": dateFormatter.string(from: slot.date),
+                    "hours": slot.hours,
+                ]
+            } else {
+                return [
+                    "date": dateFormatter.string(from: slot.date),
+                    "time_blocks": slot.timeBlocks.map(\.rawValue),
+                ]
+            }
         }
 
         let title: String
@@ -129,6 +152,8 @@ class SignalService {
             "max_group_size": maxGroupSize,
             "availability": slotsPayload,
             "description": description,
+            "time_range_start": timeRangeStart,
+            "time_range_end": timeRangeEnd,
         ]
         if let name = customActivityName, !name.isEmpty {
             body["custom_activity_name"] = name

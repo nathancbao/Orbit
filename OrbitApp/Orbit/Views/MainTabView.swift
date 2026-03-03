@@ -49,7 +49,7 @@ struct MainTabView: View {
         VStack(spacing: 0) {
             // Content area — ZStack keeps all views alive so state persists across tab switches
             ZStack {
-                DiscoveryView(userProfile: profile, isActive: selectedTab == .discovery)
+                DiscoveryView(userProfile: $profile, isActive: selectedTab == .discovery)
                     .opacity(selectedTab == .discovery ? 1 : 0)
                     .allowsHitTesting(selectedTab == .discovery)
 

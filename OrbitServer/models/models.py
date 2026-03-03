@@ -504,6 +504,8 @@ def create_signal(data, creator_id):
         'max_group_size': int(data.get('max_group_size', 6)),
         'availability': data.get('availability', []),
         'links': data.get('links', []),
+        'time_range_start': int(data.get('time_range_start', 9)),
+        'time_range_end': int(data.get('time_range_end', 21)),
         'rsvps': [],
         'status': 'pending',
         'created_at': datetime.datetime.utcnow(),

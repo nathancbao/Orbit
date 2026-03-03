@@ -161,25 +161,54 @@ def validate_signal_data(data):
     except (KeyError, TypeError, ValueError):
         errors.append("min_group_size and max_group_size must be integers")
 
+    # Optional time range for hourly scheduling (default 9-21)
+    for field in ('time_range_start', 'time_range_end'):
+        val = data.get(field)
+        if val is not None:
+            try:
+                h = int(val)
+                if h < 0 or h > 23:
+                    errors.append(f"{field} must be between 0 and 23")
+            except (TypeError, ValueError):
+                errors.append(f"{field} must be an integer (0-23)")
+
     availability = data.get('availability')
     if not isinstance(availability, list) or len(availability) == 0:
-        errors.append("availability must be a non-empty list of {date, time_blocks} slots")
+        errors.append("availability must be a non-empty list of slots")
     else:
         for slot in availability:
             if not isinstance(slot, dict):
-                errors.append("Each availability slot must be an object with 'date' and 'time_blocks'")
+                errors.append("Each availability slot must be an object")
                 break
             if not slot.get('date'):
                 errors.append("Each availability slot must have a 'date' field (ISO 8601 string)")
                 break
-            tbs = slot.get('time_blocks', [])
-            if not isinstance(tbs, list) or len(tbs) == 0:
-                errors.append("Each availability slot must have at least one time_block")
+
+            has_hours = 'hours' in slot and isinstance(slot.get('hours'), list)
+            has_time_blocks = 'time_blocks' in slot and isinstance(slot.get('time_blocks'), list)
+
+            if not has_hours and not has_time_blocks:
+                errors.append("Each slot must have 'hours' (list of ints) or 'time_blocks' (list of strings)")
                 break
-            invalid = [tb for tb in tbs if tb not in _TIME_BLOCKS]
-            if invalid:
-                errors.append(f"Invalid time_block(s): {invalid}. Must be morning, afternoon, or evening")
-                break
+
+            if has_hours:
+                hours = slot['hours']
+                if len(hours) == 0:
+                    errors.append("Each availability slot must have at least one hour")
+                    break
+                invalid = [h for h in hours if not isinstance(h, int) or h < 0 or h > 23]
+                if invalid:
+                    errors.append(f"Invalid hour(s): {invalid}. Must be integers 0-23")
+                    break
+            elif has_time_blocks:
+                tbs = slot['time_blocks']
+                if len(tbs) == 0:
+                    errors.append("Each availability slot must have at least one time_block")
+                    break
+                invalid = [tb for tb in tbs if tb not in _TIME_BLOCKS]
+                if invalid:
+                    errors.append(f"Invalid time_block(s): {invalid}. Must be morning, afternoon, or evening")
+                    break
 
     if errors:
         return False, errors

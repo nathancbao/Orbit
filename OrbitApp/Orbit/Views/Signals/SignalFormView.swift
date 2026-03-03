@@ -1,20 +1,27 @@
 import SwiftUI
 
 // MARK: - Signal Form View
-// Sheet for creating a new spontaneous signal.
+// Sheet for creating a new spontaneous signal with hourly scheduling.
 
 struct SignalFormView: View {
     @EnvironmentObject var viewModel: SignalsViewModel
     @Environment(\.dismiss) private var dismiss
 
     @State private var selectedCategory: ActivityCategory = .hangout
-    @State private var selectedSlots: Set<SlotKey> = []
-    @State private var minGroupSize: Int = 3
-    @State private var maxGroupSize: Int = 8
     @State private var customActivityName: String = ""
     @State private var description: String = ""
     @State private var link1: String = ""
     @State private var link2: String = ""
+    @State private var minGroupSize: Int = 3
+    @State private var maxGroupSize: Int = 8
+
+    // Scheduling state
+    @State private var selectedDays: Set<Int> = []          // day offsets (0 = today, 1 = tomorrow)
+    @State private var selectedHours: Set<HourSlotKey> = [] // (dayOffset, hour)
+    @State private var timeRangeStart: Int = 9
+    @State private var timeRangeEnd: Int = 21
+
+    private let maxDayOffset = 1  // Can only set 1 day in advance
 
     private var wordCount: Int {
         let trimmed = description.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -30,13 +37,24 @@ struct SignalFormView: View {
             return false
         }
         if isOverWordLimit { return false }
-        return !selectedSlots.isEmpty
+        return !selectedHours.isEmpty
     }
 
     private var linksArray: [String] {
         [link1, link2]
             .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
             .filter { !$0.isEmpty }
+    }
+
+    /// Hours visible in the grid based on the time range.
+    private var visibleHours: [Int] {
+        guard timeRangeStart < timeRangeEnd else { return [] }
+        return Array(timeRangeStart..<timeRangeEnd)
+    }
+
+    /// Sorted selected day offsets.
+    private var sortedDays: [Int] {
+        selectedDays.sorted()
     }
 
     var body: some View {
@@ -47,7 +65,11 @@ struct SignalFormView: View {
                     if selectedCategory == .custom {
                         customNameSection
                     }
-                    availabilityGridSection
+                    dayPickerSection
+                    timeRangeSection
+                    if !selectedDays.isEmpty {
+                        hourlyGridSection
+                    }
                     groupSizeSection
                     descriptionSection
                     linksSection
@@ -124,74 +146,195 @@ struct SignalFormView: View {
         }
     }
 
-    // MARK: - Availability Grid
+    // MARK: - Day Picker
 
-    private var availabilityGridSection: some View {
+    private var dayPickerSection: some View {
         VStack(alignment: .leading, spacing: 12) {
-            OrbitSectionHeader(title: "When are you free?")
+            OrbitSectionHeader(title: "Which days?")
 
-            Text("Next 14 days — tap to toggle")
+            Text("Select the days you're available (up to tomorrow)")
                 .font(.caption)
                 .foregroundColor(.secondary)
 
-            ScrollView(.horizontal, showsIndicators: false) {
-                VStack(alignment: .leading, spacing: 0) {
-                    dayHeaderRow
-                    ForEach(TimeBlock.allCases) { block in
-                        timeBlockRow(block: block)
+            HStack(spacing: 12) {
+                ForEach(0...maxDayOffset, id: \.self) { offset in
+                    let isSelected = selectedDays.contains(offset)
+                    Button {
+                        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                        if isSelected {
+                            selectedDays.remove(offset)
+                            // Remove hours for this day
+                            selectedHours = selectedHours.filter { $0.dayOffset != offset }
+                        } else {
+                            selectedDays.insert(offset)
+                        }
+                    } label: {
+                        VStack(spacing: 4) {
+                            Text(dayLabel(for: offset))
+                                .font(.subheadline)
+                                .fontWeight(.semibold)
+                            Text(dateLabel(for: offset))
+                                .font(.caption)
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 14)
+                        .background(
+                            isSelected
+                                ? AnyShapeStyle(OrbitTheme.gradientFill)
+                                : AnyShapeStyle(Color(.systemGray6))
+                        )
+                        .foregroundColor(isSelected ? .white : .primary)
+                        .clipShape(RoundedRectangle(cornerRadius: 12))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 12)
+                                .stroke(
+                                    isSelected ? Color.clear : Color(.systemGray4),
+                                    lineWidth: 1
+                                )
+                        )
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+        }
+    }
+
+    // MARK: - Time Range
+
+    private var timeRangeSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            OrbitSectionHeader(title: "Time Range")
+
+            Text("Set the window of hours to show")
+                .font(.caption)
+                .foregroundColor(.secondary)
+
+            HStack(spacing: 16) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Start")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                    Picker("Start", selection: $timeRangeStart) {
+                        ForEach(0..<23, id: \.self) { h in
+                            Text(hourString(h)).tag(h)
+                        }
+                    }
+                    .pickerStyle(.menu)
+                    .onChange(of: timeRangeStart) { newVal in
+                        if newVal >= timeRangeEnd {
+                            timeRangeEnd = min(newVal + 1, 23)
+                        }
+                        pruneHoursOutsideRange()
                     }
                 }
-                .padding(.vertical, 4)
-            }
-        }
-    }
 
-    private var dayHeaderRow: some View {
-        HStack(spacing: 4) {
-            Text("")
-                .frame(width: 36)
-
-            ForEach(0..<14, id: \.self) { dayOffset in
-                VStack(spacing: 2) {
-                    Text(weekdayLabel(for: dayOffset))
-                        .font(.system(size: 10, weight: .medium))
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("End")
+                        .font(.caption)
                         .foregroundColor(.secondary)
-                    Text(dateLabel(for: dayOffset))
-                        .font(.system(size: 10))
-                        .foregroundColor(.secondary)
+                    Picker("End", selection: $timeRangeEnd) {
+                        ForEach((timeRangeStart + 1)...23, id: \.self) { h in
+                            Text(hourString(h)).tag(h)
+                        }
+                    }
+                    .pickerStyle(.menu)
+                    .onChange(of: timeRangeEnd) { _ in
+                        pruneHoursOutsideRange()
+                    }
                 }
-                .frame(width: 44)
+
+                Spacer()
             }
         }
-        .padding(.bottom, 6)
     }
 
-    private func timeBlockRow(block: TimeBlock) -> some View {
-        HStack(spacing: 4) {
-            Text(block.shortLabel)
-                .font(.system(size: 11, weight: .semibold))
+    // MARK: - Hourly Grid (when2meet style)
+
+    private var hourlyGridSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            OrbitSectionHeader(title: "Pick your hours")
+
+            Text("Tap hours you're free — \(selectedHours.count) selected")
+                .font(.caption)
                 .foregroundColor(.secondary)
-                .frame(width: 36, alignment: .trailing)
 
-            ForEach(0..<14, id: \.self) { dayOffset in
-                let key = SlotKey(dayOffset: dayOffset, timeBlock: block)
-                let isSelected = selectedSlots.contains(key)
+            // Grid: hour labels on left, day columns on right
+            VStack(spacing: 0) {
+                // Day column headers
+                HStack(spacing: 0) {
+                    Text("")
+                        .frame(width: 56)
 
-                Button {
-                    toggleSlot(key)
-                } label: {
-                    RoundedRectangle(cornerRadius: 6)
-                        .fill(isSelected ? AnyShapeStyle(OrbitTheme.gradientFill) : AnyShapeStyle(Color(.systemGray5)))
-                        .frame(width: 44, height: 36)
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 6)
-                                .stroke(isSelected ? Color.clear : Color(.systemGray4), lineWidth: 0.5)
-                        )
+                    ForEach(sortedDays, id: \.self) { offset in
+                        VStack(spacing: 2) {
+                            Text(dayLabel(for: offset))
+                                .font(.system(size: 12, weight: .semibold))
+                            Text(dateLabel(for: offset))
+                                .font(.system(size: 10))
+                                .foregroundColor(.secondary)
+                        }
+                        .frame(maxWidth: .infinity)
+                    }
                 }
-                .buttonStyle(.plain)
+                .padding(.bottom, 8)
+
+                // Hour rows
+                ForEach(visibleHours, id: \.self) { hour in
+                    HStack(spacing: 0) {
+                        Text(hourString(hour))
+                            .font(.system(size: 11, weight: .medium))
+                            .foregroundColor(.secondary)
+                            .frame(width: 56, alignment: .trailing)
+                            .padding(.trailing, 6)
+
+                        ForEach(sortedDays, id: \.self) { dayOffset in
+                            let key = HourSlotKey(dayOffset: dayOffset, hour: hour)
+                            let isSelected = selectedHours.contains(key)
+
+                            Button {
+                                toggleHourSlot(key)
+                            } label: {
+                                RoundedRectangle(cornerRadius: 6)
+                                    .fill(isSelected
+                                          ? AnyShapeStyle(OrbitTheme.gradientFill)
+                                          : AnyShapeStyle(Color(.systemGray5)))
+                                    .frame(height: 36)
+                                    .frame(maxWidth: .infinity)
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: 6)
+                                            .stroke(isSelected ? Color.clear : Color(.systemGray4), lineWidth: 0.5)
+                                    )
+                            }
+                            .buttonStyle(.plain)
+                            .padding(.horizontal, 3)
+                        }
+                    }
+                    .padding(.vertical, 2)
+                }
+            }
+            .padding(12)
+            .background(Color(.systemGray6).opacity(0.5))
+            .clipShape(RoundedRectangle(cornerRadius: 12))
+
+            // Quick actions
+            HStack(spacing: 12) {
+                Button("Select All") {
+                    for day in sortedDays {
+                        for hour in visibleHours {
+                            selectedHours.insert(HourSlotKey(dayOffset: day, hour: hour))
+                        }
+                    }
+                }
+                .font(.caption)
+                .foregroundColor(OrbitTheme.purple)
+
+                Button("Clear") {
+                    selectedHours.removeAll()
+                }
+                .font(.caption)
+                .foregroundColor(.secondary)
             }
         }
-        .padding(.vertical, 2)
     }
 
     // MARK: - Group Size
@@ -293,19 +436,25 @@ struct SignalFormView: View {
 
     // MARK: - Helpers
 
-    private func toggleSlot(_ key: SlotKey) {
-        if selectedSlots.contains(key) {
-            selectedSlots.remove(key)
+    private func toggleHourSlot(_ key: HourSlotKey) {
+        if selectedHours.contains(key) {
+            selectedHours.remove(key)
         } else {
-            selectedSlots.insert(key)
+            selectedHours.insert(key)
         }
+    }
+
+    private func pruneHoursOutsideRange() {
+        selectedHours = selectedHours.filter { $0.hour >= timeRangeStart && $0.hour < timeRangeEnd }
     }
 
     private func dateForOffset(_ offset: Int) -> Date {
         Calendar.current.date(byAdding: .day, value: offset, to: Calendar.current.startOfDay(for: Date())) ?? Date()
     }
 
-    private func weekdayLabel(for offset: Int) -> String {
+    private func dayLabel(for offset: Int) -> String {
+        if offset == 0 { return "Today" }
+        if offset == 1 { return "Tomorrow" }
         let f = DateFormatter(); f.dateFormat = "EEE"
         return f.string(from: dateForOffset(offset))
     }
@@ -320,13 +469,12 @@ struct SignalFormView: View {
         let calendar = Calendar.current
         let today = calendar.startOfDay(for: Date())
 
-        let grouped = Dictionary(grouping: selectedSlots) { $0.dayOffset }
+        // Group selected hour slots by day, build AvailabilitySlot with hours
+        let grouped = Dictionary(grouping: selectedHours) { $0.dayOffset }
         let slots: [AvailabilitySlot] = grouped.keys.sorted().compactMap { dayOffset in
             guard let date = calendar.date(byAdding: .day, value: dayOffset, to: today) else { return nil }
-            let blocks = grouped[dayOffset]!
-                .map(\.timeBlock)
-                .sorted { TimeBlock.allCases.firstIndex(of: $0)! < TimeBlock.allCases.firstIndex(of: $1)! }
-            return AvailabilitySlot(date: date, timeBlocks: blocks)
+            let hours = grouped[dayOffset]!.map(\.hour).sorted()
+            return AvailabilitySlot(date: date, hours: hours)
         }
 
         Task {
@@ -337,7 +485,9 @@ struct SignalFormView: View {
                 maxGroupSize: maxGroupSize,
                 availability: slots,
                 description: description.trimmingCharacters(in: .whitespaces),
-                links: linksArray
+                links: linksArray,
+                timeRangeStart: timeRangeStart,
+                timeRangeEnd: timeRangeEnd
             )
             if !viewModel.showError {
                 dismiss()
@@ -346,9 +496,9 @@ struct SignalFormView: View {
     }
 }
 
-// MARK: - Slot Key
+// MARK: - Hour Slot Key
 
-struct SlotKey: Hashable {
+struct HourSlotKey: Hashable {
     let dayOffset: Int
-    let timeBlock: TimeBlock
+    let hour: Int
 }
