@@ -783,11 +783,11 @@ struct DiscoveryView: View {
         ))
     }
 
-    // Priority ring radii as fraction of half-screen width
+    // Priority ring radii as fraction of half the screen's larger dimension
     private let ringRadii: [Int: CGFloat] = [
-        0: 0.50,  // hosted — inner ring
-        1: 0.68,  // joined — second ring
-        2: 0.84,  // recommended — third ring
+        0: 0.35,  // hosted — inner ring
+        1: 0.58,  // joined — second ring
+        2: 0.80,  // recommended — third ring
         3: 0.96   // discoverable/templates — outer ring
     ]
 
@@ -797,7 +797,7 @@ struct DiscoveryView: View {
                 x: geometry.size.width / 2,
                 y: geometry.size.height / 2 - 40
             )
-            let halfScreen = min(geometry.size.width, geometry.size.height) / 2
+            let halfScreen = max(geometry.size.width, geometry.size.height) / 2
 
             ZStack {
                 // Background
@@ -913,21 +913,21 @@ struct DiscoveryView: View {
             }
             .onAppear {
                 generateImageStars(in: geometry.size)
-                generatePlanets(halfScreen: halfScreen)
+                generatePlanets(halfScreen: halfScreen, screenSize: geometry.size, center: centerPoint)
             }
             .task {
                 await viewModel.load()
                 viewModel.startBellTimer()
-                generatePlanets(halfScreen: halfScreen)
+                generatePlanets(halfScreen: halfScreen, screenSize: geometry.size, center: centerPoint)
             }
             .onChange(of: viewModel.items) {
-                generatePlanets(halfScreen: halfScreen)
+                generatePlanets(halfScreen: halfScreen, screenSize: geometry.size, center: centerPoint)
             }
             .onChange(of: isActive) { _, active in
                 if active {
                     Task {
                         await viewModel.reload()
-                        generatePlanets(halfScreen: halfScreen)
+                        generatePlanets(halfScreen: halfScreen, screenSize: geometry.size, center: centerPoint)
                     }
                 }
             }
@@ -1039,9 +1039,25 @@ struct DiscoveryView: View {
     private let maxPlanets = 7
 
     /// Minimum pixel distance between any two planet centers to prevent overlap.
-    private let minPlanetDistance: CGFloat = 90
+    private let minPlanetDistance: CGFloat = 120
 
-    private func generatePlanets(halfScreen: CGFloat) {
+    /// Check if a candidate position is valid: no overlap and within screen bounds.
+    private func isValidPosition(x: CGFloat, y: CGFloat, placed: [(x: CGFloat, y: CGFloat)],
+                                  screenSize: CGSize, center: CGPoint) -> Bool {
+        // Planet radius (half of 52pt size) plus padding
+        let margin: CGFloat = 36
+        let screenX = center.x + x
+        let screenY = center.y + y
+        guard screenX >= margin,
+              screenX <= screenSize.width - margin,
+              screenY >= margin,
+              screenY <= screenSize.height - margin else {
+            return false
+        }
+        return !placed.contains { hypot(x - $0.x, y - $0.y) < minPlanetDistance }
+    }
+
+    private func generatePlanets(halfScreen: CGFloat, screenSize: CGSize, center: CGPoint) {
         let sorted = viewModel.items
             .filter { if case .template = $0 { return false }; return true }
             .sorted { $0.priority < $1.priority }
@@ -1050,41 +1066,83 @@ struct DiscoveryView: View {
         let grouped = Dictionary(grouping: capped) { $0.priority }
 
         var allPlanets: [PlanetNode] = []
-        // Track placed positions in polar form for pixel-distance checks
-        var placed: [(r: CGFloat, a: Double)] = []
+        var placed: [(x: CGFloat, y: CGFloat)] = []
 
         for priority in grouped.keys.sorted() {
             guard let items = grouped[priority], !items.isEmpty else { continue }
             let count = items.count
             let baseAngleStep = (Double.pi * 2) / Double(count)
-            // Offset each ring so planets on adjacent rings don't line up
             let ringOffset = Double(priority) * 0.45
             let ringRadius = (ringRadii[priority] ?? 0.65) * halfScreen
 
             for (index, item) in items.enumerated() {
                 var angle = baseAngleStep * Double(index) + ringOffset
                 angle += Double.random(in: -0.15...0.15)
+                var radius = ringRadius
+                var foundSpot = false
 
-                // Nudge until pixel distance from all placed planets is sufficient
-                for _ in 0..<20 {
-                    let x = ringRadius * cos(angle)
-                    let y = ringRadius * sin(angle)
-                    let tooClose = placed.contains { other in
-                        let ox = other.r * cos(other.a)
-                        let oy = other.r * sin(other.a)
-                        return hypot(x - ox, y - oy) < minPlanetDistance
+                // Phase 1: nudge angle on the same ring
+                for _ in 0..<40 {
+                    let x = radius * cos(angle)
+                    let y = radius * sin(angle)
+                    if isValidPosition(x: x, y: y, placed: placed, screenSize: screenSize, center: center) {
+                        foundSpot = true
+                        break
                     }
-                    if !tooClose { break }
-                    angle += 0.3
+                    angle += 0.18
                 }
-                placed.append((r: ringRadius, a: angle))
+
+                // Phase 2: try shifting radius inward/outward while rotating
+                if !foundSpot {
+                    let radiusOffsets: [CGFloat] = [-0.08, 0.08, -0.15, 0.15]
+                    for rOffset in radiusOffsets {
+                        let tryRadius = ringRadius + rOffset * halfScreen
+                        for step in 0..<20 {
+                            let tryAngle = angle + Double(step) * 0.3
+                            let x = tryRadius * cos(tryAngle)
+                            let y = tryRadius * sin(tryAngle)
+                            if isValidPosition(x: x, y: y, placed: placed, screenSize: screenSize, center: center) {
+                                angle = tryAngle
+                                radius = tryRadius
+                                foundSpot = true
+                                break
+                            }
+                        }
+                        if foundSpot { break }
+                    }
+                }
+
+                // Phase 3: exhaustive sweep as last resort
+                if !foundSpot {
+                    let minR = 0.20 * halfScreen
+                    let maxR = 0.98 * halfScreen
+                    let rStep: CGFloat = 20
+                    let aStep = 0.25
+                    outerLoop: for r in stride(from: minR, through: maxR, by: rStep) {
+                        for a in stride(from: 0.0, to: Double.pi * 2, by: aStep) {
+                            let x = r * cos(a)
+                            let y = r * sin(a)
+                            if isValidPosition(x: x, y: y, placed: placed, screenSize: screenSize, center: center) {
+                                angle = a
+                                radius = r
+                                foundSpot = true
+                                break outerLoop
+                            }
+                        }
+                    }
+                }
+
+                let px = radius * cos(angle)
+                let py = radius * sin(angle)
+                placed.append((x: px, y: py))
 
                 let (type, color) = planetTypeAndColor(for: item, index: index)
+                let radiusFraction = radius / halfScreen
 
                 allPlanets.append(PlanetNode(
                     type: type,
                     angle: angle,
-                    radius: ringRadii[priority] ?? 0.65,
+                    radius: radiusFraction,
                     accentColor: color,
                     floatPhase: Double.random(in: 0...2),
                     floatSpeed: Double.random(in: 2.5...4),

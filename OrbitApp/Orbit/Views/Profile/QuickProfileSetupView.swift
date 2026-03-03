@@ -102,29 +102,6 @@ struct QuickProfileSetupView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 28) {
 
-                    // Header
-                    if let onCancel = onCancel {
-                        HStack {
-                            Button(action: onCancel) {
-                                HStack(spacing: 6) {
-                                    Image(systemName: "chevron.left")
-                                        .font(.caption)
-                                        .fontWeight(.semibold)
-                                    Text("Cancel")
-                                        .fontWeight(.medium)
-                                }
-                                .font(.body)
-                                .padding(.horizontal, 14)
-                                .padding(.vertical, 8)
-                                .background(Color(.systemGray5))
-                                .foregroundColor(.primary)
-                                .clipShape(Capsule())
-                            }
-                            Spacer()
-                        }
-                        .padding(.bottom, 4)
-                    }
-
                     VStack(alignment: .leading, spacing: 4) {
                         Text(initialProfile != nil ? "edit your profile" : "let's set up your profile")
                             .font(.title2)
@@ -481,6 +458,22 @@ struct QuickProfileSetupView: View {
                         profilePhoto = image
                     }
                 } catch {}
+            }
+        }
+        .navigationBarBackButtonHidden(onCancel != nil)
+        .toolbar {
+            if let onCancel = onCancel {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button(action: onCancel) {
+                        HStack(spacing: 4) {
+                            Image(systemName: "chevron.left")
+                                .font(.caption)
+                                .fontWeight(.semibold)
+                            Text("Cancel")
+                        }
+                        .foregroundColor(.primary)
+                    }
+                }
             }
         }
     }
