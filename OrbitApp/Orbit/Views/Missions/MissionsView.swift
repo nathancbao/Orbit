@@ -447,13 +447,19 @@ struct EmptyMissionsView: View {
 
 struct MissionCreateView: View {
     @Environment(\.dismiss) private var dismiss
-    @State private var title = ""
+    @State private var title: String
     @State private var description = ""
     @State private var location = ""
     @State private var date = Date().addingTimeInterval(86400)
     @State private var maxPodSize = 4
+    @State private var tags: [String]
     @State private var isSubmitting = false
     @State private var errorMessage: String?
+
+    init(prefillTitle: String = "", prefillTags: [String] = []) {
+        _title = State(initialValue: prefillTitle)
+        _tags = State(initialValue: prefillTags)
+    }
 
     private var canSubmit: Bool {
         !title.trimmingCharacters(in: .whitespaces).isEmpty
@@ -550,7 +556,7 @@ struct MissionCreateView: View {
                 _ = try await MissionService.shared.createMission(
                     title: title.trimmingCharacters(in: .whitespaces),
                     description: description.trimmingCharacters(in: .whitespaces),
-                    tags: [],
+                    tags: tags,
                     location: location.trimmingCharacters(in: .whitespaces),
                     date: dateString,
                     maxPodSize: maxPodSize

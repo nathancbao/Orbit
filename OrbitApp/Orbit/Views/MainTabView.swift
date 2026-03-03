@@ -11,43 +11,92 @@ struct MainTabView: View {
         self.onEditProfile = onEditProfile
     }
 
-    enum Tab {
+    enum Tab: CaseIterable {
         case discovery
         case missions
         case signals
         case pods
+
+        var label: String {
+            switch self {
+            case .discovery: return "Discovery"
+            case .missions:  return "Missions"
+            case .signals:   return "Signals"
+            case .pods:      return "Pods"
+            }
+        }
+
+        var blankIcon: String {
+            switch self {
+            case .discovery: return "discoveryNavBlank"
+            case .missions:  return "missionNavBlank"
+            case .signals:   return "signalNavBlank"
+            case .pods:      return "podsNavBlank"
+            }
+        }
+
+        var colorIcon: String {
+            switch self {
+            case .discovery: return "discoveryNavColor"
+            case .missions:  return "missionNavColor"
+            case .signals:   return "signalNavColor"
+            case .pods:      return "podsNavColor"
+            }
+        }
     }
 
     var body: some View {
-        TabView(selection: $selectedTab) {
-
-            // Discovery Tab (Galaxy View)
-            DiscoveryView(userProfile: profile)
-                .tabItem {
-                    Label("Discovery", systemImage: "moon.stars.fill")
+        VStack(spacing: 0) {
+            // Content area
+            Group {
+                switch selectedTab {
+                case .discovery:
+                    DiscoveryView(userProfile: profile)
+                case .missions:
+                    MissionsView(userProfile: $profile)
+                case .signals:
+                    SignalsView(userProfile: $profile)
+                case .pods:
+                    PodsView(userProfile: $profile)
                 }
-                .tag(Tab.discovery)
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
 
-            // Missions Tab (fixed-date events discover feed)
-            MissionsView(userProfile: $profile)
-                .tabItem {
-                    Label("Missions", systemImage: "paperplane.fill")
-                }
-                .tag(Tab.missions)
+            // Custom tab bar
+            HStack(spacing: 0) {
+                ForEach(Tab.allCases, id: \.self) { tab in
+                    Button {
+                        withAnimation(.easeInOut(duration: 0.15)) {
+                            selectedTab = tab
+                        }
+                    } label: {
+                        VStack(spacing: 4) {
+                            Image(selectedTab == tab ? tab.colorIcon : tab.blankIcon)
+                                .renderingMode(.original)
+                                .resizable()
+                                .aspectRatio(contentMode: .fit)
+                                .frame(width: 24, height: 24)
 
-            // Signals Tab (spontaneous activity feed + FAB)
-            SignalsView(userProfile: $profile)
-                .tabItem {
-                    Label("Signals", systemImage: "antenna.radiowaves.left.and.right")
+                            Text(tab.label)
+                                .font(.caption2)
+                                .foregroundColor(
+                                    selectedTab == tab
+                                        ? OrbitTheme.purple
+                                        : .gray
+                                )
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding(.top, 10)
+                    }
                 }
-                .tag(Tab.signals)
-
-            // Pods Tab (all joined pods)
-            PodsView(userProfile: $profile)
-                .tabItem {
-                    Label("Pods", systemImage: "person.3.fill")
-                }
-                .tag(Tab.pods)
+            }
+            .padding(.bottom, 20)
+            .background(
+                Color.white
+                    .shadow(color: Color.black.opacity(0.06), radius: 8, x: 0, y: -2)
+                    .ignoresSafeArea(edges: .bottom)
+            )
         }
+        .ignoresSafeArea(edges: .bottom)
     }
 }
