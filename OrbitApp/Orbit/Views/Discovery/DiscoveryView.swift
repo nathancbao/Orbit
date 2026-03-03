@@ -909,7 +909,7 @@ struct DiscoveryView: View {
                 viewModel.startBellTimer()
                 generatePlanets()
             }
-            .onChange(of: viewModel.items) { _ in
+            .onChange(of: viewModel.items) {
                 generatePlanets()
             }
             .sheet(item: $selectedMission) { mission in

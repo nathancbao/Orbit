@@ -53,6 +53,12 @@ enum DiscoveryItem: Identifiable {
     }
 }
 
+extension DiscoveryItem: Equatable {
+    static func == (lhs: DiscoveryItem, rhs: DiscoveryItem) -> Bool {
+        lhs.id == rhs.id
+    }
+}
+
 // MARK: - ViewModel
 
 @MainActor
