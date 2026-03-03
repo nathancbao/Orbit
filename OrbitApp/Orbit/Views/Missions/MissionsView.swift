@@ -152,10 +152,11 @@ struct MissionsView: View {
                 selectedMission = nil
             })
         }
-        .sheet(isPresented: $showCreate, onDismiss: {
-            Task { await viewModel.reload() }
-        }) {
-            MissionCreateView()
+        .sheet(isPresented: $showCreate) {
+            MissionCreateView(onCreated: { mission in
+                viewModel.insertCreatedMission(mission)
+                segment = .mine
+            })
         }
         .sheet(isPresented: $showProfile) {
             ProfileDisplayView(
@@ -458,9 +459,12 @@ struct MissionCreateView: View {
     @State private var isSubmitting = false
     @State private var errorMessage: String?
 
-    init(prefillTitle: String = "", prefillTags: [String] = []) {
+    var onCreated: ((Mission) -> Void)?
+
+    init(prefillTitle: String = "", prefillTags: [String] = [], onCreated: ((Mission) -> Void)? = nil) {
         _title = State(initialValue: prefillTitle)
         _tags = State(initialValue: prefillTags)
+        self.onCreated = onCreated
     }
 
     private var canSubmit: Bool {
@@ -579,7 +583,7 @@ struct MissionCreateView: View {
 
         Task {
             do {
-                _ = try await MissionService.shared.createMission(
+                var created = try await MissionService.shared.createMission(
                     title: title.trimmingCharacters(in: .whitespaces),
                     description: description.trimmingCharacters(in: .whitespaces),
                     tags: tags,
@@ -589,8 +593,15 @@ struct MissionCreateView: View {
                     endTime: endTimeString,
                     maxPodSize: maxPodSize
                 )
+                // Auto-join the mission so the creator is in a pod
+                if let pod = try? await MissionService.shared.joinMission(id: created.id) {
+                    created.userPodStatus = "in_pod"
+                    created.userPodId = pod.id
+                }
+
                 await MainActor.run {
                     isSubmitting = false
+                    onCreated?(created)
                     dismiss()
                 }
             } catch {

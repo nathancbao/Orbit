@@ -16,19 +16,18 @@ struct ProfileDisplayView: View {
 
                     // Hero profile photo (large, Tinder-style)
                     GeometryReader { geo in
-                        ZStack {
-                            Color.black
-                            if let photoURL = profile.photo, let url = URL(string: photoURL) {
-                                AsyncImage(url: url) { image in
-                                    image.resizable().scaledToFit()
-                                } placeholder: {
-                                    heroPlaceholder
-                                }
-                            } else {
+                        if let photoURL = profile.photo, let url = URL(string: photoURL) {
+                            AsyncImage(url: url) { image in
+                                image.resizable().scaledToFill()
+                            } placeholder: {
                                 heroPlaceholder
                             }
+                            .frame(width: geo.size.width, height: geo.size.width * 1.15)
+                            .clipped()
+                        } else {
+                            heroPlaceholder
+                                .frame(width: geo.size.width, height: geo.size.width * 1.15)
                         }
-                        .frame(width: geo.size.width, height: geo.size.width * 1.15)
                     }
                     .aspectRatio(1 / 1.15, contentMode: .fit)
 

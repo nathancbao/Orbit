@@ -24,14 +24,22 @@ class MissionsViewModel: ObservableObject {
 
     private var userYear: String = ""
 
+    private var currentUserId: Int {
+        UserDefaults.standard.integer(forKey: "orbit_user_id")
+    }
+
     /// Missions the user has joined (in a pod)
     var myMissions: [Mission] {
         allMissions.filter { $0.userPodStatus == "in_pod" }
     }
 
-    /// Missions available to discover (not yet joined)
+    /// Missions available to discover (not yet joined).
+    /// Missions the user created still appear here at the top even after auto-joining.
     var discoverMissions: [Mission] {
-        allMissions.filter { $0.userPodStatus != "in_pod" }
+        let uid = currentUserId
+        let created = allMissions.filter { $0.creatorId == uid && $0.userPodStatus == "in_pod" }
+        let rest = allMissions.filter { $0.userPodStatus != "in_pod" }
+        return created + rest
     }
 
     private var hasLoaded = false
@@ -78,5 +86,10 @@ class MissionsViewModel: ObservableObject {
         try? await MissionService.shared.skipMission(id: mission.id)
         allMissions.removeAll { $0.id == mission.id }
         suggestedMissions.removeAll { $0.id == mission.id }
+    }
+
+    /// Insert a newly created mission at the top of allMissions so it appears immediately.
+    func insertCreatedMission(_ mission: Mission) {
+        allMissions.insert(mission, at: 0)
     }
 }
