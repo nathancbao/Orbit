@@ -114,7 +114,7 @@ class TestValidateProfileData:
 
     def test_rejects_old_fields(self):
         """Fields from the old profile schema should be rejected."""
-        for field in ("age", "bio", "photos", "location", "personality"):
+        for field in ("age", "photos", "location", "personality"):
             valid, errors = validate_profile_data({field: "whatever"})
             assert valid is False, f"Expected old field '{field}' to be rejected"
 
@@ -123,6 +123,108 @@ class TestValidateProfileData:
         valid, errors = validate_profile_data(data)
         assert valid is False
         assert len(errors) >= 2
+
+    # ── Bio ──
+
+    def test_accepts_valid_bio(self):
+        valid, errors = validate_profile_data({"bio": "Hello, I love hiking!"})
+        assert valid is True
+
+    def test_accepts_empty_bio(self):
+        valid, errors = validate_profile_data({"bio": ""})
+        assert valid is True
+
+    def test_rejects_long_bio(self):
+        valid, errors = validate_profile_data({"bio": "x" * 251})
+        assert valid is False
+        assert any("250" in e for e in errors)
+
+    def test_rejects_non_string_bio(self):
+        valid, errors = validate_profile_data({"bio": 123})
+        assert valid is False
+
+    # ── Gallery Photos ──
+
+    def test_accepts_valid_gallery_photos(self):
+        valid, errors = validate_profile_data({
+            "gallery_photos": ["https://example.com/1.jpg", "https://example.com/2.jpg"]
+        })
+        assert valid is True
+
+    def test_accepts_empty_gallery(self):
+        valid, errors = validate_profile_data({"gallery_photos": []})
+        assert valid is True
+
+    def test_rejects_too_many_gallery_photos(self):
+        valid, errors = validate_profile_data({
+            "gallery_photos": [f"https://example.com/{i}.jpg" for i in range(7)]
+        })
+        assert valid is False
+        assert any("6" in e for e in errors)
+
+    def test_rejects_non_list_gallery(self):
+        valid, errors = validate_profile_data({"gallery_photos": "not a list"})
+        assert valid is False
+
+    def test_rejects_non_string_gallery_item(self):
+        valid, errors = validate_profile_data({"gallery_photos": [123]})
+        assert valid is False
+
+    # ── Links ──
+
+    def test_accepts_valid_links(self):
+        valid, errors = validate_profile_data({
+            "links": ["https://github.com/user", "https://linkedin.com/in/user"]
+        })
+        assert valid is True
+
+    def test_rejects_too_many_links(self):
+        valid, errors = validate_profile_data({
+            "links": ["https://a.com", "https://b.com", "https://c.com", "https://d.com"]
+        })
+        assert valid is False
+        assert any("3" in e for e in errors)
+
+    def test_rejects_non_list_links(self):
+        valid, errors = validate_profile_data({"links": "not a list"})
+        assert valid is False
+
+    def test_rejects_long_link(self):
+        valid, errors = validate_profile_data({"links": ["x" * 501]})
+        assert valid is False
+
+    # ── Gender ──
+
+    def test_accepts_valid_genders(self):
+        for gender in ("male", "female", "non-binary", "other", ""):
+            valid, errors = validate_profile_data({"gender": gender})
+            assert valid is True, f"Expected '{gender}' to be valid"
+
+    def test_rejects_invalid_gender(self):
+        valid, errors = validate_profile_data({"gender": "alien"})
+        assert valid is False
+
+    # ── MBTI ──
+
+    def test_accepts_valid_mbti(self):
+        for mbti in ("INTJ", "ENFP", "ISTP", "ESFJ", ""):
+            valid, errors = validate_profile_data({"mbti": mbti})
+            assert valid is True, f"Expected '{mbti}' to be valid"
+
+    def test_rejects_invalid_mbti(self):
+        valid, errors = validate_profile_data({"mbti": "XXXX"})
+        assert valid is False
+
+    def test_accepts_all_new_fields_together(self):
+        data = {
+            "bio": "I love coffee",
+            "gallery_photos": ["https://example.com/1.jpg"],
+            "links": ["https://github.com/me"],
+            "gender": "female",
+            "mbti": "ENFP",
+        }
+        valid, errors = validate_profile_data(data)
+        assert valid is True
 
 
 # ── Mission Validation ────────────────────────────────────────────────────────

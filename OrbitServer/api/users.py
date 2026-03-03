@@ -3,7 +3,10 @@ from flask import Blueprint, request, g
 from OrbitServer.utils.responses import success, error
 from OrbitServer.utils.auth import require_auth
 from OrbitServer.utils.validators import validate_profile_data
-from OrbitServer.services.user_service import get_user_profile, update_user_profile, upload_photo
+from OrbitServer.services.user_service import (
+    get_user_profile, update_user_profile, upload_photo,
+    upload_gallery_photo, remove_gallery_photo,
+)
 from OrbitServer.services.signal_service import get_rsvped_signals
 from OrbitServer.models.models import get_user_pods
 
@@ -49,6 +52,31 @@ def upload_me_photo():
     profile, err = upload_photo(g.user_id, file)
     if err:
         return error(err, 500)
+    return success(profile)
+
+
+@users_bp.route('/me/gallery', methods=['POST'])
+@require_auth
+def upload_me_gallery():
+    if 'photo' not in request.files:
+        return error("No photo file provided", 400)
+
+    file = request.files['photo']
+    if file.filename == '':
+        return error("No file selected", 400)
+
+    profile, err = upload_gallery_photo(g.user_id, file)
+    if err:
+        return error(err, 400)
+    return success(profile)
+
+
+@users_bp.route('/me/gallery/<int:index>', methods=['DELETE'])
+@require_auth
+def delete_me_gallery(index):
+    profile, err = remove_gallery_photo(g.user_id, index)
+    if err:
+        return error(err, 400)
     return success(profile)
 
 

@@ -22,6 +22,8 @@ enum Constants {
             static let myPods = "/users/me/pods"
             static let myRsvps = "/users/me/rsvps"
             static let uploadPhoto = "/users/me/photo"
+            static let uploadGalleryPhoto = "/users/me/gallery"
+            static func deleteGalleryPhoto(_ index: Int) -> String { "/users/me/gallery/\(index)" }
 
             // Missions (fixed-date events)
             static let missions = "/missions"
@@ -68,5 +70,8 @@ enum Constants {
         static let verificationCodeLength = 6
         static let minInterests = 3
         static let maxInterests = 10
+        static let maxBioLength = 250
+        static let maxGalleryPhotos = 6
+        static let maxLinks = 3
     }
 }

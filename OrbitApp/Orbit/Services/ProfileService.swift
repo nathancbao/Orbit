@@ -10,10 +10,11 @@ class ProfileService {
         encoder.keyEncodingStrategy = .convertToSnakeCase
         let profileData = try encoder.encode(profile)
         var body = (try JSONSerialization.jsonObject(with: profileData) as? [String: Any]) ?? [:]
-        // Remove server-computed fields and null values before sending
+        // Remove server-computed and gallery-managed fields before sending
         body.removeValue(forKey: "match_score")
         body.removeValue(forKey: "trust_score")
         body.removeValue(forKey: "email")
+        body.removeValue(forKey: "gallery_photos")
         body = body.filter { !($0.value is NSNull) }
 
         return try await APIService.shared.request(
@@ -77,5 +78,50 @@ class ProfileService {
         let apiResponse = try decoder.decode(APIResponse<ProfileResponseData>.self, from: data)
         guard let responseData = apiResponse.data else { throw NetworkError.noData }
         return responseData
+    }
+
+    func uploadGalleryPhoto(_ image: UIImage) async throws -> ProfileResponseData {
+        let resized = downscaled(image)
+        guard let imageData = resized.jpegData(compressionQuality: 0.8) else {
+            throw NetworkError.noData
+        }
+
+        let boundary = UUID().uuidString
+        let url = URL(string: Constants.API.baseURL + Constants.API.Endpoints.uploadGalleryPhoto)!
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
+
+        if let token = KeychainHelper.shared.readString(forKey: Constants.Keychain.accessToken) {
+            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        }
+
+        var body = Data()
+        body.append("--\(boundary)\r\n".data(using: .utf8)!)
+        body.append("Content-Disposition: form-data; name=\"photo\"; filename=\"gallery.jpg\"\r\n".data(using: .utf8)!)
+        body.append("Content-Type: image/jpeg\r\n\r\n".data(using: .utf8)!)
+        body.append(imageData)
+        body.append("\r\n--\(boundary)--\r\n".data(using: .utf8)!)
+        request.httpBody = body
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let httpResponse = response as? HTTPURLResponse else { throw NetworkError.noData }
+        if httpResponse.statusCode >= 400 {
+            throw NetworkError.serverError("Gallery upload failed with status \(httpResponse.statusCode)")
+        }
+
+        let decoder = JSONDecoder()
+        let apiResponse = try decoder.decode(APIResponse<ProfileResponseData>.self, from: data)
+        guard let responseData = apiResponse.data else { throw NetworkError.noData }
+        return responseData
+    }
+
+    func deleteGalleryPhoto(at index: Int) async throws -> ProfileResponseData {
+        return try await APIService.shared.request(
+            endpoint: Constants.API.Endpoints.deleteGalleryPhoto(index),
+            method: "DELETE",
+            authenticated: true
+        )
     }
 }

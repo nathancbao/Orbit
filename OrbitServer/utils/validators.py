@@ -3,6 +3,16 @@ import datetime
 
 from OrbitServer.models.models import COLLEGE_YEARS
 
+VALID_GENDERS = {'male', 'female', 'non-binary', 'other', ''}
+
+VALID_MBTI = {
+    'INTJ', 'INTP', 'ENTJ', 'ENTP',
+    'INFJ', 'INFP', 'ENFJ', 'ENFP',
+    'ISTJ', 'ISFJ', 'ESTJ', 'ESFJ',
+    'ISTP', 'ISFP', 'ESTP', 'ESFP',
+    '',
+}
+
 
 def validate_edu_email(email):
     if not email or not isinstance(email, str):
@@ -23,7 +33,8 @@ def validate_edu_email(email):
 
 def validate_profile_data(data):
     errors = []
-    allowed_fields = {'name', 'college_year', 'interests', 'photo'}
+    allowed_fields = {'name', 'college_year', 'interests', 'photo',
+                       'gallery_photos', 'bio', 'links', 'gender', 'mbti'}
 
     for key in data:
         if key not in allowed_fields:
@@ -52,6 +63,48 @@ def validate_profile_data(data):
     if 'photo' in data:
         if data['photo'] is not None and not isinstance(data['photo'], str):
             errors.append("photo must be a URL string or null")
+
+    if 'gallery_photos' in data:
+        gp = data['gallery_photos']
+        if not isinstance(gp, list):
+            errors.append("gallery_photos must be a list")
+        elif len(gp) > 6:
+            errors.append("Maximum 6 gallery photos allowed")
+        else:
+            for item in gp:
+                if not isinstance(item, str):
+                    errors.append("Each gallery photo must be a URL string")
+                    break
+
+    if 'bio' in data:
+        bio = data['bio']
+        if not isinstance(bio, str):
+            errors.append("bio must be a string")
+        elif len(bio) > 250:
+            errors.append("bio must be 250 characters or fewer")
+
+    if 'links' in data:
+        lnks = data['links']
+        if not isinstance(lnks, list):
+            errors.append("links must be a list")
+        elif len(lnks) > 3:
+            errors.append("Maximum 3 links allowed")
+        else:
+            for item in lnks:
+                if not isinstance(item, str):
+                    errors.append("Each link must be a URL string")
+                    break
+                if len(item) > 500:
+                    errors.append("Each link must be 500 characters or fewer")
+                    break
+
+    if 'gender' in data:
+        if data['gender'] not in VALID_GENDERS:
+            errors.append(f"gender must be one of: {', '.join(sorted(VALID_GENDERS - {''}))}")
+
+    if 'mbti' in data:
+        if data['mbti'] not in VALID_MBTI:
+            errors.append(f"mbti must be one of the 16 MBTI types")
 
     if errors:
         return False, errors

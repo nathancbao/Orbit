@@ -38,7 +38,8 @@
       "Bash(pip show fastembed lightfm 2>&1)",
       "Bash(pip index versions lightfm 2>&1 | head -5)",
       "Bash(git push origin main 2>&1)",
-      "Bash(pip show:*)"
+      "Bash(pip show:*)",
+      "WebSearch"
     ]
   }
 }

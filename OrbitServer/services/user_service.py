@@ -2,7 +2,10 @@ from OrbitServer.models.models import get_user, update_user, COLLEGE_YEARS
 from OrbitServer.services.storage_service import upload_file
 
 
-PROFILE_FIELDS = ['name', 'college_year', 'interests', 'photo', 'trust_score', 'email']
+PROFILE_FIELDS = [
+    'name', 'college_year', 'interests', 'photo', 'trust_score', 'email',
+    'gallery_photos', 'bio', 'links', 'gender', 'mbti',
+]
 
 DEFAULT_PROFILE = {
     'name': '',
@@ -11,6 +14,11 @@ DEFAULT_PROFILE = {
     'photo': None,
     'trust_score': 0.0,
     'email': '',
+    'gallery_photos': [],
+    'bio': '',
+    'links': [],
+    'gender': '',
+    'mbti': '',
 }
 
 
@@ -71,6 +79,49 @@ def upload_photo(user_id, file):
         return None, str(e)
 
     user_data = update_user(user_id, {'photo': url})
+    profile = _format_profile(user_data)
+    return {
+        'profile': profile,
+        'profile_complete': _is_profile_complete(profile),
+    }, None
+
+
+def upload_gallery_photo(user_id, file):
+    user = get_user(user_id)
+    if not user:
+        return None, "User not found"
+
+    gallery = list(user.get('gallery_photos') or [])
+    if len(gallery) >= 6:
+        return None, "Maximum 6 gallery photos allowed"
+
+    try:
+        url = upload_file(file, folder='gallery_photos')
+    except ValueError as e:
+        return None, str(e)
+    except RuntimeError as e:
+        return None, str(e)
+
+    gallery.append(url)
+    user_data = update_user(user_id, {'gallery_photos': gallery})
+    profile = _format_profile(user_data)
+    return {
+        'profile': profile,
+        'profile_complete': _is_profile_complete(profile),
+    }, None
+
+
+def remove_gallery_photo(user_id, index):
+    user = get_user(user_id)
+    if not user:
+        return None, "User not found"
+
+    gallery = list(user.get('gallery_photos') or [])
+    if index < 0 or index >= len(gallery):
+        return None, "Invalid photo index"
+
+    gallery.pop(index)
+    user_data = update_user(user_id, {'gallery_photos': gallery})
     profile = _format_profile(user_data)
     return {
         'profile': profile,
