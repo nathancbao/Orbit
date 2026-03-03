@@ -761,6 +761,7 @@ struct LegendItem: View {
 
 struct DiscoveryView: View {
     let userProfile: Profile
+    var isActive: Bool = false
 
     @StateObject private var viewModel: DiscoveryViewModel
     @State private var imageStars: [ImageStar] = []
@@ -773,9 +774,11 @@ struct DiscoveryView: View {
     @State private var createPrefillTitle = ""
     @State private var createPrefillTags: [String] = []
     @State private var showRecommendationsSheet = false
+    @State private var showProfile = false
 
-    init(userProfile: Profile) {
+    init(userProfile: Profile, isActive: Bool = false) {
         self.userProfile = userProfile
+        self.isActive = isActive
         _viewModel = StateObject(wrappedValue: DiscoveryViewModel(
             userInterests: userProfile.interests
         ))
@@ -783,10 +786,10 @@ struct DiscoveryView: View {
 
     // Priority ring radii as fraction of half-screen width
     private let ringRadii: [Int: CGFloat] = [
-        0: 0.35,  // hosted — inner ring
-        1: 0.50,  // joined — second ring
-        2: 0.65,  // recommended — third ring
-        3: 0.80   // templates — outer ring
+        0: 0.55,  // hosted — inner ring (clears center glow + planet radius + gap)
+        1: 0.70,  // joined — second ring
+        2: 0.82,  // recommended — third ring
+        3: 0.88   // discoverable/templates — outer ring
     ]
 
     var body: some View {
@@ -885,14 +888,22 @@ struct DiscoveryView: View {
             }
             .overlay(alignment: .top) {
                 VStack(spacing: 8) {
-                    // Top bar: legend + bell
+                    // Top bar: bell (left) + legend (center) + profile (right)
                     HStack {
-                        DiscoveryLegend()
-                        Spacer()
                         RecommendationBellView(
                             showBadge: viewModel.showRecommendationBadge,
                             onTap: { showRecommendationsSheet = true }
                         )
+                        Spacer()
+                        DiscoveryLegend()
+                        Spacer()
+                        Button { showProfile = true } label: {
+                            ProfileAvatarView(
+                                photo: userProfile.photo,
+                                size: 30,
+                                name: userProfile.name
+                            )
+                        }
                     }
                     .padding(.horizontal, 16)
                     .padding(.top, 8)
@@ -903,6 +914,7 @@ struct DiscoveryView: View {
             }
             .onAppear {
                 generateImageStars(in: geometry.size)
+                generatePlanets()
             }
             .task {
                 await viewModel.load()
@@ -911,6 +923,14 @@ struct DiscoveryView: View {
             }
             .onChange(of: viewModel.items) { _ in
                 generatePlanets()
+            }
+            .onChange(of: isActive) { active in
+                if active {
+                    Task {
+                        await viewModel.reload()
+                        generatePlanets()
+                    }
+                }
             }
             .sheet(item: $selectedMission) { mission in
                 MissionDetailView(mission: mission, onJoined: {})
@@ -942,6 +962,13 @@ struct DiscoveryView: View {
                 )
                 .presentationDetents([.medium, .large])
             }
+            .sheet(isPresented: $showProfile) {
+                ProfileDisplayView(
+                    profile: userProfile,
+                    onEdit: { showProfile = false },
+                    onProfileUpdated: { _ in }
+                )
+            }
         }
     }
 
@@ -970,14 +997,14 @@ struct DiscoveryView: View {
     // MARK: - Star Generation
 
     private func generateImageStars(in size: CGSize) {
-        imageStars = (0..<45).map { i in
+        imageStars = (0..<20).map { i in
             ImageStar(
                 position: CGPoint(
                     x: CGFloat.random(in: 20...(size.width - 20)),
                     y: CGFloat.random(in: 20...(size.height - 20))
                 ),
                 size: CGFloat.random(in: 8...16),
-                isColored: i < 10,
+                isColored: i < 5,
                 twinkleSpeed: Double.random(in: 0.5...2.0),
                 phaseOffset: Double.random(in: 0...Double.pi * 2),
                 floatAmplitude: CGFloat.random(in: 1...3),
@@ -1024,10 +1051,10 @@ struct DiscoveryView: View {
 
     private func planetTypeAndColor(for item: DiscoveryItem, index: Int) -> (PlanetType, Color) {
         switch item {
-        case .hostedMission(let m), .joinedMission(let m), .recommendedMission(let m):
+        case .hostedMission(let m), .joinedMission(let m), .recommendedMission(let m), .discoverableMission(let m):
             let color = DiscoveryTheme.missionColors[index % DiscoveryTheme.missionColors.count]
             return (.mission(m), color)
-        case .hostedSignal(let s), .joinedSignal(let s), .recommendedSignal(let s):
+        case .hostedSignal(let s), .joinedSignal(let s), .recommendedSignal(let s), .discoverableSignal(let s):
             let color = DiscoveryTheme.signalColors[index % DiscoveryTheme.signalColors.count]
             return (.signal(s), color)
         case .template(let t):

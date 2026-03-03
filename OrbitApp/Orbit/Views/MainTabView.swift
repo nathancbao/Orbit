@@ -47,18 +47,23 @@ struct MainTabView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            // Content area
-            Group {
-                switch selectedTab {
-                case .discovery:
-                    DiscoveryView(userProfile: profile)
-                case .missions:
-                    MissionsView(userProfile: $profile)
-                case .signals:
-                    SignalsView(userProfile: $profile)
-                case .pods:
-                    PodsView(userProfile: $profile)
-                }
+            // Content area — ZStack keeps all views alive so state persists across tab switches
+            ZStack {
+                DiscoveryView(userProfile: profile, isActive: selectedTab == .discovery)
+                    .opacity(selectedTab == .discovery ? 1 : 0)
+                    .allowsHitTesting(selectedTab == .discovery)
+
+                MissionsView(userProfile: $profile)
+                    .opacity(selectedTab == .missions ? 1 : 0)
+                    .allowsHitTesting(selectedTab == .missions)
+
+                SignalsView(userProfile: $profile)
+                    .opacity(selectedTab == .signals ? 1 : 0)
+                    .allowsHitTesting(selectedTab == .signals)
+
+                PodsView(userProfile: $profile, isActive: selectedTab == .pods)
+                    .opacity(selectedTab == .pods ? 1 : 0)
+                    .allowsHitTesting(selectedTab == .pods)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
 

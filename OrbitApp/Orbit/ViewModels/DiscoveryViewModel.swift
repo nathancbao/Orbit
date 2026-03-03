@@ -6,6 +6,7 @@
 //  AI recommendations, and generates template items from user interests.
 //
 
+import Combine
 import Foundation
 import SwiftUI
 
@@ -20,34 +21,43 @@ struct TemplateItem: Identifiable {
 
 // MARK: - Discovery Item
 
-enum DiscoveryItem: Identifiable {
+enum DiscoveryItem: Identifiable, Equatable {
+    static func == (lhs: DiscoveryItem, rhs: DiscoveryItem) -> Bool {
+        lhs.id == rhs.id
+    }
+
     case hostedMission(Mission)
     case hostedSignal(Signal)
     case joinedMission(Mission)
     case joinedSignal(Signal)
     case recommendedMission(Mission)
     case recommendedSignal(Signal)
+    case discoverableMission(Mission)
+    case discoverableSignal(Signal)
     case template(TemplateItem)
 
     var id: String {
         switch self {
-        case .hostedMission(let m):      return "hm-\(m.id)"
-        case .hostedSignal(let s):       return "hs-\(s.id)"
-        case .joinedMission(let m):      return "jm-\(m.id)"
-        case .joinedSignal(let s):       return "js-\(s.id)"
-        case .recommendedMission(let m): return "rm-\(m.id)"
-        case .recommendedSignal(let s):  return "rs-\(s.id)"
-        case .template(let t):           return "t-\(t.id)"
+        case .hostedMission(let m):       return "hm-\(m.id)"
+        case .hostedSignal(let s):        return "hs-\(s.id)"
+        case .joinedMission(let m):       return "jm-\(m.id)"
+        case .joinedSignal(let s):        return "js-\(s.id)"
+        case .recommendedMission(let m):  return "rm-\(m.id)"
+        case .recommendedSignal(let s):   return "rs-\(s.id)"
+        case .discoverableMission(let m): return "dm-\(m.id)"
+        case .discoverableSignal(let s):  return "ds-\(s.id)"
+        case .template(let t):            return "t-\(t.id)"
         }
     }
 
-    /// Priority tier: 0 = hosted (inner ring), 1 = joined, 2 = recommended, 3 = template (outer ring)
+    /// Priority tier: 0 = hosted (inner ring), 1 = joined, 2 = recommended, 3 = discoverable/template (outer ring)
     var priority: Int {
         switch self {
-        case .hostedMission, .hostedSignal:           return 0
-        case .joinedMission, .joinedSignal:           return 1
-        case .recommendedMission, .recommendedSignal: return 2
-        case .template:                               return 3
+        case .hostedMission, .hostedSignal:                     return 0
+        case .joinedMission, .joinedSignal:                     return 1
+        case .recommendedMission, .recommendedSignal:           return 2
+        case .discoverableMission, .discoverableSignal:         return 3
+        case .template:                                         return 3
         }
     }
 }
@@ -86,17 +96,23 @@ class DiscoveryViewModel: ObservableObject {
         async let fetchedMySignals = try? SignalService.shared.mySignals()
         async let fetchedDiscoverSignals = try? SignalService.shared.discoverSignals()
         async let fetchedSuggested = try? MissionService.shared.suggestedMissions()
+        async let fetchedRsvpSignals: [Signal]? = try? APIService.shared.request(
+            endpoint: Constants.API.Endpoints.myRsvps,
+            authenticated: true
+        )
 
         let missions = await fetchedMissions ?? []
         let mySignals = await fetchedMySignals ?? []
         let discoverSignals = await fetchedDiscoverSignals ?? []
         let suggested = await fetchedSuggested ?? []
+        let rsvpSignals = await fetchedRsvpSignals ?? []
 
         categorize(
             missions: missions,
             mySignals: mySignals,
             discoverSignals: discoverSignals,
-            suggested: suggested
+            suggested: suggested,
+            rsvpSignals: rsvpSignals
         )
         hasLoaded = true
     }
@@ -115,28 +131,27 @@ class DiscoveryViewModel: ObservableObject {
         missions: [Mission],
         mySignals: [Signal],
         discoverSignals: [Signal],
-        suggested: [Mission]
+        suggested: [Mission],
+        rsvpSignals: [Signal]
     ) {
         var result: [DiscoveryItem] = []
         let userId = currentUserId
-        let suggestedIds = Set(suggested.map { $0.id })
 
-        // Missions — check creator and pod status
+        // 1. Hosted + Joined missions
         for mission in missions {
             if mission.creatorId == userId {
                 result.append(.hostedMission(mission))
             } else if mission.userPodStatus == "in_pod" {
                 result.append(.joinedMission(mission))
             }
-            // else: not shown here (available on Missions tab)
         }
 
-        // My signals — user created these
+        // 2. Hosted signals
         for signal in mySignals {
             result.append(.hostedSignal(signal))
         }
 
-        // Discover signals — signals user RSVP'd to (they have a podId)
+        // 3. Joined signals (from discover endpoint)
         let hostedSignalIds = Set(mySignals.map { $0.id })
         for signal in discoverSignals {
             guard !hostedSignalIds.contains(signal.id) else { continue }
@@ -145,10 +160,22 @@ class DiscoveryViewModel: ObservableObject {
             }
         }
 
-        // AI-recommended missions
+        // 3b. RSVP'd signals (from /users/me/rsvps — signals user joined via Pods)
+        let alreadyAddedSignalIds = Set(result.compactMap { item -> String? in
+            switch item {
+            case .hostedSignal(let s), .joinedSignal(let s): return s.id
+            default: return nil
+            }
+        })
+        for signal in rsvpSignals {
+            if !alreadyAddedSignalIds.contains(signal.id) {
+                result.append(.joinedSignal(signal))
+            }
+        }
+
+        // 4. AI-recommended missions (process BEFORE discoverables so they get priority)
         recommendedItems = []
         for mission in suggested {
-            // Skip if already categorized as hosted or joined
             let alreadyAdded = result.contains { item in
                 switch item {
                 case .hostedMission(let m), .joinedMission(let m): return m.id == mission.id
@@ -162,12 +189,67 @@ class DiscoveryViewModel: ObservableObject {
             }
         }
 
-        // Templates from user interests (fill outer ring when not enough content)
-        let totalReal = result.count
-        if totalReal < 8 {
-            let templates = generateTemplates(maxCount: min(4, 8 - totalReal))
-            result.append(contentsOf: templates)
+        // 4b. Client-side fallback recommendations (when backend returns none)
+        if recommendedItems.isEmpty && !userInterests.isEmpty {
+            let candidateMissions = missions.filter { mission in
+                mission.creatorId != userId
+                    && mission.userPodStatus != "in_pod"
+                    && !result.contains { item in
+                        switch item {
+                        case .hostedMission(let m), .joinedMission(let m): return m.id == mission.id
+                        default: return false
+                        }
+                    }
+            }
+
+            let scored = candidateMissions.map { mission -> (Mission, Int) in
+                let matchCount = mission.tags.filter { tag in
+                    userInterests.contains { $0.caseInsensitiveCompare(tag) == .orderedSame }
+                }.count
+                return (mission, matchCount)
+            }
+            .filter { $0.1 > 0 }
+            .sorted { $0.1 > $1.1 }
+
+            for (mission, _) in scored.prefix(5) {
+                var m = mission
+                let matched = m.tags.filter { tag in
+                    userInterests.contains { $0.caseInsensitiveCompare(tag) == .orderedSame }
+                }
+                m.suggestionReason = "Matches your interests: \(matched.joined(separator: ", "))"
+                let item = DiscoveryItem.recommendedMission(m)
+                result.append(item)
+                recommendedItems.append(item)
+            }
         }
+
+        // 5. Discoverable missions (not hosted, not joined, not AI-recommended)
+        let addedMissionIds = Set(result.compactMap { item -> String? in
+            switch item {
+            case .hostedMission(let m), .joinedMission(let m), .recommendedMission(let m):
+                return m.id
+            default: return nil
+            }
+        })
+        for mission in missions {
+            if mission.creatorId != userId
+                && mission.userPodStatus != "in_pod"
+                && !addedMissionIds.contains(mission.id) {
+                result.append(.discoverableMission(mission))
+            }
+        }
+
+        // 6. Discoverable signals (not hosted, not RSVP'd)
+        for signal in discoverSignals {
+            guard !hostedSignalIds.contains(signal.id) else { continue }
+            if signal.podId == nil {
+                result.append(.discoverableSignal(signal))
+            }
+        }
+
+        // 7. Templates (always show to encourage creation)
+        let templates = generateTemplates(maxCount: 3)
+        result.append(contentsOf: templates)
 
         items = result
     }
