@@ -4,6 +4,7 @@ import PhotosUI
 // MARK: - Quick Profile Setup View
 // Single-screen profile creation (<30 seconds).
 // Collects: name, college year, 3–10 interests, optional photo.
+// Extended: bio, gender, MBTI, links, gallery photos.
 // Includes a disclaimer about account permanence tied to school email.
 
 struct QuickProfileSetupView: View {
@@ -21,6 +22,19 @@ struct QuickProfileSetupView: View {
     @State private var isSaving = false
     @State private var errorMessage: String?
 
+    // Extended profile fields
+    @State private var bio: String = ""
+    @State private var selectedGender: String = ""
+    @State private var selectedMBTI: String = ""
+    @State private var link1: String = ""
+    @State private var link2: String = ""
+    @State private var link3: String = ""
+    @State private var galleryImages: [UIImage] = []
+    @State private var galleryURLs: [String] = []
+    @State private var showGalleryPicker = false
+    @State private var galleryIndicesToRemove: Set<Int> = []
+    @State private var newGalleryImages: [UIImage] = []
+
     init(onComplete: @escaping (Profile, UIImage?) -> Void,
          onCancel: (() -> Void)? = nil,
          initialProfile: Profile? = nil) {
@@ -30,6 +44,14 @@ struct QuickProfileSetupView: View {
         _name = State(initialValue: initialProfile?.name ?? "")
         _selectedYear = State(initialValue: initialProfile?.collegeYear ?? "freshman")
         _selectedInterests = State(initialValue: Set(initialProfile?.interests ?? []))
+        _bio = State(initialValue: initialProfile?.bio ?? "")
+        _selectedGender = State(initialValue: initialProfile?.gender ?? "")
+        _selectedMBTI = State(initialValue: initialProfile?.mbti ?? "")
+        let existingLinks = initialProfile?.links ?? []
+        _link1 = State(initialValue: existingLinks.indices.contains(0) ? existingLinks[0] : "")
+        _link2 = State(initialValue: existingLinks.indices.contains(1) ? existingLinks[1] : "")
+        _link3 = State(initialValue: existingLinks.indices.contains(2) ? existingLinks[2] : "")
+        _galleryURLs = State(initialValue: initialProfile?.galleryPhotos ?? [])
     }
 
     private let availableInterests = [
@@ -48,6 +70,17 @@ struct QuickProfileSetupView: View {
     private var isValid: Bool {
         !name.trimmingCharacters(in: .whitespaces).isEmpty &&
         selectedInterests.count >= Constants.Validation.minInterests
+    }
+
+    private var linksArray: [String] {
+        [link1, link2, link3]
+            .map { $0.trimmingCharacters(in: .whitespaces) }
+            .filter { !$0.isEmpty }
+    }
+
+    private var totalGalleryCount: Int {
+        let remaining = galleryURLs.indices.filter { !galleryIndicesToRemove.contains($0) }.count
+        return remaining + newGalleryImages.count
     }
 
     var body: some View {
@@ -194,6 +227,181 @@ struct QuickProfileSetupView: View {
                         )
                     }
 
+                    // Bio
+                    VStack(alignment: .leading, spacing: 8) {
+                        HStack {
+                            Text("bio")
+                                .font(.subheadline)
+                                .foregroundColor(.secondary)
+                            Spacer()
+                            Text("\(bio.count)/\(Constants.Validation.maxBioLength)")
+                                .font(.caption)
+                                .foregroundColor(
+                                    bio.count > Constants.Validation.maxBioLength ? .red : .secondary
+                                )
+                        }
+                        TextField("tell people about yourself...", text: $bio, axis: .vertical)
+                            .lineLimit(3...6)
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 12)
+                            .background(Color(.systemGray6))
+                            .clipShape(RoundedRectangle(cornerRadius: 16))
+                            .onChange(of: bio) { _, newValue in
+                                if newValue.count > Constants.Validation.maxBioLength {
+                                    bio = String(newValue.prefix(Constants.Validation.maxBioLength))
+                                }
+                            }
+                    }
+
+                    // Gender
+                    VStack(alignment: .leading, spacing: 10) {
+                        Text("gender")
+                            .font(.subheadline)
+                            .foregroundColor(.secondary)
+                        HStack(spacing: 8) {
+                            ForEach(Profile.genderOptions, id: \.self) { option in
+                                YearChip(
+                                    label: Profile.displayGender(option),
+                                    isSelected: selectedGender == option,
+                                    action: {
+                                        selectedGender = selectedGender == option ? "" : option
+                                    }
+                                )
+                            }
+                        }
+                    }
+
+                    // MBTI
+                    VStack(alignment: .leading, spacing: 10) {
+                        HStack {
+                            Text("mbti")
+                                .font(.subheadline)
+                                .foregroundColor(.secondary)
+                            Spacer()
+                            if !selectedMBTI.isEmpty {
+                                Button("clear") {
+                                    selectedMBTI = ""
+                                }
+                                .font(.caption)
+                                .foregroundStyle(OrbitTheme.gradient)
+                            }
+                        }
+                        ForEach(Profile.mbtiGroupOrder, id: \.self) { group in
+                            VStack(alignment: .leading, spacing: 6) {
+                                Text(group)
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                                HStack(spacing: 8) {
+                                    ForEach(Profile.mbtiTypes[group] ?? [], id: \.self) { mbti in
+                                        YearChip(
+                                            label: mbti,
+                                            isSelected: selectedMBTI == mbti,
+                                            action: {
+                                                selectedMBTI = selectedMBTI == mbti ? "" : mbti
+                                            }
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    // Links
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("links")
+                            .font(.subheadline)
+                            .foregroundColor(.secondary)
+                        ForEach(0..<3, id: \.self) { index in
+                            let binding: Binding<String> = index == 0 ? $link1 : (index == 1 ? $link2 : $link3)
+                            TextField("https://...", text: binding)
+                                .keyboardType(.URL)
+                                .textInputAutocapitalization(.never)
+                                .autocorrectionDisabled()
+                                .padding(.horizontal, 16)
+                                .padding(.vertical, 12)
+                                .background(Color(.systemGray6))
+                                .clipShape(Capsule())
+                        }
+                    }
+
+                    // Gallery Photos
+                    VStack(alignment: .leading, spacing: 10) {
+                        HStack {
+                            Text("gallery photos")
+                                .font(.subheadline)
+                                .foregroundColor(.secondary)
+                            Spacer()
+                            Text("\(totalGalleryCount)/\(Constants.Validation.maxGalleryPhotos)")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+
+                        ScrollView(.horizontal, showsIndicators: false) {
+                            HStack(spacing: 12) {
+                                // Existing gallery photos from server
+                                ForEach(Array(galleryURLs.enumerated()), id: \.offset) { index, urlString in
+                                    if !galleryIndicesToRemove.contains(index) {
+                                        ZStack(alignment: .topTrailing) {
+                                            AsyncImage(url: URL(string: urlString)) { image in
+                                                image.resizable().scaledToFill()
+                                            } placeholder: {
+                                                Color(.systemGray5)
+                                            }
+                                            .frame(width: 80, height: 80)
+                                            .clipShape(RoundedRectangle(cornerRadius: 12))
+
+                                            Button {
+                                                galleryIndicesToRemove.insert(index)
+                                            } label: {
+                                                Image(systemName: "xmark.circle.fill")
+                                                    .font(.caption)
+                                                    .foregroundColor(.white)
+                                                    .background(Circle().fill(Color.black.opacity(0.6)))
+                                            }
+                                            .offset(x: 4, y: -4)
+                                        }
+                                    }
+                                }
+
+                                // New gallery images (not yet uploaded)
+                                ForEach(Array(newGalleryImages.enumerated()), id: \.offset) { index, image in
+                                    ZStack(alignment: .topTrailing) {
+                                        Image(uiImage: image)
+                                            .resizable()
+                                            .scaledToFill()
+                                            .frame(width: 80, height: 80)
+                                            .clipShape(RoundedRectangle(cornerRadius: 12))
+
+                                        Button {
+                                            newGalleryImages.remove(at: index)
+                                        } label: {
+                                            Image(systemName: "xmark.circle.fill")
+                                                .font(.caption)
+                                                .foregroundColor(.white)
+                                                .background(Circle().fill(Color.black.opacity(0.6)))
+                                        }
+                                        .offset(x: 4, y: -4)
+                                    }
+                                }
+
+                                // Add button
+                                if totalGalleryCount < Constants.Validation.maxGalleryPhotos {
+                                    Button { showGalleryPicker = true } label: {
+                                        RoundedRectangle(cornerRadius: 12)
+                                            .fill(Color(.systemGray6))
+                                            .frame(width: 80, height: 80)
+                                            .overlay(
+                                                Image(systemName: "plus")
+                                                    .font(.title2)
+                                                    .foregroundStyle(OrbitTheme.gradient)
+                                            )
+                                    }
+                                }
+                            }
+                            .padding(.vertical, 4)
+                        }
+                    }
+
                     // Disclaimer
                     HStack(alignment: .top, spacing: 8) {
                         Image(systemName: "exclamationmark.shield.fill")
@@ -247,6 +455,13 @@ struct QuickProfileSetupView: View {
         }) {
             ImagePickerView(selectedImage: $profilePhoto)
         }
+        .sheet(isPresented: $showGalleryPicker) {
+            GalleryImagePickerView { image in
+                if let image = image, totalGalleryCount < Constants.Validation.maxGalleryPhotos {
+                    newGalleryImages.append(image)
+                }
+            }
+        }
         .task {
             // Load existing profile photo from URL when editing
             if profilePhoto == nil,
@@ -279,9 +494,14 @@ struct QuickProfileSetupView: View {
             name: name.trimmingCharacters(in: .whitespaces),
             collegeYear: selectedYear,
             interests: Array(selectedInterests),
-            photo: initialProfile?.photo,  // preserve existing photo URL
+            photo: initialProfile?.photo,
             trustScore: nil,
             email: nil,
+            galleryPhotos: initialProfile?.galleryPhotos ?? [],
+            bio: bio,
+            links: linksArray,
+            gender: selectedGender,
+            mbti: selectedMBTI,
             matchScore: nil
         )
 
@@ -290,12 +510,27 @@ struct QuickProfileSetupView: View {
                 // Save profile text data first
                 _ = try await ProfileService.shared.updateProfile(profile)
 
-                // Only upload photo if the user picked a new one
+                // Handle gallery removals (in reverse order to keep indices valid)
+                let sortedRemovals = galleryIndicesToRemove.sorted(by: >)
+                for index in sortedRemovals {
+                    _ = try await ProfileService.shared.deleteGalleryPhoto(at: index)
+                }
+
+                // Upload new gallery photos
+                for image in newGalleryImages {
+                    _ = try await ProfileService.shared.uploadGalleryPhoto(image)
+                }
+
+                // Only upload profile photo if the user picked a new one
                 var finalProfile = profile
                 if photoWasChanged, let photo = profilePhoto {
                     let photoResponse = try await ProfileService.shared.uploadPhoto(photo)
                     finalProfile.photo = photoResponse.profile.photo
                 }
+
+                // Refresh profile to get updated gallery URLs
+                let refreshed = try await ProfileService.shared.getProfile()
+                finalProfile.galleryPhotos = refreshed.galleryPhotos
 
                 await MainActor.run {
                     isSaving = false
@@ -307,6 +542,44 @@ struct QuickProfileSetupView: View {
                     errorMessage = error.localizedDescription
                 }
             }
+        }
+    }
+}
+
+// MARK: - Gallery Image Picker
+
+struct GalleryImagePickerView: UIViewControllerRepresentable {
+    let onImagePicked: (UIImage?) -> Void
+    @Environment(\.dismiss) private var dismiss
+
+    func makeUIViewController(context: Context) -> UIImagePickerController {
+        let picker = UIImagePickerController()
+        picker.delegate = context.coordinator
+        picker.sourceType = .photoLibrary
+        picker.allowsEditing = true
+        return picker
+    }
+
+    func updateUIViewController(_ uiViewController: UIImagePickerController, context: Context) {}
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator(self)
+    }
+
+    class Coordinator: NSObject, UIImagePickerControllerDelegate, UINavigationControllerDelegate {
+        let parent: GalleryImagePickerView
+        init(_ parent: GalleryImagePickerView) { self.parent = parent }
+
+        func imagePickerController(_ picker: UIImagePickerController,
+                                   didFinishPickingMediaWithInfo info: [UIImagePickerController.InfoKey: Any]) {
+            let image = info[.editedImage] as? UIImage ?? info[.originalImage] as? UIImage
+            parent.onImagePicked(image)
+            parent.dismiss()
+        }
+
+        func imagePickerControllerDidCancel(_ picker: UIImagePickerController) {
+            parent.onImagePicked(nil)
+            parent.dismiss()
         }
     }
 }

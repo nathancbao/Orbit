@@ -45,6 +45,24 @@ struct ProfileDisplayView: View {
                         .shadow(color: .black.opacity(0.1), radius: 10, x: 0, y: 4)
                         .padding(.top, 60)
 
+                        // Gallery photos
+                        if !profile.galleryPhotos.isEmpty {
+                            ScrollView(.horizontal, showsIndicators: false) {
+                                HStack(spacing: 10) {
+                                    ForEach(profile.galleryPhotos, id: \.self) { urlString in
+                                        AsyncImage(url: URL(string: urlString)) { image in
+                                            image.resizable().scaledToFill()
+                                        } placeholder: {
+                                            Color(.systemGray5)
+                                        }
+                                        .frame(width: 72, height: 72)
+                                        .clipShape(RoundedRectangle(cornerRadius: 10))
+                                    }
+                                }
+                                .padding(.horizontal, 28)
+                            }
+                        }
+
                         // Name + year
                         VStack(spacing: 6) {
                             Text(profile.name)
@@ -64,6 +82,41 @@ struct ProfileDisplayView: View {
                                         .foregroundColor(.secondary)
                                 }
                             }
+                        }
+
+                        // Gender + MBTI badges
+                        if !profile.gender.isEmpty || !profile.mbti.isEmpty {
+                            HStack(spacing: 8) {
+                                if !profile.gender.isEmpty {
+                                    Text(Profile.displayGender(profile.gender))
+                                        .font(.caption)
+                                        .fontWeight(.medium)
+                                        .padding(.horizontal, 12)
+                                        .padding(.vertical, 6)
+                                        .background(OrbitTheme.gradient.opacity(0.15))
+                                        .foregroundStyle(OrbitTheme.gradient)
+                                        .clipShape(Capsule())
+                                }
+                                if !profile.mbti.isEmpty {
+                                    Text(profile.mbti)
+                                        .font(.caption)
+                                        .fontWeight(.medium)
+                                        .padding(.horizontal, 12)
+                                        .padding(.vertical, 6)
+                                        .background(OrbitTheme.gradient.opacity(0.15))
+                                        .foregroundStyle(OrbitTheme.gradient)
+                                        .clipShape(Capsule())
+                                }
+                            }
+                        }
+
+                        // Bio
+                        if !profile.bio.isEmpty {
+                            Text(profile.bio)
+                                .font(.body)
+                                .foregroundColor(.primary)
+                                .multilineTextAlignment(.center)
+                                .padding(.horizontal, 32)
                         }
 
                         // Trust score
@@ -89,6 +142,42 @@ struct ProfileDisplayView: View {
                                             .background(OrbitTheme.blue.opacity(0.12))
                                             .foregroundColor(OrbitTheme.blue)
                                             .clipShape(Capsule())
+                                    }
+                                }
+                            }
+                            .padding(.horizontal, 28)
+                        }
+
+                        // Links
+                        if !profile.links.isEmpty {
+                            VStack(alignment: .leading, spacing: 8) {
+                                Text("links")
+                                    .font(.headline)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+
+                                ForEach(profile.links, id: \.self) { link in
+                                    if let url = URL(string: link) {
+                                        Link(destination: url) {
+                                            HStack(spacing: 6) {
+                                                Image(systemName: "link")
+                                                    .font(.caption)
+                                                Text(link)
+                                                    .font(.subheadline)
+                                                    .lineLimit(1)
+                                                    .truncationMode(.middle)
+                                            }
+                                            .foregroundStyle(OrbitTheme.gradient)
+                                        }
+                                    } else {
+                                        HStack(spacing: 6) {
+                                            Image(systemName: "link")
+                                                .font(.caption)
+                                            Text(link)
+                                                .font(.subheadline)
+                                                .lineLimit(1)
+                                                .truncationMode(.middle)
+                                        }
+                                        .foregroundColor(.secondary)
                                     }
                                 }
                             }
@@ -185,7 +274,11 @@ struct TrustScoreView: View {
             photo: nil,
             trustScore: 3.8,
             email: "alex@ucdavis.edu",
-            matchScore: nil
+            galleryPhotos: [],
+            bio: "Coffee enthusiast and avid hiker. Always down for board games!",
+            links: ["https://github.com/alexchen"],
+            gender: "male",
+            mbti: "ENFP"
         ),
         onEdit: {}
     )
