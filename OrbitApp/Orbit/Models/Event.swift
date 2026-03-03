@@ -14,6 +14,8 @@ struct Mission: Codable, Identifiable {
     var tags: [String]
     var location: String
     var date: String            // YYYY-MM-DD
+    var startTime: String?      // HH:mm (24h)
+    var endTime: String?        // HH:mm (24h)
     var creatorId: Int?
     var creatorType: String?    // user | seeded | ai_suggested
     var maxPodSize: Int
@@ -28,6 +30,8 @@ struct Mission: Codable, Identifiable {
 
     enum CodingKeys: String, CodingKey {
         case id, title, description, tags, location, date, status
+        case startTime        = "start_time"
+        case endTime          = "end_time"
         case creatorId        = "creator_id"
         case creatorType      = "creator_type"
         case maxPodSize       = "max_pod_size"
@@ -41,12 +45,27 @@ struct Mission: Codable, Identifiable {
     var displayDate: String {
         let f = DateFormatter()
         f.dateFormat = "yyyy-MM-dd"
-        if let d = f.date(from: date) {
-            f.dateStyle = .medium
-            f.timeStyle = .none
-            return f.string(from: d)
+        guard let d = f.date(from: date) else { return date }
+        f.dateStyle = .medium
+        f.timeStyle = .none
+        var result = f.string(from: d)
+        if let start = startTime {
+            result += " · \(Self.formatTime(start))"
+            if let end = endTime {
+                result += " – \(Self.formatTime(end))"
+            }
         }
-        return date
+        return result
+    }
+
+    /// Convert "HH:mm" to a localized short time string (e.g. "3:00 PM").
+    private static func formatTime(_ hhmm: String) -> String {
+        let f = DateFormatter()
+        f.dateFormat = "HH:mm"
+        guard let d = f.date(from: hhmm) else { return hhmm }
+        f.dateFormat = ""
+        f.timeStyle = .short
+        return f.string(from: d)
     }
 }
 

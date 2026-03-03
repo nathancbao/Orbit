@@ -85,7 +85,7 @@ struct PodsView: View {
             )
         }
         .task { await loadData() }
-        .onChange(of: isActive) { active in
+        .onChange(of: isActive) { _, active in
             if active {
                 Task { await loadData() }
             }

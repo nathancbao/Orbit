@@ -220,7 +220,7 @@ struct SignalFormView: View {
                         }
                     }
                     .pickerStyle(.menu)
-                    .onChange(of: timeRangeStart) { newVal in
+                    .onChange(of: timeRangeStart) { _, newVal in
                         if newVal >= timeRangeEnd {
                             timeRangeEnd = min(newVal + 1, 23)
                         }
@@ -238,7 +238,7 @@ struct SignalFormView: View {
                         }
                     }
                     .pickerStyle(.menu)
-                    .onChange(of: timeRangeEnd) { _ in
+                    .onChange(of: timeRangeEnd) {
                         pruneHoursOutsideRange()
                     }
                 }
