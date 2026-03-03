@@ -24,7 +24,7 @@ enum DiscoveryTheme {
     static let glow = Color(hex: "3B82F6").opacity(0.08)
 
     static let missionColors: [Color] = [accentBlue, accentTeal, accentGreen]
-    static let signalColors: [Color] = [accentAmber, accentPink, accentLavender]
+    static let flexColors: [Color] = [accentAmber, accentPink, accentLavender]
     static let templateColor: Color = Color(hex: "6366F1")
 }
 
@@ -71,7 +71,6 @@ struct ImageStar: Identifiable {
 
 enum PlanetType {
     case mission(Mission)
-    case signal(Signal)
     case template(TemplateItem)
 }
 
@@ -87,30 +86,33 @@ struct PlanetNode: Identifiable {
 
     var title: String {
         switch type {
-        case .mission(let mission): return mission.title
-        case .signal(let signal):   return signal.displayTitle
+        case .mission(let m): return m.isFlexMode ? m.displayTitle : m.title
         case .template(let t):      return t.title
         }
     }
 
     var subtitle: String {
         switch type {
-        case .mission(let mission): return mission.displayDate
-        case .signal(let signal):   return signal.activityCategory.displayName
+        case .mission(let m): return m.isFlexMode ? (m.activityCategory?.displayName ?? "") : m.displayDate
         case .template(let t):      return t.interest
         }
     }
 
     var icon: String {
         switch type {
-        case .mission:              return "calendar.circle.fill"
-        case .signal(let signal):   return signal.activityCategory.icon
+        case .mission(let m):
+            return m.isFlexMode ? (m.activityCategory?.icon ?? "star") : "calendar.circle.fill"
         case .template:             return "sparkles"
         }
     }
 
     var isMission: Bool {
-        if case .mission = type { return true }
+        if case .mission(let m) = type { return m.mode == .set }
+        return false
+    }
+
+    var isFlexMission: Bool {
+        if case .mission(let m) = type { return m.isFlexMode }
         return false
     }
 
@@ -300,7 +302,6 @@ struct RecommendationBellView: View {
 struct RecommendationsSheet: View {
     let items: [DiscoveryItem]
     let onSelectMission: (Mission) -> Void
-    let onSelectSignal: (Signal) -> Void
 
     var body: some View {
         NavigationStack {
@@ -318,11 +319,15 @@ struct RecommendationsSheet: View {
                                 onSelectMission(mission)
                             } label: {
                                 HStack(spacing: 12) {
-                                    Image(systemName: "calendar.circle.fill")
+                                    Image(systemName: mission.isFlexMode
+                                          ? (mission.activityCategory?.icon ?? "star")
+                                          : "calendar.circle.fill")
                                         .font(.title2)
-                                        .foregroundColor(DiscoveryTheme.accentBlue)
+                                        .foregroundColor(mission.isFlexMode
+                                                         ? DiscoveryTheme.accentPink
+                                                         : DiscoveryTheme.accentBlue)
                                     VStack(alignment: .leading, spacing: 2) {
-                                        Text(mission.title)
+                                        Text(mission.isFlexMode ? mission.displayTitle : mission.title)
                                             .font(.subheadline)
                                             .fontWeight(.semibold)
                                             .foregroundColor(DiscoveryTheme.textPrimary)
@@ -330,31 +335,11 @@ struct RecommendationsSheet: View {
                                             Text(reason)
                                                 .font(.caption)
                                                 .foregroundColor(DiscoveryTheme.textMuted)
+                                        } else if mission.isFlexMode, let cat = mission.activityCategory {
+                                            Text(cat.displayName)
+                                                .font(.caption)
+                                                .foregroundColor(DiscoveryTheme.textMuted)
                                         }
-                                    }
-                                    Spacer()
-                                    Image(systemName: "chevron.right")
-                                        .font(.caption)
-                                        .foregroundColor(DiscoveryTheme.textMuted)
-                                }
-                                .padding(.vertical, 4)
-                            }
-                        case .recommendedSignal(let signal):
-                            Button {
-                                onSelectSignal(signal)
-                            } label: {
-                                HStack(spacing: 12) {
-                                    Image(systemName: signal.activityCategory.icon)
-                                        .font(.title2)
-                                        .foregroundColor(DiscoveryTheme.accentPink)
-                                    VStack(alignment: .leading, spacing: 2) {
-                                        Text(signal.displayTitle)
-                                            .font(.subheadline)
-                                            .fontWeight(.semibold)
-                                            .foregroundColor(DiscoveryTheme.textPrimary)
-                                        Text(signal.activityCategory.displayName)
-                                            .font(.caption)
-                                            .foregroundColor(DiscoveryTheme.textMuted)
                                     }
                                     Spacer()
                                     Image(systemName: "chevron.right")
@@ -478,7 +463,7 @@ struct PlanetNodeView: View {
     @State private var floatOffset: CGFloat = 0
     @State private var appeared: Bool = false
     @State private var ringRotation: Double = 0
-    @State private var signalPulse: CGFloat = 1.0
+    @State private var flexPulse: CGFloat = 1.0
 
     private var planetSize: CGFloat { isSelected ? 60 : 52 }
     private var glowSize: CGFloat { isSelected ? 100 : 80 }
@@ -522,19 +507,19 @@ struct PlanetNodeView: View {
                         .rotationEffect(.degrees(ringRotation))
                 }
 
-                // Signal: Radiating pulse rings
-                if case .signal = planet.type {
+                // Flex mission: Radiating pulse rings
+                if planet.isFlexMission {
                     Circle()
                         .stroke(planet.accentColor.opacity(0.2), lineWidth: 1)
                         .frame(width: planetSize + 16, height: planetSize + 16)
-                        .scaleEffect(signalPulse)
-                        .opacity(Double(2.0 - signalPulse))
+                        .scaleEffect(flexPulse)
+                        .opacity(Double(2.0 - flexPulse))
 
                     Circle()
                         .stroke(planet.accentColor.opacity(0.12), lineWidth: 1)
                         .frame(width: planetSize + 28, height: planetSize + 28)
-                        .scaleEffect(signalPulse)
-                        .opacity(Double(2.0 - signalPulse) * 0.5)
+                        .scaleEffect(flexPulse)
+                        .opacity(Double(2.0 - flexPulse) * 0.5)
                 }
 
                 // Template: Dashed outline
@@ -684,9 +669,9 @@ struct PlanetNodeView: View {
                     withAnimation(.linear(duration: 8).repeatForever(autoreverses: false)) {
                         ringRotation = 360
                     }
-                } else if case .signal = planet.type {
+                } else if planet.isFlexMission {
                     withAnimation(.easeOut(duration: 2).repeatForever(autoreverses: false)) {
-                        signalPulse = 1.5
+                        flexPulse = 1.5
                     }
                 }
             }
@@ -724,8 +709,8 @@ struct ConnectorLinesView: View {
 struct DiscoveryLegend: View {
     var body: some View {
         HStack(spacing: 16) {
-            LegendItem(color: DiscoveryTheme.accentBlue, label: "Missions", icon: "calendar.circle.fill")
-            LegendItem(color: DiscoveryTheme.accentPink, label: "Signals", icon: "antenna.radiowaves.left.and.right")
+            LegendItem(color: DiscoveryTheme.accentBlue, label: "Set", icon: "calendar.circle.fill")
+            LegendItem(color: DiscoveryTheme.accentPink, label: "Flex", icon: "antenna.radiowaves.left.and.right")
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 8)
@@ -763,12 +748,12 @@ struct DiscoveryView: View {
     var isActive: Bool = false
 
     @StateObject private var viewModel: DiscoveryViewModel
+    @StateObject private var missionsVM = MissionsViewModel()
     @State private var imageStars: [ImageStar] = []
     @State private var planets: [PlanetNode] = []
     @State private var selectedPlanetId: UUID? = nil
     @State private var planetPositions: [UUID: CGPoint] = [:]
     @State private var selectedMission: Mission? = nil
-    @State private var selectedSignal: Signal? = nil
     @State private var showCreateMission = false
     @State private var createPrefillTitle = ""
     @State private var createPrefillTags: [String] = []
@@ -934,11 +919,9 @@ struct DiscoveryView: View {
             .sheet(item: $selectedMission) { mission in
                 MissionDetailView(mission: mission, onJoined: {})
             }
-            .sheet(item: $selectedSignal) { signal in
-                SignalDetailView(signal: signal)
-            }
             .sheet(isPresented: $showCreateMission) {
                 MissionCreateView(
+                    viewModel: missionsVM,
                     prefillTitle: createPrefillTitle,
                     prefillTags: createPrefillTags
                 )
@@ -950,12 +933,6 @@ struct DiscoveryView: View {
                         showRecommendationsSheet = false
                         DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
                             selectedMission = mission
-                        }
-                    },
-                    onSelectSignal: { signal in
-                        showRecommendationsSheet = false
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                            selectedSignal = signal
                         }
                     }
                 )
@@ -979,8 +956,6 @@ struct DiscoveryView: View {
             switch planet.type {
             case .mission(let mission):
                 selectedMission = mission
-            case .signal(let signal):
-                selectedSignal = signal
             case .template(let template):
                 createPrefillTitle = template.title
                 createPrefillTags = template.suggestedTags
@@ -1157,11 +1132,9 @@ struct DiscoveryView: View {
     private func planetTypeAndColor(for item: DiscoveryItem, index: Int) -> (PlanetType, Color) {
         switch item {
         case .hostedMission(let m), .joinedMission(let m), .recommendedMission(let m), .discoverableMission(let m):
-            let color = DiscoveryTheme.missionColors[index % DiscoveryTheme.missionColors.count]
+            let colors = m.isFlexMode ? DiscoveryTheme.flexColors : DiscoveryTheme.missionColors
+            let color = colors[index % colors.count]
             return (.mission(m), color)
-        case .hostedSignal(let s), .joinedSignal(let s), .recommendedSignal(let s), .discoverableSignal(let s):
-            let color = DiscoveryTheme.signalColors[index % DiscoveryTheme.signalColors.count]
-            return (.signal(s), color)
         case .template(let t):
             return (.template(t), DiscoveryTheme.templateColor)
         }

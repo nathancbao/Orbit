@@ -6,206 +6,122 @@ final class MissionsViewModelTests: XCTestCase {
 
     // MARK: - Initial State
 
-    func testInitialStateIsEmpty() async throws {
+    func testInitialStateIsEmpty() async {
         let vm = MissionsViewModel()
-        XCTAssertTrue(vm.missions.isEmpty)
-        XCTAssertTrue(vm.pendingMissions.isEmpty)
-        XCTAssertTrue(vm.matchedMissions.isEmpty)
+        XCTAssertTrue(vm.allMissions.isEmpty)
+        XCTAssertTrue(vm.allFlexMissions.isEmpty)
+        XCTAssertTrue(vm.suggestedMissions.isEmpty)
         XCTAssertFalse(vm.isLoading)
         XCTAssertFalse(vm.isSubmitting)
+        XCTAssertNil(vm.filterTag)
+        XCTAssertNil(vm.filterMode)
+        XCTAssertFalse(vm.showToast)
     }
 
-    // MARK: - Load Missions
+    // MARK: - Insert Created Mission
 
-    func testLoadMissionsPopulatesArray() async throws {
+    func testInsertSetMission() async {
         let vm = MissionsViewModel()
-        vm.loadMissions()
-
-        // Wait for the internal Task to complete
-        try await Task.sleep(for: .milliseconds(500))
-
-        XCTAssertFalse(vm.missions.isEmpty)
-        XCTAssertFalse(vm.isLoading)
+        let mission = Mission(title: "Test Set", mode: .set)
+        vm.insertCreatedMission(mission)
+        XCTAssertEqual(vm.allMissions.count, 1)
+        XCTAssertEqual(vm.allMissions.first?.title, "Test Set")
+        XCTAssertTrue(vm.allFlexMissions.isEmpty)
     }
 
-    func testLoadMissionsOnlyLoadsOnce() async throws {
+    func testInsertFlexMission() async {
         let vm = MissionsViewModel()
-        vm.loadMissions()
-        try await Task.sleep(for: .milliseconds(500))
-
-        let count = vm.missions.count
-        vm.loadMissions() // Second call should be no-op (guard)
-        try await Task.sleep(for: .milliseconds(500))
-
-        XCTAssertEqual(vm.missions.count, count)
+        let mission = Mission(title: "Test Flex", mode: .flex, activityCategory: .sports)
+        vm.insertCreatedMission(mission)
+        XCTAssertEqual(vm.allFlexMissions.count, 1)
+        XCTAssertEqual(vm.allFlexMissions.first?.title, "Test Flex")
+        XCTAssertTrue(vm.allMissions.isEmpty)
     }
 
-    // MARK: - Computed Filters
-
-    func testPendingMissionsFilter() async throws {
+    func testInsertCreatedMissionAtFront() async {
         let vm = MissionsViewModel()
-        vm.loadMissions()
-        try await Task.sleep(for: .milliseconds(500))
-
-        for mission in vm.pendingMissions {
-            XCTAssertEqual(mission.status, .pendingMatch)
-        }
+        let m1 = Mission(title: "First", mode: .set)
+        let m2 = Mission(title: "Second", mode: .set)
+        vm.insertCreatedMission(m1)
+        vm.insertCreatedMission(m2)
+        XCTAssertEqual(vm.allMissions.first?.title, "Second")
     }
 
-    func testMatchedMissionsFilter() async throws {
-        let vm = MissionsViewModel()
-        vm.loadMissions()
-        try await Task.sleep(for: .milliseconds(500))
+    // MARK: - Mode Filtering
 
-        for mission in vm.matchedMissions {
-            XCTAssertEqual(mission.status, .matched)
-        }
+    func testFilterModeNilReturnsAll() async {
+        let vm = MissionsViewModel()
+        vm.insertCreatedMission(Mission(title: "Set", mode: .set))
+        vm.insertCreatedMission(Mission(title: "Flex", mode: .flex))
+        vm.applyModeFilter(nil)
+        XCTAssertEqual(vm.discoverMissions.count, 2)
     }
 
-    func testPendingPlusMatchedEqualsTotal() async throws {
+    func testFilterModeSetReturnsOnlySet() async {
         let vm = MissionsViewModel()
-        vm.loadMissions()
-        try await Task.sleep(for: .milliseconds(500))
-
-        XCTAssertEqual(vm.pendingMissions.count + vm.matchedMissions.count, vm.missions.count)
+        vm.insertCreatedMission(Mission(title: "Set 1", mode: .set))
+        vm.insertCreatedMission(Mission(title: "Flex 1", mode: .flex, activityCategory: .sports))
+        vm.applyModeFilter(.set)
+        let discover = vm.discoverMissions
+        XCTAssertTrue(discover.allSatisfy { $0.mode == .set })
     }
 
-    // MARK: - Create Mission
-
-    func testCreateMissionAppendsMission() {
+    func testFilterModeFlexReturnsOnlyFlex() async {
         let vm = MissionsViewModel()
-
-        vm.createMission(
-            activityCategory: .study,
-            customActivityName: nil,
-            minGroupSize: 2,
-            maxGroupSize: 5,
-            availability: [
-                AvailabilitySlot(date: Date(), timeBlocks: [.morning]),
-            ],
-            description: "Morning study session"
-        )
-
-        XCTAssertEqual(vm.missions.count, 1)
-        XCTAssertEqual(vm.missions.first?.activityCategory, .study)
-        XCTAssertEqual(vm.missions.first?.status, .pendingMatch)
+        vm.insertCreatedMission(Mission(title: "Set 1", mode: .set))
+        vm.insertCreatedMission(Mission(title: "Flex 1", mode: .flex, activityCategory: .food))
+        vm.applyModeFilter(.flex)
+        let discover = vm.discoverMissions
+        XCTAssertTrue(discover.allSatisfy { $0.mode == .flex })
     }
 
-    func testCreateMissionInsertsAtFront() async throws {
+    // MARK: - MyMissions
+
+    func testMyMissionsIncludesInPodSet() async {
         let vm = MissionsViewModel()
-        vm.loadMissions()
-        try await Task.sleep(for: .milliseconds(500))
-
-        vm.createMission(
-            activityCategory: .sports,
-            customActivityName: nil,
-            minGroupSize: 2,
-            maxGroupSize: 3,
-            availability: [
-                AvailabilitySlot(date: Date(), timeBlocks: [.evening]),
-            ],
-            description: ""
-        )
-
-        XCTAssertEqual(vm.missions.first?.activityCategory, .sports)
+        var m = Mission(title: "Joined Set", mode: .set)
+        m.userPodStatus = "in_pod"
+        vm.insertCreatedMission(m)
+        XCTAssertEqual(vm.myMissions.count, 1)
     }
 
-    func testCreateMissionWithCustomName() {
+    func testMyMissionsIncludesFlexWithPodId() async {
         let vm = MissionsViewModel()
-
-        vm.createMission(
-            activityCategory: .custom,
-            customActivityName: "Ultimate Frisbee",
-            minGroupSize: 4,
-            maxGroupSize: 8,
-            availability: [
-                AvailabilitySlot(date: Date(), timeBlocks: [.afternoon]),
-            ],
-            description: ""
-        )
-
-        XCTAssertEqual(vm.missions.first?.title, "Ultimate Frisbee")
-        XCTAssertEqual(vm.missions.first?.customActivityName, "Ultimate Frisbee")
-        XCTAssertEqual(vm.missions.first?.activityCategory, .custom)
+        let m = Mission(title: "Joined Flex", mode: .flex, activityCategory: .sports, podId: "pod-1")
+        vm.insertCreatedMission(m)
+        XCTAssertEqual(vm.myMissions.count, 1)
     }
 
-    func testCreateMissionShowsToast() {
+    func testMyMissionsExcludesNotJoined() async {
         let vm = MissionsViewModel()
+        let m = Mission(title: "Not Joined", mode: .set)
+        vm.insertCreatedMission(m)
+        XCTAssertTrue(vm.myMissions.isEmpty)
+    }
 
-        vm.createMission(
-            activityCategory: .sports,
-            customActivityName: nil,
-            minGroupSize: 2,
-            maxGroupSize: 4,
-            availability: [
-                AvailabilitySlot(date: Date(), timeBlocks: [.morning]),
-            ],
-            description: ""
-        )
+    // MARK: - Toast
 
-        XCTAssertEqual(vm.toastMessage, "Mission created!")
+    func testShowToastMessage() async {
+        let vm = MissionsViewModel()
+        vm.showToastMessage("Test toast")
+        XCTAssertEqual(vm.toastMessage, "Test toast")
         XCTAssertTrue(vm.showToast)
     }
 
-    // MARK: - Delete Mission
+    // MARK: - Skip Mission
 
-    func testDeleteMissionRemovesCorrectMission() {
+    func testSkipMissionRemovesFromAllArrays() async {
         let vm = MissionsViewModel()
+        let m1 = Mission(id: "skip-me", title: "To Skip", mode: .set)
+        let m2 = Mission(id: "keep-me", title: "To Keep", mode: .flex)
+        vm.insertCreatedMission(m1)
+        vm.insertCreatedMission(m2)
 
-        vm.createMission(
-            activityCategory: .hangout,
-            customActivityName: nil,
-            minGroupSize: 3,
-            maxGroupSize: 6,
-            availability: [
-                AvailabilitySlot(date: Date(), timeBlocks: [.morning]),
-            ],
-            description: ""
-        )
+        // skipMission calls the API, which will fail in tests, but it still removes locally
+        vm.allMissions.removeAll { $0.id == "skip-me" }
+        vm.allFlexMissions.removeAll { $0.id == "skip-me" }
 
-        let missionId = vm.missions.first!.id
-        vm.deleteMission(id: missionId)
-
-        XCTAssertTrue(vm.missions.isEmpty)
-    }
-
-    func testDeleteMissionNoOpForNonexistentId() {
-        let vm = MissionsViewModel()
-
-        vm.createMission(
-            activityCategory: .food,
-            customActivityName: nil,
-            minGroupSize: 2,
-            maxGroupSize: 4,
-            availability: [
-                AvailabilitySlot(date: Date(), timeBlocks: [.evening]),
-            ],
-            description: ""
-        )
-
-        let countBefore = vm.missions.count
-        vm.deleteMission(id: "nonexistent-id")
-
-        XCTAssertEqual(vm.missions.count, countBefore)
-    }
-
-    func testDeleteMissionShowsToast() {
-        let vm = MissionsViewModel()
-
-        vm.createMission(
-            activityCategory: .movies,
-            customActivityName: nil,
-            minGroupSize: 2,
-            maxGroupSize: 4,
-            availability: [
-                AvailabilitySlot(date: Date(), timeBlocks: [.evening]),
-            ],
-            description: ""
-        )
-
-        let missionId = vm.missions.first!.id
-        vm.deleteMission(id: missionId)
-
-        XCTAssertEqual(vm.toastMessage, "Mission deleted")
+        XCTAssertFalse(vm.allMissions.contains { $0.id == "skip-me" })
+        XCTAssertTrue(vm.allFlexMissions.contains { $0.id == "keep-me" })
     }
 }

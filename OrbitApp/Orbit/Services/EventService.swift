@@ -71,6 +71,65 @@ class MissionService {
             method: "POST", authenticated: true
         )
     }
+
+    // MARK: - Flex Mode (wraps SignalService — TODO: migrate to unified /missions endpoints)
+
+    @available(*, deprecated, message: "Transitional — calls SignalService internally")
+    func listFlexMissions() async throws -> [Mission] {
+        let signals = try await SignalService.shared.discoverSignals()
+        return signals.map { Mission.fromSignal($0) }
+    }
+
+    @available(*, deprecated, message: "Transitional — calls SignalService internally")
+    func myFlexMissions() async throws -> [Mission] {
+        let signals = try await SignalService.shared.mySignals()
+        return signals.map { Mission.fromSignal($0) }
+    }
+
+    func createFlexMission(
+        activityCategory: ActivityCategory,
+        customActivityName: String?,
+        minGroupSize: Int,
+        maxGroupSize: Int,
+        availability: [AvailabilitySlot],
+        description: String,
+        links: [String] = [],
+        timeRangeStart: Int = 9,
+        timeRangeEnd: Int = 21
+    ) async throws -> Mission {
+        // TODO: Migrate to POST /missions with mode: "flex" on backend
+        let signal = try await SignalService.shared.createSignal(
+            activityCategory: activityCategory,
+            customActivityName: customActivityName,
+            minGroupSize: minGroupSize,
+            maxGroupSize: maxGroupSize,
+            availability: availability,
+            description: description,
+            links: links,
+            timeRangeStart: timeRangeStart,
+            timeRangeEnd: timeRangeEnd
+        )
+        return Mission.fromSignal(signal)
+    }
+
+    func joinFlexMission(id: String) async throws -> Mission {
+        // TODO: Migrate to POST /missions/{id}/join on backend
+        let signal = try await SignalService.shared.rsvpSignal(id: id)
+        return Mission.fromSignal(signal)
+    }
+
+    func deleteFlexMission(id: String) async throws {
+        // TODO: Migrate to DELETE /missions/{id} on backend
+        try await SignalService.shared.deleteSignal(id: id)
+    }
+
+    /// Fetches set missions + flex missions concurrently, returns merged array.
+    func listAllMissions(tag: String? = nil, year: String? = nil) async throws -> [Mission] {
+        async let setMissions = listMissions(tag: tag, year: year)
+        async let flexMissions = listFlexMissions()
+        let (s, f) = try await (setMissions, flexMissions)
+        return s + f
+    }
 }
 
 struct EmptyResponse: Codable {
@@ -94,6 +153,7 @@ struct SignalDiscoverResponse: Codable {
 // MARK: - Signal Service
 // API client for signals (backend: /api/signals).
 
+@available(*, deprecated, message: "Use MissionService for all activity types")
 class SignalService {
     static let shared = SignalService()
     private init() {}

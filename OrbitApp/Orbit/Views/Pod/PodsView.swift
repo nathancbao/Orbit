@@ -29,7 +29,7 @@ struct PodsView: View {
                             .foregroundStyle(OrbitTheme.gradient)
                         Text("no pods yet")
                             .font(.headline)
-                        Text("join a mission or respond to a signal to form a pod")
+                        Text("join a mission to form a pod")
                             .font(.subheadline)
                             .foregroundColor(.secondary)
                             .multilineTextAlignment(.center)

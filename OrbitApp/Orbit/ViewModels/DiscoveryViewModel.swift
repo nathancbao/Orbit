@@ -2,7 +2,7 @@
 //  DiscoveryViewModel.swift
 //  Orbit
 //
-//  State management for the Discovery galaxy view — fetches missions, signals,
+//  State management for the Discovery galaxy view — fetches missions (set + flex),
 //  AI recommendations, and generates template items from user interests.
 //
 
@@ -27,25 +27,17 @@ enum DiscoveryItem: Identifiable, Equatable {
     }
 
     case hostedMission(Mission)
-    case hostedSignal(Signal)
     case joinedMission(Mission)
-    case joinedSignal(Signal)
     case recommendedMission(Mission)
-    case recommendedSignal(Signal)
     case discoverableMission(Mission)
-    case discoverableSignal(Signal)
     case template(TemplateItem)
 
     var id: String {
         switch self {
         case .hostedMission(let m):       return "hm-\(m.id)"
-        case .hostedSignal(let s):        return "hs-\(s.id)"
         case .joinedMission(let m):       return "jm-\(m.id)"
-        case .joinedSignal(let s):        return "js-\(s.id)"
         case .recommendedMission(let m):  return "rm-\(m.id)"
-        case .recommendedSignal(let s):   return "rs-\(s.id)"
         case .discoverableMission(let m): return "dm-\(m.id)"
-        case .discoverableSignal(let s):  return "ds-\(s.id)"
         case .template(let t):            return "t-\(t.id)"
         }
     }
@@ -53,11 +45,11 @@ enum DiscoveryItem: Identifiable, Equatable {
     /// Priority tier: 0 = hosted (inner ring), 1 = joined, 2 = recommended, 3 = discoverable/template (outer ring)
     var priority: Int {
         switch self {
-        case .hostedMission, .hostedSignal:                     return 0
-        case .joinedMission, .joinedSignal:                     return 1
-        case .recommendedMission, .recommendedSignal:           return 2
-        case .discoverableMission, .discoverableSignal:         return 3
-        case .template:                                         return 3
+        case .hostedMission:       return 0
+        case .joinedMission:       return 1
+        case .recommendedMission:  return 2
+        case .discoverableMission: return 3
+        case .template:            return 3
         }
     }
 }
@@ -94,9 +86,11 @@ class DiscoveryViewModel: ObservableObject {
 
         // Fetch each source independently so a single failure doesn't wipe others.
         let missions = (try? await MissionService.shared.listMissions()) ?? []
+        let suggested = (try? await MissionService.shared.suggestedMissions()) ?? []
+
+        // Fetch signals and convert to flex missions
         let mySignals = (try? await SignalService.shared.mySignals()) ?? []
         let discoverSignals = (try? await SignalService.shared.discoverSignals()) ?? []
-        let suggested = (try? await MissionService.shared.suggestedMissions()) ?? []
         let rsvpSignals: [Signal] = (try? await APIService.shared.request(
             endpoint: Constants.API.Endpoints.myRsvps,
             authenticated: true
@@ -132,7 +126,12 @@ class DiscoveryViewModel: ObservableObject {
         var result: [DiscoveryItem] = []
         let userId = currentUserId
 
-        // 1. Hosted + Joined missions
+        // Convert signals to flex missions
+        let myFlexMissions = mySignals.map { Mission.fromSignal($0) }
+        let discoverFlexMissions = discoverSignals.map { Mission.fromSignal($0) }
+        let rsvpFlexMissions = rsvpSignals.map { Mission.fromSignal($0) }
+
+        // 1. Hosted + Joined set missions
         for mission in missions {
             if mission.creatorId == userId {
                 result.append(.hostedMission(mission))
@@ -141,30 +140,31 @@ class DiscoveryViewModel: ObservableObject {
             }
         }
 
-        // 2. Hosted signals
-        for signal in mySignals {
-            result.append(.hostedSignal(signal))
+        // 2. Hosted flex missions (from mySignals)
+        for mission in myFlexMissions {
+            result.append(.hostedMission(mission))
         }
 
-        // 3. Joined signals (from discover endpoint)
-        let hostedSignalIds = Set(mySignals.map { $0.id })
-        for signal in discoverSignals {
-            guard !hostedSignalIds.contains(signal.id) else { continue }
-            if signal.podId != nil {
-                result.append(.joinedSignal(signal))
+        // 3. Joined flex missions (from discover endpoint — have podId)
+        let hostedFlexIds = Set(myFlexMissions.map { $0.id })
+        for mission in discoverFlexMissions {
+            guard !hostedFlexIds.contains(mission.id) else { continue }
+            if mission.podId != nil {
+                result.append(.joinedMission(mission))
             }
         }
 
-        // 3b. RSVP'd signals (from /users/me/rsvps — signals user joined via Pods)
-        let alreadyAddedSignalIds = Set(result.compactMap { item -> String? in
+        // 3b. RSVP'd flex missions (from /users/me/rsvps)
+        let alreadyAddedFlexIds = Set(result.compactMap { item -> String? in
             switch item {
-            case .hostedSignal(let s), .joinedSignal(let s): return s.id
+            case .hostedMission(let m), .joinedMission(let m):
+                return m.isFlexMode ? m.id : nil
             default: return nil
             }
         })
-        for signal in rsvpSignals {
-            if !alreadyAddedSignalIds.contains(signal.id) {
-                result.append(.joinedSignal(signal))
+        for mission in rsvpFlexMissions {
+            if !alreadyAddedFlexIds.contains(mission.id) {
+                result.append(.joinedMission(mission))
             }
         }
 
@@ -218,7 +218,7 @@ class DiscoveryViewModel: ObservableObject {
             }
         }
 
-        // 5. Discoverable missions (not hosted, not joined, not AI-recommended)
+        // 5. Discoverable set missions (not hosted, not joined, not AI-recommended)
         let addedMissionIds = Set(result.compactMap { item -> String? in
             switch item {
             case .hostedMission(let m), .joinedMission(let m), .recommendedMission(let m):
@@ -234,11 +234,11 @@ class DiscoveryViewModel: ObservableObject {
             }
         }
 
-        // 6. Discoverable signals (not hosted, not RSVP'd)
-        for signal in discoverSignals {
-            guard !hostedSignalIds.contains(signal.id) else { continue }
-            if signal.podId == nil {
-                result.append(.discoverableSignal(signal))
+        // 6. Discoverable flex missions (not hosted, not RSVP'd)
+        for mission in discoverFlexMissions {
+            guard !hostedFlexIds.contains(mission.id) else { continue }
+            if mission.podId == nil && !addedMissionIds.contains(mission.id) {
+                result.append(.discoverableMission(mission))
             }
         }
 

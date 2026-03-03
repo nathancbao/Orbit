@@ -14,14 +14,12 @@ struct MainTabView: View {
     enum Tab: CaseIterable {
         case discovery
         case missions
-        case signals
         case pods
 
         var label: String {
             switch self {
             case .discovery: return "Discovery"
             case .missions:  return "Missions"
-            case .signals:   return "Signals"
             case .pods:      return "Pods"
             }
         }
@@ -30,7 +28,6 @@ struct MainTabView: View {
             switch self {
             case .discovery: return "discoveryNavBlank"
             case .missions:  return "missionNavBlank"
-            case .signals:   return "signalNavBlank"
             case .pods:      return "podsNavBlank"
             }
         }
@@ -39,7 +36,6 @@ struct MainTabView: View {
             switch self {
             case .discovery: return "discoveryNavColor"
             case .missions:  return "missionNavColor"
-            case .signals:   return "signalNavColor"
             case .pods:      return "podsNavColor"
             }
         }
@@ -56,10 +52,6 @@ struct MainTabView: View {
                 MissionsView(userProfile: $profile)
                     .opacity(selectedTab == .missions ? 1 : 0)
                     .allowsHitTesting(selectedTab == .missions)
-
-                SignalsView(userProfile: $profile)
-                    .opacity(selectedTab == .signals ? 1 : 0)
-                    .allowsHitTesting(selectedTab == .signals)
 
                 PodsView(userProfile: $profile, isActive: selectedTab == .pods)
                     .opacity(selectedTab == .pods ? 1 : 0)

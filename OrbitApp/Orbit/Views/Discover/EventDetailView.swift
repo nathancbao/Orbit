@@ -62,6 +62,10 @@ struct MissionDetailView: View {
     @State private var isJoining = false
     @State private var joinedPod: Pod?
     @State private var errorMessage: String?
+    @State private var showSignedUp = false
+    @State private var localToast = false
+    @State private var joinedPodId: String?
+    @State private var showPod = false
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
@@ -75,76 +79,25 @@ struct MissionDetailView: View {
                 }
                 .ignoresSafeArea()
 
-                ScrollView {
-                    VStack(alignment: .leading, spacing: 24) {
-
-                        // Title
-                        Text(mission.title)
-                            .font(.largeTitle)
-                            .fontWeight(.bold)
-                            .padding(.top, 8)
-
-                        // Meta row
-                        HStack(spacing: 16) {
-                            HStack(spacing: 6) {
-                                Image(systemName: "calendar")
-                                    .foregroundStyle(OrbitTheme.gradient)
-                                Text(mission.displayDate)
-                                    .font(.subheadline)
-                            }
-                            HStack(spacing: 6) {
-                                Image(systemName: "mappin.and.ellipse")
-                                    .foregroundStyle(OrbitTheme.gradient)
-                                Text(mission.location.isEmpty ? "Location TBD" : mission.location)
-                                    .font(.subheadline)
-                                    .lineLimit(1)
-                            }
-                        }
-                        .foregroundColor(.secondary)
-
-                        // Tags
-                        if !mission.tags.isEmpty {
-                            ScrollView(.horizontal, showsIndicators: false) {
-                                HStack(spacing: 8) {
-                                    ForEach(mission.tags, id: \.self) { tag in
-                                        Text(tag)
-                                            .font(.caption)
-                                            .padding(.horizontal, 10)
-                                            .padding(.vertical, 5)
-                                            .background(OrbitTheme.blue.opacity(0.12))
-                                            .clipShape(Capsule())
-                                            .foregroundColor(OrbitTheme.blue)
-                                    }
-                                }
-                            }
-                        }
-
-                        // Description
-                        Text(mission.description)
-                            .font(.body)
-                            .foregroundColor(.primary)
-                            .lineSpacing(4)
-
-                        Divider()
-
-                        // Pod status section
-                        MissionPodStatusSection(mission: mission)
-
-                        if let error = errorMessage {
-                            Text(error)
-                                .font(.caption)
-                                .foregroundColor(.red)
-                        }
-
-                        // Action button
-                        actionButton
-
-                        Spacer(minLength: 60)
-                    }
-                    .padding(.horizontal, 24)
-                    .padding(.top, 8)
+                if mission.isFlexMode {
+                    flexContent
+                } else {
+                    setContent
                 }
             }
+            .overlay(alignment: .bottom) {
+                if localToast {
+                    Text("You're in!")
+                        .font(.subheadline).fontWeight(.medium)
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 22).padding(.vertical, 12)
+                        .background(Capsule().fill(Color(red: 0.1, green: 0.1, blue: 0.22).opacity(0.95)))
+                        .shadow(color: .black.opacity(0.18), radius: 10, y: 4)
+                        .padding(.bottom, 80)
+                        .transition(.move(edge: .bottom).combined(with: .opacity))
+                }
+            }
+            .animation(.spring(duration: 0.3), value: localToast)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
@@ -153,16 +106,94 @@ struct MissionDetailView: View {
             }
         }
         .sheet(item: $joinedPod) { pod in
-            PodView(podId: pod.id, title: mission.title)
+            PodView(podId: pod.id, title: mission.isFlexMode ? mission.displayTitle : mission.title)
                 .onDisappear {
                     onJoined()
                     dismiss()
                 }
         }
+        .sheet(isPresented: $showPod) {
+            if let podId = joinedPodId {
+                PodView(podId: podId, title: mission.displayTitle)
+            }
+        }
+        .onAppear {
+            if mission.isFlexMode, let podId = mission.podId {
+                showSignedUp = true
+                joinedPodId = podId
+            }
+        }
+    }
+
+    // MARK: - Set Mode Content (unchanged)
+
+    private var setContent: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 24) {
+                Text(mission.title)
+                    .font(.largeTitle)
+                    .fontWeight(.bold)
+                    .padding(.top, 8)
+
+                HStack(spacing: 16) {
+                    HStack(spacing: 6) {
+                        Image(systemName: "calendar")
+                            .foregroundStyle(OrbitTheme.gradient)
+                        Text(mission.displayDate)
+                            .font(.subheadline)
+                    }
+                    HStack(spacing: 6) {
+                        Image(systemName: "mappin.and.ellipse")
+                            .foregroundStyle(OrbitTheme.gradient)
+                        Text(mission.location.isEmpty ? "Location TBD" : mission.location)
+                            .font(.subheadline)
+                            .lineLimit(1)
+                    }
+                }
+                .foregroundColor(.secondary)
+
+                if !mission.tags.isEmpty {
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 8) {
+                            ForEach(mission.tags, id: \.self) { tag in
+                                Text(tag)
+                                    .font(.caption)
+                                    .padding(.horizontal, 10)
+                                    .padding(.vertical, 5)
+                                    .background(OrbitTheme.blue.opacity(0.12))
+                                    .clipShape(Capsule())
+                                    .foregroundColor(OrbitTheme.blue)
+                            }
+                        }
+                    }
+                }
+
+                Text(mission.description)
+                    .font(.body)
+                    .foregroundColor(.primary)
+                    .lineSpacing(4)
+
+                Divider()
+
+                MissionPodStatusSection(mission: mission)
+
+                if let error = errorMessage {
+                    Text(error)
+                        .font(.caption)
+                        .foregroundColor(.red)
+                }
+
+                setActionButton
+
+                Spacer(minLength: 60)
+            }
+            .padding(.horizontal, 24)
+            .padding(.top, 8)
+        }
     }
 
     @ViewBuilder
-    private var actionButton: some View {
+    private var setActionButton: some View {
         switch mission.userPodStatus {
         case "in_pod":
             if let podId = mission.userPodId {
@@ -181,12 +212,12 @@ struct MissionDetailView: View {
                 .foregroundColor(.secondary)
                 .font(.subheadline)
         default:
-            Button(action: join) {
+            Button(action: joinSetMission) {
                 ZStack {
                     if isJoining {
                         ProgressView().tint(.white)
                     } else {
-                        Text("join a pod →")
+                        Text("join a pod \u{2192}")
                             .font(.system(size: 16, weight: .semibold))
                             .tracking(0.5)
                     }
@@ -201,7 +232,208 @@ struct MissionDetailView: View {
         }
     }
 
-    private func join() {
+    // MARK: - Flex Mode Content
+
+    private var flexContent: some View {
+        VStack(spacing: 0) {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 24) {
+                    // Icon and Title
+                    HStack(spacing: 12) {
+                        if let cat = mission.activityCategory {
+                            Image(systemName: cat.icon)
+                                .font(.title)
+                                .foregroundStyle(OrbitTheme.gradient)
+                        }
+                        Text(mission.displayTitle)
+                            .font(.largeTitle)
+                            .fontWeight(.bold)
+                    }
+                    .padding(.top, 8)
+
+                    // Category and Status
+                    HStack(spacing: 16) {
+                        if let cat = mission.activityCategory {
+                            HStack(spacing: 6) {
+                                Image(systemName: "tag")
+                                    .foregroundStyle(OrbitTheme.gradient)
+                                Text(cat.displayName)
+                                    .font(.subheadline)
+                            }
+                        }
+                        if let status = mission.signalStatus {
+                            FlexStatusBadge(status: status)
+                        }
+                    }
+                    .foregroundColor(.secondary)
+
+                    // Group Size
+                    if let label = mission.flexGroupSizeLabel {
+                        HStack(spacing: 6) {
+                            Image(systemName: "person.2.fill")
+                                .foregroundStyle(OrbitTheme.gradient)
+                            Text(label)
+                                .font(.subheadline)
+                        }
+                        .foregroundColor(.secondary)
+                    }
+
+                    // Description
+                    if !mission.description.isEmpty {
+                        Text(mission.description)
+                            .font(.body)
+                            .foregroundColor(.primary)
+                            .lineSpacing(4)
+                    }
+
+                    // Links
+                    if let links = mission.links, !links.isEmpty {
+                        VStack(alignment: .leading, spacing: 8) {
+                            ForEach(links, id: \.self) { link in
+                                if let url = URL(string: link) {
+                                    Button {
+                                        UIApplication.shared.open(url)
+                                    } label: {
+                                        HStack(spacing: 6) {
+                                            Image(systemName: "link")
+                                                .font(.caption)
+                                            Text(link)
+                                                .font(.subheadline)
+                                                .lineLimit(1)
+                                                .truncationMode(.middle)
+                                        }
+                                        .foregroundColor(OrbitTheme.blue)
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    Divider()
+
+                    // Availability Section
+                    if let slots = mission.availability, !slots.isEmpty {
+                        VStack(alignment: .leading, spacing: 12) {
+                            Text("availability")
+                                .font(.headline)
+
+                            if let summary = mission.flexAvailabilitySummary {
+                                Text(summary)
+                                    .font(.subheadline)
+                                    .foregroundColor(.secondary)
+                            }
+
+                            ForEach(slots) { slot in
+                                VStack(alignment: .leading, spacing: 8) {
+                                    Text(slot.dayLabel)
+                                        .font(.subheadline)
+                                        .fontWeight(.medium)
+
+                                    if slot.isHourly {
+                                        let wrapped = slot.hours.map { WrappedHour(hour: $0) }
+                                        FlowLayout(spacing: 6) {
+                                            ForEach(wrapped) { wh in
+                                                Text(hourString(wh.hour))
+                                                    .font(.caption)
+                                                    .padding(.horizontal, 10)
+                                                    .padding(.vertical, 5)
+                                                    .background(OrbitTheme.purple.opacity(0.12))
+                                                    .clipShape(Capsule())
+                                                    .foregroundColor(OrbitTheme.purple)
+                                            }
+                                        }
+                                    } else {
+                                        HStack(spacing: 6) {
+                                            ForEach(slot.timeBlocks, id: \.self) { block in
+                                                HStack(spacing: 4) {
+                                                    Image(systemName: block.icon)
+                                                        .font(.caption2)
+                                                    Text(block.label)
+                                                        .font(.caption)
+                                                }
+                                                .padding(.horizontal, 8)
+                                                .padding(.vertical, 4)
+                                                .background(OrbitTheme.purple.opacity(0.12))
+                                                .clipShape(Capsule())
+                                                .foregroundColor(OrbitTheme.purple)
+                                            }
+                                        }
+                                    }
+                                }
+                                .padding(12)
+                                .background(Color(.systemGray6))
+                                .cornerRadius(12)
+                            }
+                        }
+                    }
+
+                    Spacer(minLength: 80)
+                }
+                .padding(.horizontal, 24)
+                .padding(.top, 8)
+            }
+
+            // Flex action button area
+            if showSignedUp {
+                if joinedPodId != nil {
+                    Button(action: { showPod = true }) {
+                        Label("open your pod", systemImage: "person.3.fill")
+                            .font(.headline)
+                            .fontWeight(.semibold)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 16)
+                            .background(OrbitTheme.gradientFill)
+                            .foregroundColor(.white)
+                            .clipShape(RoundedRectangle(cornerRadius: 14))
+                    }
+                    .padding(.horizontal, 24)
+                    .padding(.bottom, 16)
+                } else {
+                    Text("You already signed up for this event!")
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 16)
+                        .padding(.horizontal, 24)
+                        .padding(.bottom, 16)
+                }
+            } else {
+                Button {
+                    UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                    joinFlexMission()
+                } label: {
+                    ZStack {
+                        if isJoining {
+                            ProgressView().tint(.white)
+                        } else {
+                            Text("I'm Down")
+                                .font(.headline)
+                                .fontWeight(.semibold)
+                        }
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 16)
+                    .background(OrbitTheme.gradientFill)
+                    .foregroundColor(.white)
+                    .clipShape(RoundedRectangle(cornerRadius: 14))
+                }
+                .disabled(isJoining)
+                .padding(.horizontal, 24)
+                .padding(.bottom, 16)
+
+                if let error = errorMessage {
+                    Text(error)
+                        .font(.caption)
+                        .foregroundColor(.red)
+                        .padding(.horizontal, 24)
+                }
+            }
+        }
+    }
+
+    // MARK: - Actions
+
+    private func joinSetMission() {
         isJoining = true
         errorMessage = nil
         Task {
@@ -215,6 +447,36 @@ struct MissionDetailView: View {
                 await MainActor.run {
                     isJoining = false
                     errorMessage = error.localizedDescription
+                }
+            }
+        }
+    }
+
+    private func joinFlexMission() {
+        isJoining = true
+        errorMessage = nil
+        Task {
+            do {
+                let updated = try await MissionService.shared.joinFlexMission(id: mission.id)
+                await MainActor.run {
+                    isJoining = false
+                    showSignedUp = true
+                    joinedPodId = updated.podId
+                    withAnimation(.spring(duration: 0.3)) { localToast = true }
+                    if updated.podId == nil {
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) { dismiss() }
+                    }
+                }
+            } catch {
+                await MainActor.run {
+                    isJoining = false
+                    let message = error.localizedDescription
+                    if message.localizedCaseInsensitiveContains("already") {
+                        showSignedUp = true
+                        joinedPodId = mission.podId
+                    } else {
+                        errorMessage = message
+                    }
                 }
             }
         }

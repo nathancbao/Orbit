@@ -9,6 +9,7 @@ import Foundation
 import Combine
 import SwiftUI
 
+@available(*, deprecated, message: "Use MissionsViewModel")
 @MainActor
 class SignalsViewModel: ObservableObject {
 
