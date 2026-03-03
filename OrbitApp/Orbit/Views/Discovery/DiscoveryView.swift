@@ -762,6 +762,7 @@ struct DiscoveryView: View {
     @Binding var userProfile: Profile
     var isActive: Bool = false
 
+    @State private var userProfile: Profile
     @StateObject private var viewModel: DiscoveryViewModel
     @State private var imageStars: [ImageStar] = []
     @State private var planets: [PlanetNode] = []
@@ -923,7 +924,7 @@ struct DiscoveryView: View {
             .onChange(of: viewModel.items) {
                 generatePlanets()
             }
-            .onChange(of: isActive) { active in
+            .onChange(of: isActive) { _, active in
                 if active {
                     Task {
                         await viewModel.reload()

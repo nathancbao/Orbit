@@ -32,8 +32,19 @@ class ProfileService {
         return response.profile
     }
 
+    /// Downscale an image so its longest side is at most `maxDimension` points.
+    private func downscaled(_ image: UIImage, maxDimension: CGFloat = 512) -> UIImage {
+        let size = image.size
+        guard max(size.width, size.height) > maxDimension else { return image }
+        let scale = maxDimension / max(size.width, size.height)
+        let newSize = CGSize(width: size.width * scale, height: size.height * scale)
+        let renderer = UIGraphicsImageRenderer(size: newSize)
+        return renderer.image { _ in image.draw(in: CGRect(origin: .zero, size: newSize)) }
+    }
+
     func uploadPhoto(_ image: UIImage) async throws -> ProfileResponseData {
-        guard let imageData = image.jpegData(compressionQuality: 0.8) else {
+        let resized = downscaled(image)
+        guard let imageData = resized.jpegData(compressionQuality: 0.8) else {
             throw NetworkError.noData
         }
 
