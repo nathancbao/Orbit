@@ -5,6 +5,7 @@
 **9 total interviews across 3 iteration rounds (3 users per round).**
 
 ### Five Phases
+
 1. **Setup** — Lower the stakes, clarify you're testing the app not the user
 2. **First Glance (5-Second Test)** — Show home screen, ask what they think the app does
 3. **Task (Core Loop)** — Give a scenario, observe silently
@@ -395,33 +396,59 @@
 
 ---
 
-### Interview 9 - Ai Linh (Iteration 3)
+### Interview 9 - Ai Linh
 
-#### Phases 1 & 2: First Impressions
+#### Phase 1: The Setup (lower the stakes)
 
-> (After explaining the setup)
+> "I’m going to show you a rough prototype we’re working on. I want to be clear: I am testing the app, I am not testing you. If you get stuck or confused, that is great – it helps me fix the design. Please be honest; you won’t hurt my feelings."
 
-- (No specific notes recorded)
+#### Phase 2: The "First Glance" (The 5-Second Test)
+
+> Hand them the device on the home screen. Do NOT give them a task yet.
+> "Take a look at this screen for a few seconds. Without clicking anything yet... what do you think this app does?"
+
+- Connects me to do different things
+- Feel like I’m about to network
 
 #### Phase 3: The Task (The Core Loop)
 
-> "Say you wanted to play basketball. Try organizing it..."
-> "How would you talk with your pod members?"
+> Give them a scenario, not instructions.
+> Script: "Imagine you are planning a trip for next weekend. Show me how you would use this tool to get a list of restaurants."
 
-- (No specific notes recorded)
+- Goes through discovery page
+- Joins a pod
+- Sees the group members
+- Fills out time
+- Cancel vs create button not working
+- Wanted more people to join
 
 #### Phase 4: The AI "Vibe Check"
 
-> "How do you feel about the event suggestions?"
+> "Look at the answer the AI just gave you."
+> "Is this useful?" / "Do you trust it?" / "What would you do with this information next?"
 
-- (No specific notes recorded)
+- YES, try to get to know whoever’s in this group
+- Small group, but response is important
 
 #### Phase 5: The Debrief
 
-> "If you could change one thing to make this process easier, what would you change?"
-> "How would you describe this app to a friend?"
-> "Scale of 1-5 (5 being easy) how easy was this process?"
+> "On a scale of 1 to 5, how difficult was that?"
+> "If you had a magic wand, what is the one thing you would change to make this easier?"
+> "How would you describe this app to a friend in one sentence?"
 
-- (No specific notes recorded)
+- Difficulty: **1**
+- Signals time is harder to navigate
+- At end of event: do you wanna share photos to public? People can see and see if they want to join
+- Adding signals wasn’t clear
+- Step by step tutorial
+- Might not get it the first time but it’s okay, 30 seconds max
+- Have summary of missions and signal, short sentence
+- Difference between signal and missions not clear
+- Returning: lot of friendship apps
+- Some incentives to upgrade, little room
+- Maybe if more extroverted would join more events
+- Depends how specific it is
+- More extensive profile
+- Would be wary of trusting people
 
-*Note: Ai Linh's iteration 3 interview appears to have incomplete notes.*
+
