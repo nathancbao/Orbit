@@ -5,6 +5,7 @@ import SwiftUI
 
 struct PodsView: View {
     @Binding var userProfile: Profile
+    var isActive: Bool = false
     @State private var pods: [Pod] = []
     @State private var rsvpedSignals: [Signal] = []
     @State private var isLoading = false
@@ -84,6 +85,11 @@ struct PodsView: View {
             )
         }
         .task { await loadData() }
+        .onChange(of: isActive) { active in
+            if active {
+                Task { await loadData() }
+            }
+        }
     }
 
     private func loadData() async {
