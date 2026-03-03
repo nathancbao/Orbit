@@ -260,7 +260,7 @@ struct MotivationalBannerView: View {
     }
 
     private func startCycling() {
-        DispatchQueue.main.asyncAfter(deadline: .now() + 5) {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 15) {
             withAnimation(.easeInOut(duration: 0.6)) {
                 currentIndex = (currentIndex + 1) % messages.count
             }
@@ -998,12 +998,14 @@ struct DiscoveryView: View {
     private func generateImageStars(in size: CGSize) {
         let starCount = 16
         let minDistance: CGFloat = 50
+        // Keep stars below the top bar + motivational banner (~100pt)
+        let topInset: CGFloat = 100
         var positions: [CGPoint] = []
 
         for _ in 0..<starCount {
             var candidate = CGPoint(
                 x: CGFloat.random(in: 30...(size.width - 30)),
-                y: CGFloat.random(in: 30...(size.height - 30))
+                y: CGFloat.random(in: topInset...(size.height - 30))
             )
             // Try to find a position far enough from existing stars
             for _ in 0..<20 {
@@ -1013,7 +1015,7 @@ struct DiscoveryView: View {
                 if !tooClose { break }
                 candidate = CGPoint(
                     x: CGFloat.random(in: 30...(size.width - 30)),
-                    y: CGFloat.random(in: 30...(size.height - 30))
+                    y: CGFloat.random(in: topInset...(size.height - 30))
                 )
             }
             positions.append(candidate)

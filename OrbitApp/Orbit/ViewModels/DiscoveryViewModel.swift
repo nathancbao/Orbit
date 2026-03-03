@@ -92,20 +92,15 @@ class DiscoveryViewModel: ObservableObject {
         isLoading = true
         defer { isLoading = false }
 
-        async let fetchedMissions = try? MissionService.shared.listMissions()
-        async let fetchedMySignals = try? SignalService.shared.mySignals()
-        async let fetchedDiscoverSignals = try? SignalService.shared.discoverSignals()
-        async let fetchedSuggested = try? MissionService.shared.suggestedMissions()
-        async let fetchedRsvpSignals: [Signal]? = try? APIService.shared.request(
+        // Fetch each source independently so a single failure doesn't wipe others.
+        let missions = (try? await MissionService.shared.listMissions()) ?? []
+        let mySignals = (try? await SignalService.shared.mySignals()) ?? []
+        let discoverSignals = (try? await SignalService.shared.discoverSignals()) ?? []
+        let suggested = (try? await MissionService.shared.suggestedMissions()) ?? []
+        let rsvpSignals: [Signal] = (try? await APIService.shared.request(
             endpoint: Constants.API.Endpoints.myRsvps,
             authenticated: true
-        )
-
-        let missions = await fetchedMissions ?? []
-        let mySignals = await fetchedMySignals ?? []
-        let discoverSignals = await fetchedDiscoverSignals ?? []
-        let suggested = await fetchedSuggested ?? []
-        let rsvpSignals = await fetchedRsvpSignals ?? []
+        )) ?? []
 
         categorize(
             missions: missions,

@@ -27,28 +27,35 @@ class SignalsViewModel: ObservableObject {
     // MARK: - Load
 
     func loadSignals() async {
-        // Only skip if we already have data. If previous load failed (empty), retry.
-        guard !hasLoaded || (discoverSignals.isEmpty && mySignals.isEmpty) else { return }
-        isLoading = true
-        defer { isLoading = false }
-
-        async let discover = try? SignalService.shared.discoverSignals()
-        async let mine = try? SignalService.shared.mySignals()
-
-        discoverSignals = await discover ?? []
-        mySignals = await mine ?? []
+        guard !hasLoaded else { return }
+        await fetchSignals()
         hasLoaded = true
     }
 
     func reload() async {
+        await fetchSignals()
+    }
+
+    private func fetchSignals() async {
         isLoading = true
         defer { isLoading = false }
 
-        async let discover = try? SignalService.shared.discoverSignals()
-        async let mine = try? SignalService.shared.mySignals()
-
-        discoverSignals = await discover ?? []
-        mySignals = await mine ?? []
+        do {
+            async let discover = SignalService.shared.discoverSignals()
+            async let mine = SignalService.shared.mySignals()
+            let (d, m) = try await (discover, mine)
+            discoverSignals = d
+            mySignals = m
+        } catch {
+            // If one fails, try them individually so a single failure
+            // doesn't wipe both lists.
+            if let d = try? await SignalService.shared.discoverSignals() {
+                discoverSignals = d
+            }
+            if let m = try? await SignalService.shared.mySignals() {
+                mySignals = m
+            }
+        }
     }
 
     // MARK: - Create

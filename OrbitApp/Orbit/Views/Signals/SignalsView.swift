@@ -127,8 +127,8 @@ struct SignalsView: View {
         }
         .onAppear {
             // Retry if previous load returned empty (e.g. network wasn't ready)
-            if viewModel.discoverSignals.isEmpty && viewModel.mySignals.isEmpty {
-                Task { await viewModel.loadSignals() }
+            if viewModel.discoverSignals.isEmpty || viewModel.mySignals.isEmpty {
+                Task { await viewModel.reload() }
             }
         }
     }
