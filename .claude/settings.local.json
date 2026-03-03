@@ -39,7 +39,9 @@
       "Bash(pip index versions lightfm 2>&1 | head -5)",
       "Bash(git push origin main 2>&1)",
       "Bash(pip show:*)",
-      "WebSearch"
+      "WebSearch",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:raw.githubusercontent.com)"
     ]
   }
 }

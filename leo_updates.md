@@ -47,6 +47,22 @@ There are two places this runs — event recommendations and pod formation. No g
 
 **Pod formation:** When a user joins an event, instead of dropping them into whatever pod has an open slot, the system finds the pod whose current members share the most interests with them. It scores every open pod using average Jaccard similarity between the joining user's interests and each member's interests, then routes the user to the best match. The goal is that by the time a pod fills up, the four members already have something in common before they've even said hello.
 
+### Plain English Summary
+
+**TF-IDF** — do the words match? Weights terms by how rare/important they are across all missions.
+
+**Jaccard (behavioral decay)** — does this look like stuff you've done before? Tag overlap between past interactions and the candidate mission, faded by age.
+
+**Trust score** — static flat boost based on how reliably the user shows up.
+
+**LightFM** — did people like you enjoy this? Matrix factorization on interaction history across all users. Ignores words entirely, learns from behavior patterns.
+
+**FastEmbed** — does this mean the same thing as your interests? Dense vector embeddings catch semantic relationships (e.g. "hiking" ↔ "trail walking") even when exact words don't match.
+
+The key distinction between LightFM and FastEmbed: LightFM learns from *who* interacted with *what*, FastEmbed understands *what things mean*. They complement each other — LightFM can surface things semantically unrelated but popular with similar users, FastEmbed can surface things with no interaction history but semantically aligned.
+
+---
+
 ### Worked Example
 
 **User profile:**

@@ -2,6 +2,7 @@ import re
 import datetime
 
 from OrbitServer.models.models import COLLEGE_YEARS
+from OrbitServer.utils.profanity import contains_profanity
 
 VALID_GENDERS = {'male', 'female', 'non-binary', 'other', ''}
 
@@ -131,6 +132,11 @@ def validate_mission_data(data, is_update=False):
             errors.append("tags must be a list")
         elif len(data['tags']) > 10:
             errors.append("Maximum 10 tags allowed")
+        else:
+            for tag in data['tags']:
+                if isinstance(tag, str) and contains_profanity(tag):
+                    errors.append("Tags contain prohibited content")
+                    break
 
     if 'max_pod_size' in data:
         try:

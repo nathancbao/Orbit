@@ -1,27 +1,20 @@
 """
-Basic profanity filter for chat messages.
-Uses a simple word-list approach. Can be swapped for a library later.
+Profanity filter for chat messages and tags.
+Uses better-profanity with a custom word list extension.
 """
 
-# Minimal base list — extend as needed
-_BANNED_WORDS = {
-    'fuck', 'shit', 'bitch', 'asshole', 'cunt', 'dick', 'pussy', 'nigger',
-    'nigga', 'faggot', 'fag', 'slut', 'whore', 'bastard', 'motherfucker',
-    'retard', 'kike', 'spic', 'chink', 'wetback',
-}
+from better_profanity import profanity
+
+_CUSTOM_WORDS = ['gooning']
+
+profanity.load_censor_words(custom_words=_CUSTOM_WORDS)
 
 
 def contains_profanity(text: str) -> bool:
     """Return True if the text contains a banned word."""
     if not text:
         return False
-    words = text.lower().split()
-    for word in words:
-        # Strip punctuation from edges
-        clean = word.strip('.,!?;:\'"()[]{}')
-        if clean in _BANNED_WORDS:
-            return True
-    return False
+    return profanity.contains_profanity(text)
 
 
 def filter_message(text: str) -> tuple[bool, str]:
