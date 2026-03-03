@@ -726,7 +726,6 @@ struct DiscoveryLegend: View {
         HStack(spacing: 16) {
             LegendItem(color: DiscoveryTheme.accentBlue, label: "Missions", icon: "calendar.circle.fill")
             LegendItem(color: DiscoveryTheme.accentPink, label: "Signals", icon: "antenna.radiowaves.left.and.right")
-            LegendItem(color: DiscoveryTheme.templateColor, label: "Templates", icon: "sparkles")
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 8)
@@ -760,7 +759,7 @@ struct LegendItem: View {
 // MARK: - Main Discovery View
 
 struct DiscoveryView: View {
-    let userProfile: Profile
+    @Binding var userProfile: Profile
     var isActive: Bool = false
 
     @StateObject private var viewModel: DiscoveryViewModel
@@ -776,20 +775,20 @@ struct DiscoveryView: View {
     @State private var showRecommendationsSheet = false
     @State private var showProfile = false
 
-    init(userProfile: Profile, isActive: Bool = false) {
-        self.userProfile = userProfile
+    init(userProfile: Binding<Profile>, isActive: Bool = false) {
+        _userProfile = userProfile
         self.isActive = isActive
         _viewModel = StateObject(wrappedValue: DiscoveryViewModel(
-            userInterests: userProfile.interests
+            userInterests: userProfile.wrappedValue.interests
         ))
     }
 
     // Priority ring radii as fraction of half-screen width
     private let ringRadii: [Int: CGFloat] = [
-        0: 0.55,  // hosted — inner ring (clears center glow + planet radius + gap)
-        1: 0.70,  // joined — second ring
-        2: 0.82,  // recommended — third ring
-        3: 0.88   // discoverable/templates — outer ring
+        0: 0.50,  // hosted — inner ring
+        1: 0.68,  // joined — second ring
+        2: 0.84,  // recommended — third ring
+        3: 0.96   // discoverable/templates — outer ring
     ]
 
     var body: some View {
@@ -914,21 +913,21 @@ struct DiscoveryView: View {
             }
             .onAppear {
                 generateImageStars(in: geometry.size)
-                generatePlanets()
+                generatePlanets(halfScreen: halfScreen)
             }
             .task {
                 await viewModel.load()
                 viewModel.startBellTimer()
-                generatePlanets()
+                generatePlanets(halfScreen: halfScreen)
             }
             .onChange(of: viewModel.items) {
-                generatePlanets()
+                generatePlanets(halfScreen: halfScreen)
             }
-            .onChange(of: isActive) { active in
+            .onChange(of: isActive) { _, active in
                 if active {
                     Task {
                         await viewModel.reload()
-                        generatePlanets()
+                        generatePlanets(halfScreen: halfScreen)
                     }
                 }
             }
@@ -966,7 +965,7 @@ struct DiscoveryView: View {
                 ProfileDisplayView(
                     profile: userProfile,
                     onEdit: { showProfile = false },
-                    onProfileUpdated: { _ in }
+                    onProfileUpdated: { updated in userProfile = updated }
                 )
             }
         }
@@ -997,14 +996,34 @@ struct DiscoveryView: View {
     // MARK: - Star Generation
 
     private func generateImageStars(in size: CGSize) {
-        imageStars = (0..<20).map { i in
+        let starCount = 16
+        let minDistance: CGFloat = 50
+        var positions: [CGPoint] = []
+
+        for _ in 0..<starCount {
+            var candidate = CGPoint(
+                x: CGFloat.random(in: 30...(size.width - 30)),
+                y: CGFloat.random(in: 30...(size.height - 30))
+            )
+            // Try to find a position far enough from existing stars
+            for _ in 0..<20 {
+                let tooClose = positions.contains { existing in
+                    hypot(existing.x - candidate.x, existing.y - candidate.y) < minDistance
+                }
+                if !tooClose { break }
+                candidate = CGPoint(
+                    x: CGFloat.random(in: 30...(size.width - 30)),
+                    y: CGFloat.random(in: 30...(size.height - 30))
+                )
+            }
+            positions.append(candidate)
+        }
+
+        imageStars = positions.map { pos in
             ImageStar(
-                position: CGPoint(
-                    x: CGFloat.random(in: 20...(size.width - 20)),
-                    y: CGFloat.random(in: 20...(size.height - 20))
-                ),
+                position: pos,
                 size: CGFloat.random(in: 8...16),
-                isColored: i < 5,
+                isColored: false,
                 twinkleSpeed: Double.random(in: 0.5...2.0),
                 phaseOffset: Double.random(in: 0...Double.pi * 2),
                 floatAmplitude: CGFloat.random(in: 1...3),
@@ -1015,22 +1034,48 @@ struct DiscoveryView: View {
 
     // MARK: - Planet Generation (Priority Rings)
 
-    private func generatePlanets() {
+    private let maxPlanets = 7
+
+    /// Minimum pixel distance between any two planet centers to prevent overlap.
+    private let minPlanetDistance: CGFloat = 90
+
+    private func generatePlanets(halfScreen: CGFloat) {
+        let sorted = viewModel.items
+            .filter { if case .template = $0 { return false }; return true }
+            .sorted { $0.priority < $1.priority }
+        let capped = Array(sorted.prefix(maxPlanets))
+
+        let grouped = Dictionary(grouping: capped) { $0.priority }
+
         var allPlanets: [PlanetNode] = []
+        // Track placed positions in polar form for pixel-distance checks
+        var placed: [(r: CGFloat, a: Double)] = []
 
-        // Group items by priority tier
-        let grouped = Dictionary(grouping: viewModel.items) { $0.priority }
-
-        for (priority, items) in grouped {
+        for priority in grouped.keys.sorted() {
+            guard let items = grouped[priority], !items.isEmpty else { continue }
             let count = items.count
-            guard count > 0 else { continue }
-
             let baseAngleStep = (Double.pi * 2) / Double(count)
+            // Offset each ring so planets on adjacent rings don't line up
+            let ringOffset = Double(priority) * 0.45
+            let ringRadius = (ringRadii[priority] ?? 0.65) * halfScreen
 
             for (index, item) in items.enumerated() {
-                let baseAngle = baseAngleStep * Double(index)
-                let jitter = Double.random(in: -0.15...0.15)
-                let angle = baseAngle + jitter
+                var angle = baseAngleStep * Double(index) + ringOffset
+                angle += Double.random(in: -0.15...0.15)
+
+                // Nudge until pixel distance from all placed planets is sufficient
+                for _ in 0..<20 {
+                    let x = ringRadius * cos(angle)
+                    let y = ringRadius * sin(angle)
+                    let tooClose = placed.contains { other in
+                        let ox = other.r * cos(other.a)
+                        let oy = other.r * sin(other.a)
+                        return hypot(x - ox, y - oy) < minPlanetDistance
+                    }
+                    if !tooClose { break }
+                    angle += 0.3
+                }
+                placed.append((r: ringRadius, a: angle))
 
                 let (type, color) = planetTypeAndColor(for: item, index: index)
 
@@ -1074,13 +1119,13 @@ struct DiscoveryView: View {
 
 #Preview {
     DiscoveryView(
-        userProfile: Profile(
+        userProfile: .constant(Profile(
             name: "Preview User",
             collegeYear: "junior",
             interests: ["Hiking", "Gaming", "Music"],
             photo: nil,
             trustScore: 4.0,
             email: "test@test.edu"
-        )
+        ))
     )
 }

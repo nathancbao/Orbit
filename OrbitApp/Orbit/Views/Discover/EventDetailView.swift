@@ -1,5 +1,56 @@
 import SwiftUI
 
+// MARK: - Wrapped Hour (Identifiable wrapper for ForEach)
+
+struct WrappedHour: Identifiable {
+    let hour: Int
+    var id: Int { hour }
+}
+
+// MARK: - Flow Layout (wrapping horizontal layout)
+
+struct FlowLayout: Layout {
+    var spacing: CGFloat = 6
+
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        let maxWidth = proposal.width ?? .infinity
+        var currentX: CGFloat = 0
+        var currentY: CGFloat = 0
+        var lineHeight: CGFloat = 0
+
+        for subview in subviews {
+            let size = subview.sizeThatFits(.unspecified)
+            if currentX + size.width > maxWidth && currentX > 0 {
+                currentX = 0
+                currentY += lineHeight + spacing
+                lineHeight = 0
+            }
+            currentX += size.width + spacing
+            lineHeight = max(lineHeight, size.height)
+        }
+
+        return CGSize(width: maxWidth, height: currentY + lineHeight)
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        var currentX: CGFloat = bounds.minX
+        var currentY: CGFloat = bounds.minY
+        var lineHeight: CGFloat = 0
+
+        for subview in subviews {
+            let size = subview.sizeThatFits(.unspecified)
+            if currentX + size.width > bounds.maxX && currentX > bounds.minX {
+                currentX = bounds.minX
+                currentY += lineHeight + spacing
+                lineHeight = 0
+            }
+            subview.place(at: CGPoint(x: currentX, y: currentY), proposal: ProposedViewSize(size))
+            currentX += size.width + spacing
+            lineHeight = max(lineHeight, size.height)
+        }
+    }
+}
+
 // MARK: - Mission Detail View
 // Shown as a sheet when user taps a mission card.
 // Displays full mission info and "Join Pod" button.
@@ -287,24 +338,42 @@ struct SignalDetailView: View {
 
                                 if !signal.availability.isEmpty {
                                     ForEach(signal.availability) { slot in
-                                        HStack(spacing: 10) {
+                                        VStack(alignment: .leading, spacing: 8) {
                                             Text(slot.dayLabel)
                                                 .font(.subheadline)
                                                 .fontWeight(.medium)
-                                                .frame(width: 70, alignment: .leading)
 
-                                            ForEach(slot.timeBlocks, id: \.self) { block in
-                                                HStack(spacing: 4) {
-                                                    Image(systemName: block.icon)
-                                                        .font(.caption2)
-                                                    Text(block.label)
-                                                        .font(.caption)
+                                            if slot.isHourly {
+                                                // New hourly format
+                                                let wrapped = slot.hours.map { WrappedHour(hour: $0) }
+                                                FlowLayout(spacing: 6) {
+                                                    ForEach(wrapped) { wh in
+                                                        Text(hourString(wh.hour))
+                                                            .font(.caption)
+                                                            .padding(.horizontal, 10)
+                                                            .padding(.vertical, 5)
+                                                            .background(OrbitTheme.purple.opacity(0.12))
+                                                            .clipShape(Capsule())
+                                                            .foregroundColor(OrbitTheme.purple)
+                                                    }
                                                 }
-                                                .padding(.horizontal, 8)
-                                                .padding(.vertical, 4)
-                                                .background(OrbitTheme.purple.opacity(0.12))
-                                                .clipShape(Capsule())
-                                                .foregroundColor(OrbitTheme.purple)
+                                            } else {
+                                                // Legacy time-block format
+                                                HStack(spacing: 6) {
+                                                    ForEach(slot.timeBlocks, id: \.self) { block in
+                                                        HStack(spacing: 4) {
+                                                            Image(systemName: block.icon)
+                                                                .font(.caption2)
+                                                            Text(block.label)
+                                                                .font(.caption)
+                                                        }
+                                                        .padding(.horizontal, 8)
+                                                        .padding(.vertical, 4)
+                                                        .background(OrbitTheme.purple.opacity(0.12))
+                                                        .clipShape(Capsule())
+                                                        .foregroundColor(OrbitTheme.purple)
+                                                    }
+                                                }
                                             }
                                         }
                                         .padding(12)

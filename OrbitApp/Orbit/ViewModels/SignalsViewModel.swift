@@ -60,7 +60,9 @@ class SignalsViewModel: ObservableObject {
         maxGroupSize: Int,
         availability: [AvailabilitySlot],
         description: String,
-        links: [String] = []
+        links: [String] = [],
+        timeRangeStart: Int = 9,
+        timeRangeEnd: Int = 21
     ) async {
         isSubmitting = true
         defer { isSubmitting = false }
@@ -73,7 +75,9 @@ class SignalsViewModel: ObservableObject {
                 maxGroupSize: maxGroupSize,
                 availability: availability,
                 description: description,
-                links: links
+                links: links,
+                timeRangeStart: timeRangeStart,
+                timeRangeEnd: timeRangeEnd
             )
             // Insert locally for instant feedback, then refresh in background.
             discoverSignals.insert(created, at: 0)

@@ -247,10 +247,6 @@ class DiscoveryViewModel: ObservableObject {
             }
         }
 
-        // 7. Templates (always show to encourage creation)
-        let templates = generateTemplates(maxCount: 3)
-        result.append(contentsOf: templates)
-
         items = result
     }
 
