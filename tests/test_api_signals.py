@@ -138,20 +138,21 @@ class TestDiscoverSignals:
         mock_discover.return_value = ([
             {"id": "uuid-1", "title": "Sports", "status": "pending"},
             {"id": "uuid-2", "title": "Food", "status": "pending"},
-        ], None)
+        ], None, None)
         resp = client.get('/api/signals/discover', headers=auth_header())
         body = json.loads(resp.data)
         assert resp.status_code == 200
         assert body["success"] is True
-        assert len(body["data"]) == 2
+        assert len(body["data"]["signals"]) == 2
+        assert body["data"]["next_cursor"] is None
 
     @patch('OrbitServer.api.signals.get_all_signals')
     def test_returns_empty_list(self, mock_discover, client):
-        mock_discover.return_value = ([], None)
+        mock_discover.return_value = ([], None, None)
         resp = client.get('/api/signals/discover', headers=auth_header())
         body = json.loads(resp.data)
         assert resp.status_code == 200
-        assert body["data"] == []
+        assert body["data"]["signals"] == []
 
 
 # ── POST /api/signals/<id>/rsvp ─────────────────────────────────────────────

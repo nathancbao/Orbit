@@ -1,4 +1,5 @@
 import hashlib
+import logging
 import os
 import random
 import datetime
@@ -11,6 +12,8 @@ from OrbitServer.models.models import (
 )
 from OrbitServer.utils.auth import create_access_token, create_refresh_token, decode_token
 
+logger = logging.getLogger(__name__)
+
 SENDGRID_API_KEY = os.environ.get('SENDGRID_API_KEY', '')
 FROM_EMAIL = os.environ.get('FROM_EMAIL', 'noreply@orbitapp.com')
 
@@ -20,14 +23,53 @@ def _hash_token(token):
     return hashlib.sha256(token.encode()).hexdigest()
 
 
+def _send_email(to_email, subject, html_content):
+    """Send an email via SendGrid. Raises on failure."""
+    from sendgrid import SendGridAPIClient
+    from sendgrid.helpers.mail import Mail
+
+    message = Mail(
+        from_email=FROM_EMAIL,
+        to_emails=to_email,
+        subject=subject,
+        html_content=html_content,
+    )
+    sg = SendGridAPIClient(SENDGRID_API_KEY)
+    response = sg.send(message)
+    if response.status_code >= 400:
+        raise RuntimeError(f"SendGrid returned status {response.status_code}")
+
+
 def send_verification_code(email):
     code = str(random.randint(100000, 999999))
     store_verification_code(email, code)
 
-    # TODO: restore SendGrid when ready for production
-    # (commented-out SendGrid integration removed — see git history if needed)
-    print(f"[DEMO MODE] Verification code for {email}: {code}")
-    print(f"[DEMO MODE] Use code '123456' to bypass verification")
+    html = (
+        '<div style="font-family: -apple-system, BlinkMacSystemFont, sans-serif; '
+        'max-width: 480px; margin: 0 auto; padding: 32px;">'
+        '<h2 style="color: #1a1a2e; margin-bottom: 8px;">Orbit Verification</h2>'
+        '<p style="color: #555; font-size: 16px; line-height: 1.5;">'
+        'Your verification code is:</p>'
+        f'<div style="background: #f0f0f5; border-radius: 12px; padding: 20px; '
+        f'text-align: center; margin: 20px 0;">'
+        f'<span style="font-size: 36px; font-weight: 700; letter-spacing: 8px; '
+        f'color: #1a1a2e;">{code}</span></div>'
+        '<p style="color: #888; font-size: 14px;">This code expires in 10 minutes. '
+        'If you didn\'t request this, you can safely ignore this email.</p>'
+        '</div>'
+    )
+
+    if SENDGRID_API_KEY:
+        try:
+            _send_email(email, 'Your Orbit Verification Code', html)
+            logger.info("Verification email sent to %s", email)
+        except Exception:
+            logger.exception("SendGrid failed for %s, falling back to log", email)
+            print(f"[FALLBACK] Verification code for {email}: {code}")
+    else:
+        print(f"[DEMO MODE] Verification code for {email}: {code}")
+        print(f"[DEMO MODE] Use code '123456' to bypass verification")
+
     return True
 
 

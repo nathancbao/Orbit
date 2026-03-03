@@ -42,6 +42,7 @@ _model = None
 _dataset = None
 _lock = threading.Lock()
 _trained = False
+_training_in_progress = False
 
 
 def _sigmoid(x: float) -> float:
@@ -145,16 +146,33 @@ def _train():
 
 
 def _get_model():
-    """Lazy-load the model on first call (thread-safe, double-checked)."""
-    global _trained
-    if not _trained:
-        with _lock:
-            if not _trained:
-                try:
-                    _train()
-                except Exception:
-                    logger.exception("LightFM training failed")
-    return _model, _dataset
+    """Return the model if trained, otherwise kick off background training.
+
+    Never blocks the request thread.  Returns (None, None) while training
+    is in progress — callers degrade gracefully to 0.0 scores.
+    """
+    global _trained, _training_in_progress
+    if _trained:
+        return _model, _dataset
+
+    with _lock:
+        if _trained:
+            return _model, _dataset
+        if _training_in_progress:
+            return None, None  # already training, don't block
+        _training_in_progress = True
+
+    def _background_train():
+        global _training_in_progress
+        try:
+            _train()
+        except Exception:
+            logger.exception("LightFM background training failed")
+        finally:
+            _training_in_progress = False
+
+    threading.Thread(target=_background_train, daemon=True).start()
+    return None, None
 
 
 def get_lightfm_scores(user_id: int, mission_ids: list) -> dict:
@@ -198,15 +216,40 @@ def get_lightfm_scores(user_id: int, mission_ids: list) -> dict:
         return {mid: 0.0 for mid in mission_ids}
 
 
+def warmup():
+    """Synchronous training for the GAE warmup handler. OK to block here."""
+    global _trained
+    if _trained:
+        return
+    with _lock:
+        if _trained:
+            return
+        try:
+            _train()
+        except Exception:
+            logger.exception("LightFM warmup training failed")
+
+
 def retrain():
     """
     Force a full retrain from current Datastore data.
     Call from a scheduled cron endpoint (e.g. nightly) to keep the model fresh.
     """
-    global _trained
+    global _trained, _training_in_progress
     with _lock:
+        if _training_in_progress:
+            logger.info("LightFM: retrain requested but training already in progress")
+            return
         _trained = False
+        _training_in_progress = True
+
+    def _background_retrain():
+        global _training_in_progress
         try:
             _train()
         except Exception:
             logger.exception("LightFM retrain failed")
+        finally:
+            _training_in_progress = False
+
+    threading.Thread(target=_background_retrain, daemon=True).start()

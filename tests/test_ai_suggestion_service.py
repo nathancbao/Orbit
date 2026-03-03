@@ -283,13 +283,13 @@ class TestGetSuggestedMissions:
         assert len(result) == 1
         assert abs(result[0]['match_score'] - W_LIGHTFM) < 1e-3
 
-    @patch('OrbitServer.services.ai_suggestion_service.get_or_create_mission_embedding')
+    @patch('OrbitServer.services.ai_suggestion_service.preload_embeddings')
     @patch('OrbitServer.services.ai_suggestion_service.get_user_embedding')
     @patch('OrbitServer.services.ai_suggestion_service.list_missions')
     @patch('OrbitServer.services.ai_suggestion_service.get_user_history')
     @patch('OrbitServer.services.ai_suggestion_service.get_user')
     def test_semantic_score_raises_match_score(self, mock_user, mock_history, mock_list,
-                                               mock_user_emb, mock_mission_emb):
+                                               mock_user_emb, mock_preload):
         """A non-None semantic embedding should produce a higher score than None (all else equal)."""
         from OrbitServer.services.ai_suggestion_service import get_suggested_missions, W_SEMANTIC
         mock_user.return_value = {'interests': ['hiking'], 'trust_score': 0.0}
@@ -298,13 +298,13 @@ class TestGetSuggestedMissions:
 
         # Without semantic signal
         mock_user_emb.return_value = None
-        mock_mission_emb.return_value = None
+        mock_preload.return_value = {1: None}
         result_no_sem = get_suggested_missions(user_id=1)
 
         # With identical vectors -> cosine = 1.0
         vec = np.array([1.0, 0.0, 0.0], dtype=np.float32)
         mock_user_emb.return_value = vec
-        mock_mission_emb.return_value = vec
+        mock_preload.return_value = {1: vec}
         result_with_sem = get_suggested_missions(user_id=1)
 
         score_no_sem = result_no_sem[0]['match_score']

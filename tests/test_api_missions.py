@@ -15,25 +15,22 @@ class TestListMissions:
         resp = client.get('/api/missions')
         assert resp.status_code == 401
 
-    @patch('OrbitServer.api.missions.get_user_pod_for_mission')
-    @patch('OrbitServer.api.missions.list_pods')
+    @patch('OrbitServer.models.models.get_user_pods')
     @patch('OrbitServer.api.missions.get_missions_for_user')
-    def test_returns_missions(self, mock_list, mock_pods, mock_user_pod, client):
+    def test_returns_missions(self, mock_list, mock_user_pods, client):
         mock_list.return_value = ([{"id": 1, "title": "Hike", "max_pod_size": 4}], None)
-        mock_user_pod.return_value = None
-        mock_pods.return_value = []
+        mock_user_pods.return_value = []
         resp = client.get('/api/missions', headers=auth_header())
         body = json.loads(resp.data)
         assert resp.status_code == 200
         assert body["success"] is True
         assert len(body["data"]) == 1
 
-    @patch('OrbitServer.api.missions.get_user_pod_for_mission')
-    @patch('OrbitServer.api.missions.list_pods')
+    @patch('OrbitServer.models.models.get_user_pods')
     @patch('OrbitServer.api.missions.get_missions_for_user')
-    def test_annotates_user_pod_status(self, mock_list, mock_pods, mock_user_pod, client):
+    def test_annotates_user_pod_status(self, mock_list, mock_user_pods, client):
         mock_list.return_value = ([{"id": 1, "title": "Hike", "max_pod_size": 4}], None)
-        mock_user_pod.return_value = {"id": "pod-abc"}
+        mock_user_pods.return_value = [{"id": "pod-abc", "mission_id": 1, "mission_title": "Hike"}]
         resp = client.get('/api/missions', headers=auth_header())
         body = json.loads(resp.data)
         assert body["data"][0]["user_pod_status"] == "in_pod"

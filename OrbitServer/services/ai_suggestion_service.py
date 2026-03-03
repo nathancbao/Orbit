@@ -27,6 +27,7 @@ from sklearn.metrics.pairwise import cosine_similarity as sk_cosine
 from OrbitServer.models.models import list_missions, get_user, get_user_history
 from OrbitServer.services.embedding_service import (
     get_or_create_mission_embedding, get_user_embedding, cosine_similarity,
+    preload_embeddings,
 )
 from OrbitServer.services.lightfm_service import get_lightfm_scores
 
@@ -247,7 +248,11 @@ def get_suggested_missions(user_id, limit=5) -> list:
     # 5. User embedding for semantic scoring (None if model unavailable)
     user_vec = get_user_embedding(interests_list)
 
-    # 6. LightFM collaborative scores (batch)
+    # 5b. Batch-load mission embeddings from already-fetched mission dicts
+    #     (avoids N+1 Datastore reads)
+    mission_embeddings = preload_embeddings(candidates) if user_vec is not None else {}
+
+    # 6. LightFM collaborative scores (batch, non-blocking)
     lightfm_scores = get_lightfm_scores(user_id, [m['id'] for m in candidates])
 
     # 7. Score each candidate
@@ -263,7 +268,7 @@ def get_suggested_missions(user_id, limit=5) -> list:
 
         semantic_s = 0.0
         if user_vec is not None:
-            mission_vec = get_or_create_mission_embedding(mid)
+            mission_vec = mission_embeddings.get(int(mid))
             if mission_vec is not None:
                 semantic_s = max(0.0, min(1.0, cosine_similarity(user_vec, mission_vec)))
 

@@ -118,6 +118,34 @@ def cosine_similarity(a: np.ndarray, b: np.ndarray) -> float:
     return float(np.dot(a, b) / (norm_a * norm_b))
 
 
+def preload_embeddings(missions: list) -> dict:
+    """Bulk-load embeddings for a list of mission dicts into the in-process cache.
+
+    Returns {mission_id: np.ndarray or None}.  Avoids N+1 Datastore reads by
+    using the embedding field already present on mission dicts fetched by
+    list_missions().
+    """
+    result = {}
+    for mission in missions:
+        mid = int(mission['id'])
+        # Check L1 cache first
+        with _cache_lock:
+            if mid in _embedding_cache:
+                result[mid] = _embedding_cache[mid]
+                continue
+
+        # Use embedding already on the mission dict (from list_missions query)
+        stored = mission.get('embedding')
+        if stored and len(stored) > 0:
+            vec = np.array(stored, dtype=np.float32)
+            with _cache_lock:
+                _embedding_cache[mid] = vec
+            result[mid] = vec
+        else:
+            result[mid] = None
+    return result
+
+
 def invalidate_cache(mission_id: int) -> None:
     """Remove a mission from the in-process cache."""
     with _cache_lock:

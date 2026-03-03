@@ -12,12 +12,17 @@ def create_new_signal(data, creator_id):
     return signal, None
 
 
-def get_all_signals(user_id=None):
-    """Return all signals, newest first (for discover feed). Returns (list, None)."""
-    signals = list_all_signals()
+def get_all_signals(user_id=None, limit=20, cursor=None, category=None):
+    """Return signals, newest first (for discover feed).
+
+    Returns (list, next_cursor, None).
+    """
+    signals, next_cursor = list_all_signals(
+        limit=limit, cursor=cursor, category=category,
+    )
     if user_id is not None:
         _resolve_pod_ids(signals, user_id)
-    return signals, None
+    return signals, next_cursor, None
 
 
 def get_user_signals(user_id):

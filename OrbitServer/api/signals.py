@@ -25,15 +25,24 @@ def list_signals():
 
 
 # ── GET /signals/discover ────────────────────────────────────────────────────
-# Returns all signals (discover feed for all users).
+# Paginated discover feed.  Query params: ?limit=20&cursor=<token>&category=<cat>
 
 @signals_bp.route('/discover', methods=['GET'])
 @require_auth
 def discover():
-    signals, err = get_all_signals(g.user_id)
+    try:
+        limit = min(int(request.args.get('limit', 20)), 50)
+    except (TypeError, ValueError):
+        limit = 20
+    cursor = request.args.get('cursor') or None
+    category = request.args.get('category') or None
+
+    signals, next_cursor, err = get_all_signals(
+        g.user_id, limit=limit, cursor=cursor, category=category,
+    )
     if err:
         return error(err, 500)
-    return success(signals)
+    return success({"signals": signals, "next_cursor": next_cursor})
 
 
 # ── POST /signals ────────────────────────────────────────────────────────────

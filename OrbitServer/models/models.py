@@ -183,6 +183,20 @@ def delete_mission(mission_id):
         delete_pod(pod['id'])
 
 
+def get_missions_batch(mission_ids):
+    """Fetch multiple missions in a single Datastore multi-get. Returns {id: dict}."""
+    if not mission_ids:
+        return {}
+    keys = [client.key('Mission', int(mid)) for mid in mission_ids]
+    entities = client.get_multi(keys)
+    result = {}
+    for entity in entities:
+        if entity is not None:
+            d = _entity_to_dict(entity)
+            result[d['id']] = d
+    return result
+
+
 def list_missions(filters=None):
     query = client.query(kind='Mission')
     if filters and filters.get('tag'):
@@ -517,12 +531,23 @@ def list_signals_for_user(user_id, limit=100):
     return [_entity_to_dict(e) for e in results]
 
 
-def list_all_signals(limit=50):
-    """Return all Signal entities, newest first (for discover feed)."""
+def list_all_signals(limit=50, cursor=None, category=None):
+    """Return Signal entities, newest first (for discover feed).
+
+    Supports cursor-based pagination and optional category filter.
+    Returns (list_of_dicts, next_cursor_string_or_None).
+    """
     query = client.query(kind='Signal')
+    if category:
+        query.add_filter(filter=PropertyFilter('activity_category', '=', category))
     query.order = ['-created_at']
-    results = list(query.fetch(limit=limit))
-    return [_entity_to_dict(e) for e in results]
+    # Cursor comes in as a string from the API — encode to bytes for Datastore
+    start = cursor.encode('utf-8') if isinstance(cursor, str) else cursor
+    query_iter = query.fetch(limit=limit, start_cursor=start)
+    page = next(query_iter.pages)
+    results = [_entity_to_dict(e) for e in page]
+    next_cursor = query_iter.next_page_token
+    return results, next_cursor.decode('utf-8') if next_cursor else None
 
 
 def list_rsvped_signals(user_id, limit=100):
