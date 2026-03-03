@@ -35,12 +35,16 @@ class MissionService {
     }
 
     func createMission(title: String, description: String, tags: [String],
-                       location: String, date: String, maxPodSize: Int = 4) async throws -> Mission {
-        let body: [String: Any] = [
+                       location: String, date: String,
+                       startTime: String? = nil, endTime: String? = nil,
+                       maxPodSize: Int = 4) async throws -> Mission {
+        var body: [String: Any] = [
             "title": title, "description": description,
             "tags": tags, "location": location,
             "date": date, "max_pod_size": maxPodSize,
         ]
+        if let startTime { body["start_time"] = startTime }
+        if let endTime { body["end_time"] = endTime }
         return try await APIService.shared.request(
             endpoint: Constants.API.Endpoints.missions,
             method: "POST", body: body, authenticated: true

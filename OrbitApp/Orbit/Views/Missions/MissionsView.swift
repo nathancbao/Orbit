@@ -451,6 +451,8 @@ struct MissionCreateView: View {
     @State private var description = ""
     @State private var location = ""
     @State private var date = Date().addingTimeInterval(86400)
+    @State private var startTime = Calendar.current.date(from: DateComponents(hour: 12, minute: 0))!
+    @State private var endTime = Calendar.current.date(from: DateComponents(hour: 13, minute: 0))!
     @State private var maxPodSize = 4
     @State private var tags: [String]
     @State private var isSubmitting = false
@@ -487,6 +489,24 @@ struct MissionCreateView: View {
                         DatePicker("", selection: $date, in: Date()..., displayedComponents: .date)
                             .datePickerStyle(.compact)
                             .labelsHidden()
+                    }
+
+                    HStack(spacing: 16) {
+                        VStack(alignment: .leading, spacing: 8) {
+                            OrbitSectionHeader(title: "Start Time")
+                            DatePicker("", selection: $startTime, displayedComponents: .hourAndMinute)
+                                .labelsHidden()
+                        }
+                        VStack(alignment: .leading, spacing: 8) {
+                            OrbitSectionHeader(title: "End Time")
+                            DatePicker("", selection: $endTime, displayedComponents: .hourAndMinute)
+                                .labelsHidden()
+                        }
+                    }
+                    .onChange(of: startTime) { _, newStart in
+                        if endTime <= newStart {
+                            endTime = newStart.addingTimeInterval(3600)
+                        }
                     }
 
                     VStack(alignment: .leading, spacing: 8) {
@@ -548,9 +568,15 @@ struct MissionCreateView: View {
     private func submitMission() {
         guard canSubmit else { return }
         isSubmitting = true
-        let formatter = DateFormatter()
-        formatter.dateFormat = "yyyy-MM-dd"
-        let dateString = formatter.string(from: date)
+        let dateFormatter = DateFormatter()
+        dateFormatter.dateFormat = "yyyy-MM-dd"
+        let dateString = dateFormatter.string(from: date)
+
+        let timeFormatter = DateFormatter()
+        timeFormatter.dateFormat = "HH:mm"
+        let startTimeString = timeFormatter.string(from: startTime)
+        let endTimeString = timeFormatter.string(from: endTime)
+
         Task {
             do {
                 _ = try await MissionService.shared.createMission(
@@ -559,6 +585,8 @@ struct MissionCreateView: View {
                     tags: tags,
                     location: location.trimmingCharacters(in: .whitespaces),
                     date: dateString,
+                    startTime: startTimeString,
+                    endTime: endTimeString,
                     maxPodSize: maxPodSize
                 )
                 await MainActor.run {
