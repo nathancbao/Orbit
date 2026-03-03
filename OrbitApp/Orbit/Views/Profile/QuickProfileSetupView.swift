@@ -548,39 +548,28 @@ struct QuickProfileSetupView: View {
 
 // MARK: - Gallery Image Picker
 
-struct GalleryImagePickerView: UIViewControllerRepresentable {
+struct GalleryImagePickerView: View {
     let onImagePicked: (UIImage?) -> Void
     @Environment(\.dismiss) private var dismiss
+    @State private var pickedImage: UIImage?
+    @State private var showCrop = false
 
-    func makeUIViewController(context: Context) -> UIImagePickerController {
-        let picker = UIImagePickerController()
-        picker.delegate = context.coordinator
-        picker.sourceType = .photoLibrary
-        picker.allowsEditing = true
-        return picker
-    }
-
-    func updateUIViewController(_ uiViewController: UIImagePickerController, context: Context) {}
-
-    func makeCoordinator() -> Coordinator {
-        Coordinator(self)
-    }
-
-    class Coordinator: NSObject, UIImagePickerControllerDelegate, UINavigationControllerDelegate {
-        let parent: GalleryImagePickerView
-        init(_ parent: GalleryImagePickerView) { self.parent = parent }
-
-        func imagePickerController(_ picker: UIImagePickerController,
-                                   didFinishPickingMediaWithInfo info: [UIImagePickerController.InfoKey: Any]) {
-            let image = info[.editedImage] as? UIImage ?? info[.originalImage] as? UIImage
-            parent.onImagePicked(image)
-            parent.dismiss()
-        }
-
-        func imagePickerControllerDidCancel(_ picker: UIImagePickerController) {
-            parent.onImagePicked(nil)
-            parent.dismiss()
-        }
+    var body: some View {
+        PhotoLibraryPicker(selectedImage: $pickedImage)
+            .onChange(of: pickedImage) { _, img in
+                if img != nil { showCrop = true }
+            }
+            .fullScreenCover(isPresented: $showCrop) {
+                if let img = pickedImage {
+                    CropView(image: img) { cropped in
+                        onImagePicked(cropped)
+                        dismiss()
+                    } onCancel: {
+                        pickedImage = nil
+                        showCrop = false
+                    }
+                }
+            }
     }
 }
 
@@ -665,42 +654,232 @@ struct InterestChipGrid: View {
     }
 }
 
-// MARK: - Simple Image Picker (no crop required)
+// MARK: - Profile Image Picker (with crop)
 
-struct ImagePickerView: UIViewControllerRepresentable {
+struct ImagePickerView: View {
+    @Binding var selectedImage: UIImage?
+    @Environment(\.dismiss) private var dismiss
+    @State private var pickedImage: UIImage?
+    @State private var showCrop = false
+
+    var body: some View {
+        PhotoLibraryPicker(selectedImage: $pickedImage)
+            .onChange(of: pickedImage) { _, img in
+                if img != nil { showCrop = true }
+            }
+            .fullScreenCover(isPresented: $showCrop) {
+                if let img = pickedImage {
+                    CropView(image: img) { cropped in
+                        selectedImage = cropped
+                        dismiss()
+                    } onCancel: {
+                        pickedImage = nil
+                        showCrop = false
+                    }
+                }
+            }
+    }
+}
+
+// MARK: - Photo Library Picker (PHPicker wrapper)
+
+struct PhotoLibraryPicker: UIViewControllerRepresentable {
     @Binding var selectedImage: UIImage?
     @Environment(\.dismiss) private var dismiss
 
-    func makeUIViewController(context: Context) -> UIImagePickerController {
-        let picker = UIImagePickerController()
+    func makeUIViewController(context: Context) -> PHPickerViewController {
+        var config = PHPickerConfiguration()
+        config.filter = .images
+        config.selectionLimit = 1
+        let picker = PHPickerViewController(configuration: config)
         picker.delegate = context.coordinator
-        picker.sourceType = .photoLibrary
-        picker.allowsEditing = true
         return picker
     }
 
-    func updateUIViewController(_ uiViewController: UIImagePickerController, context: Context) {}
+    func updateUIViewController(_ uiViewController: PHPickerViewController, context: Context) {}
 
-    func makeCoordinator() -> Coordinator {
-        Coordinator(self)
+    func makeCoordinator() -> Coordinator { Coordinator(self) }
+
+    class Coordinator: NSObject, PHPickerViewControllerDelegate {
+        let parent: PhotoLibraryPicker
+        init(_ parent: PhotoLibraryPicker) { self.parent = parent }
+
+        func picker(_ picker: PHPickerViewController, didFinishPicking results: [PHPickerResult]) {
+            guard let provider = results.first?.itemProvider,
+                  provider.canLoadObject(ofClass: UIImage.self) else {
+                parent.dismiss()
+                return
+            }
+            provider.loadObject(ofClass: UIImage.self) { object, _ in
+                DispatchQueue.main.async {
+                    self.parent.selectedImage = object as? UIImage
+                }
+            }
+        }
+    }
+}
+
+// MARK: - Zoomable Crop View
+
+struct CropView: View {
+    let image: UIImage
+    let onCrop: (UIImage) -> Void
+    let onCancel: () -> Void
+
+    @State private var scale: CGFloat = 1.0
+    @State private var lastScale: CGFloat = 1.0
+    @State private var offset: CGSize = .zero
+    @State private var lastOffset: CGSize = .zero
+
+    var body: some View {
+        GeometryReader { geo in
+            let cropSize = min(geo.size.width, geo.size.height) - 40
+
+            ZStack {
+                Color.black.ignoresSafeArea()
+
+                Image(uiImage: image)
+                    .resizable()
+                    .scaledToFit()
+                    .scaleEffect(scale)
+                    .offset(offset)
+                    .gesture(
+                        SimultaneousGesture(
+                            MagnificationGesture()
+                                .onChanged { value in
+                                    scale = max(1.0, lastScale * value)
+                                }
+                                .onEnded { value in
+                                    scale = max(1.0, lastScale * value)
+                                    lastScale = scale
+                                },
+                            DragGesture()
+                                .onChanged { value in
+                                    offset = CGSize(
+                                        width: lastOffset.width + value.translation.width,
+                                        height: lastOffset.height + value.translation.height
+                                    )
+                                }
+                                .onEnded { value in
+                                    offset = CGSize(
+                                        width: lastOffset.width + value.translation.width,
+                                        height: lastOffset.height + value.translation.height
+                                    )
+                                    lastOffset = offset
+                                }
+                        )
+                    )
+
+                // Dark overlay with square cutout
+                CropOverlay(cropSize: cropSize)
+                    .allowsHitTesting(false)
+
+                // Controls
+                VStack {
+                    HStack {
+                        Button("Cancel") { onCancel() }
+                            .foregroundColor(.white)
+                            .padding()
+                        Spacer()
+                        Button("Done") {
+                            let cropped = performCrop(
+                                viewSize: geo.size,
+                                cropSize: cropSize
+                            )
+                            onCrop(cropped)
+                        }
+                        .fontWeight(.semibold)
+                        .foregroundColor(.white)
+                        .padding()
+                    }
+                    Spacer()
+                    Text("Pinch to zoom, drag to adjust")
+                        .font(.caption)
+                        .foregroundColor(.white.opacity(0.6))
+                        .padding(.bottom, 30)
+                }
+            }
+        }
     }
 
-    class Coordinator: NSObject, UIImagePickerControllerDelegate, UINavigationControllerDelegate {
-        let parent: ImagePickerView
-        init(_ parent: ImagePickerView) { self.parent = parent }
-
-        func imagePickerController(_ picker: UIImagePickerController,
-                                   didFinishPickingMediaWithInfo info: [UIImagePickerController.InfoKey: Any]) {
-            if let edited = info[.editedImage] as? UIImage {
-                parent.selectedImage = edited
-            } else if let original = info[.originalImage] as? UIImage {
-                parent.selectedImage = original
-            }
-            parent.dismiss()
+    private func performCrop(viewSize: CGSize, cropSize: CGFloat) -> UIImage {
+        let imgSize = image.size
+        // Determine how the image is displayed (scaledToFit)
+        let viewFit: CGSize
+        let imgAspect = imgSize.width / imgSize.height
+        let viewAspect = viewSize.width / viewSize.height
+        if imgAspect > viewAspect {
+            let w = viewSize.width
+            viewFit = CGSize(width: w, height: w / imgAspect)
+        } else {
+            let h = viewSize.height
+            viewFit = CGSize(width: h * imgAspect, height: h)
         }
 
-        func imagePickerControllerDidCancel(_ picker: UIImagePickerController) {
-            parent.dismiss()
+        // Scaled display size
+        let displayW = viewFit.width * scale
+        let displayH = viewFit.height * scale
+
+        // The crop square center is at the view center
+        let cropOriginX = (viewSize.width - cropSize) / 2
+        let cropOriginY = (viewSize.height - cropSize) / 2
+
+        // Image display origin (accounting for offset)
+        let imgDisplayX = (viewSize.width - displayW) / 2 + offset.width
+        let imgDisplayY = (viewSize.height - displayH) / 2 + offset.height
+
+        // Crop rect in display coordinates
+        let relX = (cropOriginX - imgDisplayX) / displayW
+        let relY = (cropOriginY - imgDisplayY) / displayH
+        let relW = cropSize / displayW
+        let relH = cropSize / displayH
+
+        // Convert to pixel coordinates
+        let pixelX = relX * imgSize.width
+        let pixelY = relY * imgSize.height
+        let pixelW = relW * imgSize.width
+        let pixelH = relH * imgSize.height
+
+        let cropRect = CGRect(x: pixelX, y: pixelY, width: pixelW, height: pixelH)
+            .intersection(CGRect(origin: .zero, size: imgSize))
+
+        guard !cropRect.isEmpty,
+              let cgCropped = image.cgImage?.cropping(to: cropRect) else {
+            return image
+        }
+        return UIImage(cgImage: cgCropped, scale: image.scale, orientation: image.imageOrientation)
+    }
+}
+
+// MARK: - Crop Overlay (dark surround with square hole)
+
+struct CropOverlay: View {
+    let cropSize: CGFloat
+
+    var body: some View {
+        GeometryReader { geo in
+            let rect = CGRect(origin: .zero, size: geo.size)
+            let cropOrigin = CGPoint(
+                x: (geo.size.width - cropSize) / 2,
+                y: (geo.size.height - cropSize) / 2
+            )
+            let cropRect = CGRect(origin: cropOrigin, size: CGSize(width: cropSize, height: cropSize))
+
+            Canvas { context, _ in
+                context.fill(Path(rect), with: .color(.black.opacity(0.55)))
+                context.blendMode = .destinationOut
+                context.fill(
+                    Path(roundedRect: cropRect, cornerRadius: 4),
+                    with: .color(.white)
+                )
+            }
+            .compositingGroup()
+
+            // Border around crop area
+            RoundedRectangle(cornerRadius: 4)
+                .stroke(Color.white.opacity(0.7), lineWidth: 1)
+                .frame(width: cropSize, height: cropSize)
+                .position(x: geo.size.width / 2, y: geo.size.height / 2)
         }
     }
 }

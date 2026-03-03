@@ -7,61 +7,33 @@ struct ProfileDisplayView: View {
 
     @Environment(\.dismiss) private var dismiss
     @State private var showEdit = false
+    @State private var galleryIndex = 0
 
     var body: some View {
         NavigationStack {
-            ZStack {
-                Color.white.ignoresSafeArea()
+            ScrollView {
+                VStack(spacing: 0) {
 
-                VStack {
-                    TopWavyLines().frame(height: 140)
-                    Spacer()
-                }
-                .ignoresSafeArea()
-
-                VStack {
-                    Spacer()
-                    BottomWavyLines().frame(height: 140)
-                }
-                .ignoresSafeArea()
-
-                ScrollView {
-                    VStack(spacing: 28) {
-
-                        // Avatar
+                    // Hero profile photo (large, Tinder-style)
+                    GeometryReader { geo in
                         ZStack {
+                            Color.black
                             if let photoURL = profile.photo, let url = URL(string: photoURL) {
                                 AsyncImage(url: url) { image in
-                                    image.resizable().scaledToFill()
+                                    image.resizable().scaledToFit()
                                 } placeholder: {
-                                    avatarPlaceholder
+                                    heroPlaceholder
                                 }
-                                .frame(width: 110, height: 110)
-                                .clipShape(Circle())
                             } else {
-                                avatarPlaceholder
+                                heroPlaceholder
                             }
                         }
-                        .shadow(color: .black.opacity(0.1), radius: 10, x: 0, y: 4)
-                        .padding(.top, 60)
+                        .frame(width: geo.size.width, height: geo.size.width * 1.15)
+                    }
+                    .aspectRatio(1 / 1.15, contentMode: .fit)
 
-                        // Gallery photos
-                        if !profile.galleryPhotos.isEmpty {
-                            ScrollView(.horizontal, showsIndicators: false) {
-                                HStack(spacing: 10) {
-                                    ForEach(profile.galleryPhotos, id: \.self) { urlString in
-                                        AsyncImage(url: URL(string: urlString)) { image in
-                                            image.resizable().scaledToFill()
-                                        } placeholder: {
-                                            Color(.systemGray5)
-                                        }
-                                        .frame(width: 72, height: 72)
-                                        .clipShape(RoundedRectangle(cornerRadius: 10))
-                                    }
-                                }
-                                .padding(.horizontal, 28)
-                            }
-                        }
+                    // Content below the hero photo
+                    VStack(spacing: 24) {
 
                         // Name + year
                         VStack(spacing: 6) {
@@ -83,6 +55,7 @@ struct ProfileDisplayView: View {
                                 }
                             }
                         }
+                        .padding(.top, 20)
 
                         // Gender + MBTI badges
                         if !profile.gender.isEmpty || !profile.mbti.isEmpty {
@@ -148,6 +121,38 @@ struct ProfileDisplayView: View {
                             .padding(.horizontal, 28)
                         }
 
+                        // Gallery photos (swipeable carousel)
+                        if !profile.galleryPhotos.isEmpty {
+                            VStack(alignment: .leading, spacing: 12) {
+                                HStack {
+                                    Text("gallery")
+                                        .font(.headline)
+                                    Spacer()
+                                    Text("\(galleryIndex + 1)/\(profile.galleryPhotos.count)")
+                                        .font(.caption)
+                                        .foregroundColor(.secondary)
+                                }
+                                .padding(.horizontal, 28)
+
+                                TabView(selection: $galleryIndex) {
+                                    ForEach(Array(profile.galleryPhotos.enumerated()), id: \.offset) { index, urlString in
+                                        AsyncImage(url: URL(string: urlString)) { image in
+                                            image.resizable().scaledToFit()
+                                        } placeholder: {
+                                            Color(.systemGray5)
+                                        }
+                                        .frame(maxWidth: .infinity)
+                                        .background(Color.black)
+                                        .clipShape(RoundedRectangle(cornerRadius: 12))
+                                        .padding(.horizontal, 28)
+                                        .tag(index)
+                                    }
+                                }
+                                .tabViewStyle(.page(indexDisplayMode: .never))
+                                .frame(height: 320)
+                            }
+                        }
+
                         // Links
                         if !profile.links.isEmpty {
                             VStack(alignment: .leading, spacing: 8) {
@@ -186,9 +191,11 @@ struct ProfileDisplayView: View {
 
                         Spacer(minLength: 80)
                     }
-                    .frame(maxWidth: .infinity)
                 }
+                .frame(maxWidth: .infinity)
             }
+            .background(Color.white)
+            .ignoresSafeArea(edges: .top)
             .navigationTitle("Profile")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -221,15 +228,11 @@ struct ProfileDisplayView: View {
         }
     }
 
-    private var avatarPlaceholder: some View {
+    private var heroPlaceholder: some View {
         ZStack {
-            Circle()
-                .fill(
-                    OrbitTheme.gradientFill
-                )
-                .frame(width: 110, height: 110)
+            OrbitTheme.gradientFill
             Text(String(profile.name.prefix(1)).uppercased())
-                .font(.system(size: 44, weight: .bold))
+                .font(.system(size: 72, weight: .bold))
                 .foregroundColor(.white)
         }
     }
