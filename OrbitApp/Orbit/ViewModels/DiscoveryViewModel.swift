@@ -9,6 +9,7 @@
 import Combine
 import Foundation
 import SwiftUI
+import Combine
 
 // MARK: - Template Item
 
@@ -59,6 +60,12 @@ enum DiscoveryItem: Identifiable, Equatable {
         case .discoverableMission, .discoverableSignal:         return 3
         case .template:                                         return 3
         }
+    }
+}
+
+extension DiscoveryItem: Equatable {
+    static func == (lhs: DiscoveryItem, rhs: DiscoveryItem) -> Bool {
+        lhs.id == rhs.id
     }
 }
 

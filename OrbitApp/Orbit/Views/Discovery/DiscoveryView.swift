@@ -921,7 +921,7 @@ struct DiscoveryView: View {
                 viewModel.startBellTimer()
                 generatePlanets()
             }
-            .onChange(of: viewModel.items) { _ in
+            .onChange(of: viewModel.items) {
                 generatePlanets()
             }
             .onChange(of: isActive) { active in
