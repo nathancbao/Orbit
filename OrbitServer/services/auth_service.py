@@ -15,7 +15,7 @@ from OrbitServer.utils.auth import create_access_token, create_refresh_token, de
 logger = logging.getLogger(__name__)
 
 SENDGRID_API_KEY = os.environ.get('SENDGRID_API_KEY', '')
-FROM_EMAIL = os.environ.get('FROM_EMAIL', 'noreply@orbitapp.com')
+FROM_EMAIL = os.environ.get('FROM_EMAIL', 'theorbitapp.noreply@gmail.com')
 
 
 def _hash_token(token):
