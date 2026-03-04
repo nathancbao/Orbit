@@ -233,7 +233,7 @@ struct SignalRsvpCard: View {
             onDismiss?()
         }) {
             if let podId = signal.podId {
-                PodView(podId: podId, title: signal.displayTitle)
+                PodView(podId: podId, title: signal.displayTitle, missionMode: .flex)
             } else {
                 SignalDetailView(signal: signal)
             }

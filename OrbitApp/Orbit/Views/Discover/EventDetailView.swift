@@ -106,7 +106,7 @@ struct MissionDetailView: View {
             }
         }
         .sheet(item: $joinedPod) { pod in
-            PodView(podId: pod.id, title: mission.isFlexMode ? mission.displayTitle : mission.title)
+            PodView(podId: pod.id, title: mission.isFlexMode ? mission.displayTitle : mission.title, missionMode: mission.mode)
                 .onDisappear {
                     onJoined()
                     dismiss()
@@ -114,7 +114,7 @@ struct MissionDetailView: View {
         }
         .sheet(isPresented: $showPod) {
             if let podId = joinedPodId {
-                PodView(podId: podId, title: mission.displayTitle)
+                PodView(podId: podId, title: mission.displayTitle, missionMode: mission.mode)
             }
         }
         .onAppear {
@@ -731,7 +731,7 @@ struct SignalDetailView: View {
             }
             .sheet(isPresented: $showPod) {
                 if let podId = joinedPodId {
-                    PodView(podId: podId, title: signal.displayTitle)
+                    PodView(podId: podId, title: signal.displayTitle, missionMode: .flex)
                 }
             }
             .onAppear {
