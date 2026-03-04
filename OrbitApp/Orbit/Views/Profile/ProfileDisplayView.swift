@@ -91,8 +91,8 @@ struct ProfileDisplayView: View {
                                 .padding(.horizontal, 32)
                         }
 
-                        // Trust score
-                        if let score = profile.trustScore {
+                        // Trust score (only show once they have real ratings)
+                        if let score = profile.trustScore, score > 0 {
                             TrustScoreView(score: score)
                         }
 
@@ -203,8 +203,8 @@ struct ProfileDisplayView: View {
                         dismiss()
                     } label: {
                         Image(systemName: "xmark.circle.fill")
-                            .font(.title3)
-                            .foregroundColor(Color(.systemGray3))
+                            .font(.title2)
+                            .foregroundStyle(.white.opacity(0.9), Color.white.opacity(0.25))
                     }
                 }
                 if onProfileUpdated != nil {
@@ -213,7 +213,7 @@ struct ProfileDisplayView: View {
                             showEdit = true
                         }
                         .fontWeight(.semibold)
-                        .foregroundColor(.primary)
+                        .foregroundColor(.white)
                     }
                 }
             }
