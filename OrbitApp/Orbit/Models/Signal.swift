@@ -85,6 +85,12 @@ struct AvailabilitySlot: Codable, Identifiable, Equatable {
         case hours
     }
 
+    init(date: Date, timeBlocks: [TimeBlock] = [], hours: [Int] = []) {
+        self.date = date
+        self.timeBlocks = timeBlocks
+        self.hours = hours
+    }
+
     // Backend sends date as "YYYY-MM-DD" string, not ISO8601 with time.
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
