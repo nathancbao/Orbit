@@ -87,27 +87,15 @@ struct QuickProfileSetupView: View {
         ZStack {
             Color.white.ignoresSafeArea()
 
-            VStack {
-                TopWavyLines().frame(height: 150)
-                Spacer()
-            }
-            .ignoresSafeArea()
-
-            VStack {
-                Spacer()
-                BottomWavyLines().frame(height: 160)
-            }
-            .ignoresSafeArea()
-
             ScrollView {
                 VStack(alignment: .leading, spacing: 28) {
 
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(initialProfile != nil ? "edit your profile" : "let's set up your profile")
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text(initialProfile != nil ? "Edit Profile" : "Set Up Your Profile")
                             .font(.title2)
                             .fontWeight(.bold)
                         if initialProfile == nil {
-                            Text("takes about 30 seconds ✨")
+                            Text("Takes about 30 seconds — the more you share, the better your matches.")
                                 .font(.subheadline)
                                 .foregroundColor(.secondary)
                         }
@@ -432,7 +420,7 @@ struct QuickProfileSetupView: View {
                     Spacer(minLength: 40)
                 }
                 .padding(.horizontal, 24)
-                .padding(.top, 60)
+                .padding(.top, 20)
             }
         }
         .sheet(isPresented: $showPhotoPicker, onDismiss: {

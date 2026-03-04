@@ -674,7 +674,8 @@ struct MissionCreateView: View {
     // MARK: - Set Mode Form
 
     private var setModeForm: some View {
-        VStack(spacing: 24) {
+        VStack(alignment: .leading, spacing: 20) {
+
             VStack(alignment: .leading, spacing: 8) {
                 OrbitSectionHeader(title: "Mission Title")
                 TextField("e.g. BBQ Night", text: $title)
@@ -688,24 +689,50 @@ struct MissionCreateView: View {
                     .lineLimit(2...4)
             }
 
-            VStack(alignment: .leading, spacing: 8) {
-                OrbitSectionHeader(title: "Date")
-                DatePicker("", selection: $date, in: Date()..., displayedComponents: .date)
-                    .datePickerStyle(.compact)
-                    .labelsHidden()
-            }
+            // Date + Time grouped in a single card
+            VStack(alignment: .leading, spacing: 10) {
+                OrbitSectionHeader(title: "When")
+                VStack(spacing: 0) {
+                    HStack {
+                        Label("Date", systemImage: "calendar")
+                            .font(.subheadline)
+                            .foregroundColor(.primary)
+                        Spacer()
+                        DatePicker("", selection: $date, in: Date()..., displayedComponents: .date)
+                            .datePickerStyle(.compact)
+                            .labelsHidden()
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 14)
 
-            HStack(spacing: 16) {
-                VStack(alignment: .leading, spacing: 8) {
-                    OrbitSectionHeader(title: "Start Time")
-                    DatePicker("", selection: $startTime, displayedComponents: .hourAndMinute)
-                        .labelsHidden()
+                    Divider().padding(.leading, 16)
+
+                    HStack {
+                        Label("Starts", systemImage: "clock")
+                            .font(.subheadline)
+                            .foregroundColor(.primary)
+                        Spacer()
+                        DatePicker("", selection: $startTime, displayedComponents: .hourAndMinute)
+                            .labelsHidden()
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 14)
+
+                    Divider().padding(.leading, 16)
+
+                    HStack {
+                        Label("Ends", systemImage: "clock.fill")
+                            .font(.subheadline)
+                            .foregroundColor(.primary)
+                        Spacer()
+                        DatePicker("", selection: $endTime, displayedComponents: .hourAndMinute)
+                            .labelsHidden()
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 14)
                 }
-                VStack(alignment: .leading, spacing: 8) {
-                    OrbitSectionHeader(title: "End Time")
-                    DatePicker("", selection: $endTime, displayedComponents: .hourAndMinute)
-                        .labelsHidden()
-                }
+                .background(Color(.systemGray6))
+                .clipShape(RoundedRectangle(cornerRadius: 14))
             }
             .onChange(of: startTime) { _, newStart in
                 if endTime <= newStart {
@@ -719,10 +746,21 @@ struct MissionCreateView: View {
                     .textFieldStyle(.roundedBorder)
             }
 
-            VStack(alignment: .leading, spacing: 8) {
+            VStack(alignment: .leading, spacing: 10) {
                 OrbitSectionHeader(title: "Max Pod Size")
-                Stepper("\(maxPodSize) people per pod", value: $maxPodSize, in: 2...10)
-                    .font(.subheadline)
+                HStack {
+                    Label("\(maxPodSize) people per pod", systemImage: "person.2.fill")
+                        .font(.subheadline)
+                        .foregroundColor(.primary)
+                    Spacer()
+                    Stepper("", value: $maxPodSize, in: 2...10)
+                        .labelsHidden()
+                        .fixedSize()
+                }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 14)
+                .background(Color(.systemGray6))
+                .clipShape(RoundedRectangle(cornerRadius: 14))
             }
         }
     }
@@ -1133,19 +1171,27 @@ struct MissionCreateView: View {
 
     private func submitFlexMission() {
         guard canSubmit, !viewModel.isSubmitting else { return }
+        // Send "today, all day" as a placeholder — the group will pick the actual time later.
+        // The backend requires at least one slot, so we send all three time blocks for today.
+        let defaultSlot = AvailabilitySlot(
+            date: Date(),
+            timeBlocks: TimeBlock.allCases,
+            hours: []
+        )
         Task {
-            await viewModel.createFlexMission(
+            if let created = await viewModel.createFlexMission(
                 activityCategory: selectedCategory,
                 customActivityName: selectedCategory == .custom ? customActivityName.trimmingCharacters(in: .whitespaces) : nil,
                 minGroupSize: minGroupSize,
                 maxGroupSize: maxGroupSize,
-                availability: [],
+                availability: [defaultSlot],
                 description: description.trimmingCharacters(in: .whitespaces),
                 links: linksArray
-            )
-            if viewModel.errorMessage == nil {
-                onCreated?(viewModel.allFlexMissions.first ?? Mission(title: ""))
+            ) {
+                onCreated?(created)
                 dismiss()
+            } else {
+                errorMessage = viewModel.errorMessage ?? "Something went wrong. Try again."
             }
         }
     }
