@@ -41,7 +41,8 @@
       "Bash(pip show:*)",
       "WebSearch",
       "WebFetch(domain:github.com)",
-      "WebFetch(domain:raw.githubusercontent.com)"
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "Bash(git -C /Users/jonathan/Desktop/ECS_191/Orbit status)"
     ]
   }
 }

@@ -250,7 +250,9 @@ def validate_signal_data(data):
         availability = []
     if not isinstance(availability, list):
         errors.append("availability must be a list of slots")
-    elif len(availability) > 0:
+    elif len(availability) == 0:
+        errors.append("availability cannot be empty")
+    else:
         for slot in availability:
             if not isinstance(slot, dict):
                 errors.append("Each availability slot must be an object")
