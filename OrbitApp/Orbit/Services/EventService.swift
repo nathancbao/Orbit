@@ -87,6 +87,7 @@ class MissionService {
     }
 
     func createFlexMission(
+        title: String = "",
         activityCategory: ActivityCategory,
         customActivityName: String?,
         minGroupSize: Int,
@@ -99,6 +100,7 @@ class MissionService {
     ) async throws -> Mission {
         // TODO: Migrate to POST /missions with mode: "flex" on backend
         let signal = try await SignalService.shared.createSignal(
+            title: title,
             activityCategory: activityCategory,
             customActivityName: customActivityName,
             minGroupSize: minGroupSize,
@@ -174,6 +176,7 @@ class SignalService {
     }
 
     func createSignal(
+        title: String = "",
         activityCategory: ActivityCategory,
         customActivityName: String?,
         minGroupSize: Int,
@@ -202,15 +205,18 @@ class SignalService {
             }
         }
 
-        let title: String
-        if activityCategory == .custom {
-            title = customActivityName ?? "Custom Activity"
+        // Use user-provided title if given; otherwise fall back to category name
+        let resolvedTitle: String
+        if !title.trimmingCharacters(in: .whitespaces).isEmpty {
+            resolvedTitle = title.trimmingCharacters(in: .whitespaces)
+        } else if activityCategory == .custom {
+            resolvedTitle = customActivityName ?? "Custom Activity"
         } else {
-            title = activityCategory.displayName
+            resolvedTitle = activityCategory.displayName
         }
 
         var body: [String: Any] = [
-            "title": title,
+            "title": resolvedTitle,
             "activity_category": activityCategory.rawValue,
             "min_group_size": minGroupSize,
             "max_group_size": maxGroupSize,

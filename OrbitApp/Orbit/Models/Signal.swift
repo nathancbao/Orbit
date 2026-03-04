@@ -192,7 +192,7 @@ struct Signal: Codable, Identifiable {
     let maxGroupSize: Int
     let availability: [AvailabilitySlot]
     let status: SignalStatus
-    let creatorId: Int
+    let creatorId: Int?
     let createdAt: String?
     let podId: String?
     let links: [String]?

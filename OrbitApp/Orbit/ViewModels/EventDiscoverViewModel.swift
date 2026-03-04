@@ -44,29 +44,41 @@ class MissionsViewModel: ObservableObject {
         return all.filter { $0.mode == mode }
     }
 
-    /// Missions the user has joined (in a pod for set, or has podId/is creator for flex).
+    /// Missions the user has joined (in a pod for set, or created/RSVPed for flex).
     var myMissions: [Mission] {
         let uid = currentUserId
         return combinedMissions.filter { m in
             if m.mode == .flex {
-                return m.podId != nil || m.creatorId == uid
+                // podId set = pod formed after RSVP
+                // creatorId == uid = creator (even if pod not formed yet)
+                // userPodStatus = "in_pod" = stamped locally after creation
+                return m.podId != nil || m.creatorId == uid || m.userPodStatus == "in_pod"
             }
             return m.userPodStatus == "in_pod"
         }
     }
 
-    /// Missions available to discover (not yet joined).
-    /// Missions the user created still appear here at the top even after auto-joining.
+    /// Missions available to discover.
+    /// User's own missions appear at the top so they can track who's joining.
     var discoverMissions: [Mission] {
         let uid = currentUserId
-        let created = combinedMissions.filter { $0.creatorId == uid && ($0.userPodStatus == "in_pod" || $0.podId != nil) }
+        // "Mine" section at top: SET missions joined + FLEX missions I created/RSVPed/have a pod for
+        let mine = combinedMissions.filter { m in
+            if m.mode == .flex {
+                return m.creatorId == uid || m.userPodStatus == "in_pod" || m.podId != nil
+            }
+            return m.userPodStatus == "in_pod"
+        }
+        // Rest: missions not yet joined by this user
+        let mineIds = Set(mine.map { $0.id })
         let rest = combinedMissions.filter { m in
+            guard !mineIds.contains(m.id) else { return false }
             if m.mode == .flex {
                 return m.podId == nil && m.creatorId != uid
             }
             return m.userPodStatus != "in_pod"
         }
-        return created + rest
+        return mine + rest
     }
 
     private var hasLoaded = false
@@ -103,9 +115,12 @@ class MissionsViewModel: ObservableObject {
             if let s = try? await MissionService.shared.listMissions(tag: filterTag, year: showMyYearOnly ? userYear : nil) {
                 allMissions = s
             }
-            if let f = try? await MissionService.shared.listFlexMissions() {
-                allFlexMissions = f
-            }
+            // Merge discover + my flex so creator's own missions are included
+            var fallbackFlex: [Mission] = []
+            if let f = try? await MissionService.shared.listFlexMissions() { fallbackFlex += f }
+            if let mf = try? await MissionService.shared.myFlexMissions() { fallbackFlex += mf }
+            var seen = Set<String>()
+            allFlexMissions = fallbackFlex.filter { seen.insert($0.id).inserted }
         }
         isLoading = false
         hasLoaded = true
@@ -155,7 +170,9 @@ class MissionsViewModel: ObservableObject {
 
     // MARK: - Flex Creation
 
+    @discardableResult
     func createFlexMission(
+        title: String = "",
         activityCategory: ActivityCategory,
         customActivityName: String?,
         minGroupSize: Int,
@@ -165,12 +182,14 @@ class MissionsViewModel: ObservableObject {
         links: [String] = [],
         timeRangeStart: Int = 9,
         timeRangeEnd: Int = 21
-    ) async {
+    ) async -> Mission? {
         isSubmitting = true
+        errorMessage = nil
         defer { isSubmitting = false }
 
         do {
             let created = try await MissionService.shared.createFlexMission(
+                title: title,
                 activityCategory: activityCategory,
                 customActivityName: customActivityName,
                 minGroupSize: minGroupSize,
@@ -181,12 +200,20 @@ class MissionsViewModel: ObservableObject {
                 timeRangeStart: timeRangeStart,
                 timeRangeEnd: timeRangeEnd
             )
-            // Auto-RSVP the creator so they're in a pod from the start
-            let rsvped = (try? await MissionService.shared.joinFlexMission(id: created.id)) ?? created
-            allFlexMissions.insert(rsvped, at: 0)
+            // Auto-RSVP the creator so they're in a pod from the start.
+            // Do NOT insert here — caller's onCreated → insertCreatedMission handles it once.
+            var rsvped = (try? await MissionService.shared.joinFlexMission(id: created.id)) ?? created
+            // Stamp creator identity so myMissions/discoverMissions filters work
+            // even if the backend RSVP response omits creator_id.
+            if rsvped.creatorId == nil {
+                rsvped.creatorId = currentUserId
+            }
+            rsvped.userPodStatus = "in_pod"
             showToastMessage("Mission created!")
+            return rsvped
         } catch {
             errorMessage = error.localizedDescription
+            return nil
         }
     }
 

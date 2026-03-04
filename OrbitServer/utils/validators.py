@@ -246,9 +246,11 @@ def validate_signal_data(data):
                 errors.append(f"{field} must be an integer (0-23)")
 
     availability = data.get('availability')
-    if not isinstance(availability, list) or len(availability) == 0:
-        errors.append("availability must be a non-empty list of slots")
-    else:
+    if availability is None:
+        availability = []
+    if not isinstance(availability, list):
+        errors.append("availability must be a list of slots")
+    elif len(availability) > 0:
         for slot in availability:
             if not isinstance(slot, dict):
                 errors.append("Each availability slot must be an object")

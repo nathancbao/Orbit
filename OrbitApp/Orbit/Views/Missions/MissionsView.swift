@@ -1180,6 +1180,7 @@ struct MissionCreateView: View {
         )
         Task {
             if let created = await viewModel.createFlexMission(
+                title: title.trimmingCharacters(in: .whitespaces),
                 activityCategory: selectedCategory,
                 customActivityName: selectedCategory == .custom ? customActivityName.trimmingCharacters(in: .whitespaces) : nil,
                 minGroupSize: minGroupSize,
