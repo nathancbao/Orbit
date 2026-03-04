@@ -13,6 +13,11 @@ struct Pod: Codable, Identifiable {
     var members: [PodMember]?   // Enriched — only present in GET /pods/<id>
     var missionTitle: String?   // Enriched — present in GET /users/me/pods
 
+    // ── Local-only schedule fields (not from API — TODO: migrate to backend) ──
+    var confirmedTime: Date?
+    var scheduleDeadline: Date?
+    var leaderPickDeadline: Date?
+
     /// Display name: user-set name, then mission title, then fallback.
     var displayName: String {
         if let n = name, !n.isEmpty { return n }
@@ -51,6 +56,19 @@ struct Pod: Codable, Identifiable {
         confirmedAttendees = (try? container.decode([Int].self, forKey: .confirmedAttendees)) ?? []
         members = try? container.decodeIfPresent([PodMember].self, forKey: .members)
         missionTitle = try? container.decodeIfPresent(String.self, forKey: .missionTitle)
+
+        // Local-only fields — not decoded from API
+        confirmedTime = nil
+        scheduleDeadline = nil
+        leaderPickDeadline = nil
+    }
+
+    /// The leader of the pod (first member in join order).
+    var leaderId: Int? { memberIds.first }
+
+    /// Whether this pod is still in pre-scheduling state (not yet confirmed/cancelled).
+    var isFlexForming: Bool {
+        status == "open" || status == "full"
     }
 }
 
