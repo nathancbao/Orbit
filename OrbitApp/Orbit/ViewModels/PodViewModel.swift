@@ -13,11 +13,20 @@ class PodViewModel: ObservableObject {
     @Published var errorMessage: String?
     @Published var messageText: String = ""
 
-    private let podId: String
-    private var currentUserId: Int = 0  // Set from Keychain on init
+    // Flex mode routing
+    @Published var missionMode: MissionMode = .set
+    @Published var mission: Mission?
 
-    init(podId: String) {
+    private let podId: String
+
+    init(podId: String, missionMode: MissionMode = .set) {
         self.podId = podId
+        self.missionMode = missionMode
+    }
+
+    /// Whether this pod is in flex scheduling (pre-chat) state.
+    var isFlexForming: Bool {
+        missionMode == .flex && pod?.status != "meeting_confirmed" && pod?.status != "cancelled"
     }
 
     func load() async {
@@ -27,11 +36,25 @@ class PodViewModel: ObservableObject {
         do { pod = try await PodService.shared.getPod(id: podId) }
         catch { errorMessage = error.localizedDescription }
 
-        do { messages = try await ChatService.shared.getMessages(podId: podId) }
-        catch { /* empty messages is fine for a new pod */ }
+        // Resolve mission mode from the pod's missionId if not already known.
+        if let pod = pod {
+            do {
+                let m = try await MissionService.shared.getMission(id: pod.missionId)
+                mission = m
+                missionMode = m.mode
+            } catch {
+                // Keep whatever mode was passed in init
+            }
+        }
 
-        do { votes = try await ChatService.shared.getVotes(podId: podId) }
-        catch { /* empty votes is fine for a new pod */ }
+        // Only load chat for set mode or scheduled flex mode.
+        if !isFlexForming {
+            do { messages = try await ChatService.shared.getMessages(podId: podId) }
+            catch { /* empty messages is fine for a new pod */ }
+
+            do { votes = try await ChatService.shared.getVotes(podId: podId) }
+            catch { /* empty votes is fine for a new pod */ }
+        }
 
         isLoading = false
     }
