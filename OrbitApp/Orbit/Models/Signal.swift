@@ -195,6 +195,7 @@ struct Signal: Codable, Identifiable {
     let creatorId: Int?
     let createdAt: String?
     let podId: String?
+    let scheduledTime: String?
     let links: [String]?
     let timeRangeStart: Int?
     let timeRangeEnd: Int?
@@ -208,6 +209,7 @@ struct Signal: Codable, Identifiable {
         case creatorId         = "creator_id"
         case createdAt         = "created_at"
         case podId             = "pod_id"
+        case scheduledTime     = "scheduled_time"
         case timeRangeStart    = "time_range_start"
         case timeRangeEnd      = "time_range_end"
     }

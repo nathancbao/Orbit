@@ -36,6 +36,11 @@ class PodViewModel: ObservableObject {
         do { pod = try await PodService.shared.getPod(id: podId) }
         catch { errorMessage = error.localizedDescription }
 
+        // Populate local schedule grid from backend data.
+        if let pod = pod {
+            ScheduleService.shared.populateFromBackend(podId: podId, data: pod.scheduleData)
+        }
+
         // Resolve mission mode from the pod's missionId if not already known.
         if let pod = pod {
             do {
@@ -47,14 +52,11 @@ class PodViewModel: ObservableObject {
             }
         }
 
-        // Only load chat for set mode or scheduled flex mode.
-        if !isFlexForming {
-            do { messages = try await ChatService.shared.getMessages(podId: podId) }
-            catch { /* empty messages is fine for a new pod */ }
+        do { messages = try await ChatService.shared.getMessages(podId: podId) }
+        catch { /* empty messages is fine for a new pod */ }
 
-            do { votes = try await ChatService.shared.getVotes(podId: podId) }
-            catch { /* empty votes is fine for a new pod */ }
-        }
+        do { votes = try await ChatService.shared.getVotes(podId: podId) }
+        catch { /* empty votes is fine for a new pod */ }
 
         isLoading = false
     }

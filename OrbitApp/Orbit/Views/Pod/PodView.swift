@@ -12,6 +12,7 @@ struct PodView: View {
     @State private var scheduleVM: ScheduleViewModel?
     @State private var showVoteSheet = false
     @State private var voteSheetType: String = "time"
+    @State private var showScheduleSheet = false
     @State private var showKickSheet = false
     @State private var kickTarget: PodMember?
     @State private var showRenameAlert = false
@@ -43,70 +44,97 @@ struct PodView: View {
     }
 
     var body: some View {
+        podViewWithSheets
+            .onChange(of: viewModel.didLeave) {
+                if viewModel.didLeave { dismiss() }
+            }
+            .onChange(of: viewModel.isLoading) {
+                if !viewModel.isLoading { createScheduleVMIfNeeded() }
+            }
+            .task {
+                await viewModel.load()
+                createScheduleVMIfNeeded()
+                if missionMode == .flex,
+                   let pod = viewModel.pod,
+                   pod.scheduleData?.entries[String(currentUserId)] == nil {
+                    showScheduleSheet = true
+                }
+            }
+    }
+
+    private var podViewWithSheets: some View {
+        podViewWithAlerts
+            .sheet(isPresented: $showVoteSheet) {
+                CreateVoteSheet(
+                    voteType: voteSheetType,
+                    onCreate: { options in
+                        Task { await viewModel.createVote(type: voteSheetType, options: options) }
+                        showVoteSheet = false
+                    },
+                    onCancel: { showVoteSheet = false }
+                )
+            }
+            .sheet(item: $selectedMemberProfile) { profile in
+                ProfileDisplayView(profile: profile)
+            }
+            .sheet(isPresented: $showScheduleSheet) {
+                if let pod = viewModel.pod, let svm = scheduleVM {
+                    NavigationStack {
+                        FlexPodFormingView(pod: pod, scheduleVM: svm, podVM: viewModel)
+                            .navigationTitle("Availability")
+                            .navigationBarTitleDisplayMode(.inline)
+                            .toolbar {
+                                ToolbarItem(placement: .confirmationAction) {
+                                    Button("Done") { showScheduleSheet = false }
+                                }
+                            }
+                    }
+                }
+            }
+    }
+
+    private var podViewWithAlerts: some View {
         NavigationStack {
             mainContent
                 .navigationTitle(displayTitle)
                 .navigationBarTitleDisplayMode(.inline)
                 .toolbar { toolbarContent }
-                .alert("Rename Pod", isPresented: $showRenameAlert) {
-                    TextField("Pod name", text: $renameText)
-                    Button("Save") {
-                        let trimmed = renameText.trimmingCharacters(in: .whitespaces)
-                        guard !trimmed.isEmpty else { return }
-                        Task { await viewModel.renamePod(name: trimmed) }
-                    }
-                    Button("Cancel", role: .cancel) {}
-                } message: {
-                    Text("Give your pod a name")
-                }
-                .sheet(isPresented: $showVoteSheet) {
-                    CreateVoteSheet(
-                        voteType: voteSheetType,
-                        onCreate: { options in
-                            Task { await viewModel.createVote(type: voteSheetType, options: options) }
-                            showVoteSheet = false
-                        },
-                        onCancel: { showVoteSheet = false }
-                    )
-                }
-                .alert(
-                    "Kick \(kickTarget?.name ?? "member")?",
-                    isPresented: $showKickSheet,
-                    presenting: kickTarget
-                ) { member in
-                    Button("Kick", role: .destructive) {
-                        Task { await viewModel.kickMember(userId: member.userId) }
-                    }
-                    Button("Cancel", role: .cancel) {}
-                } message: { member in
-                    Text("Your vote to kick \(member.name) will be recorded. A majority is needed to remove them.")
-                }
-                .alert("Error", isPresented: .constant(viewModel.errorMessage != nil)) {
-                    Button("OK") { viewModel.errorMessage = nil }
-                } message: {
-                    Text(viewModel.errorMessage ?? "")
-                }
-                .alert("Leave Pod?", isPresented: $showLeaveAlert) {
-                    Button("Leave", role: .destructive) {
-                        Task { await viewModel.leavePod() }
-                    }
-                    Button("Cancel", role: .cancel) {}
-                } message: {
-                    Text("You will no longer be able to see this pod's chat or votes.")
-                }
-                .onChange(of: viewModel.didLeave) {
-                    if viewModel.didLeave { dismiss() }
-                }
-                .onChange(of: viewModel.isLoading) {
-                    if !viewModel.isLoading { createScheduleVMIfNeeded() }
-                }
-                .sheet(item: $selectedMemberProfile) { profile in
-                    ProfileDisplayView(profile: profile)
-                }
-                .task {
-                    await viewModel.load()
-                    createScheduleVMIfNeeded()
-                }
+        }
+        .alert("Rename Pod", isPresented: $showRenameAlert) {
+            TextField("Pod name", text: $renameText)
+            Button("Save") {
+                let trimmed = renameText.trimmingCharacters(in: .whitespaces)
+                guard !trimmed.isEmpty else { return }
+                Task { await viewModel.renamePod(name: trimmed) }
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("Give your pod a name")
+        }
+        .alert(
+            "Kick \(kickTarget?.name ?? "member")?",
+            isPresented: $showKickSheet,
+            presenting: kickTarget
+        ) { member in
+            Button("Kick", role: .destructive) {
+                Task { await viewModel.kickMember(userId: member.userId) }
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: { member in
+            Text("Your vote to kick \(member.name) will be recorded. A majority is needed to remove them.")
+        }
+        .alert("Error", isPresented: .constant(viewModel.errorMessage != nil)) {
+            Button("OK") { viewModel.errorMessage = nil }
+        } message: {
+            Text(viewModel.errorMessage ?? "")
+        }
+        .alert("Leave Pod?", isPresented: $showLeaveAlert) {
+            Button("Leave", role: .destructive) {
+                Task { await viewModel.leavePod() }
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("You will no longer be able to see this pod's chat or votes.")
         }
     }
 
@@ -116,12 +144,7 @@ struct PodView: View {
     private var mainContent: some View {
         ZStack {
             Color(.systemGroupedBackground).ignoresSafeArea()
-
-            if viewModel.isFlexForming, let pod = viewModel.pod, let svm = scheduleVM {
-                FlexPodFormingView(pod: pod, scheduleVM: svm, podVM: viewModel)
-            } else {
-                existingChatContent
-            }
+            existingChatContent
         }
     }
 
@@ -142,9 +165,9 @@ struct PodView: View {
         }
     }
 
-    /// Lazily create ScheduleViewModel when pod loads in flex forming mode.
+    /// Lazily create ScheduleViewModel for flex mode pods.
     private func createScheduleVMIfNeeded() {
-        guard viewModel.isFlexForming, let pod = viewModel.pod, scheduleVM == nil else { return }
+        guard missionMode == .flex, let pod = viewModel.pod, scheduleVM == nil else { return }
         scheduleVM = ScheduleViewModel(
             podId: podId,
             missionId: pod.missionId,
@@ -209,6 +232,11 @@ struct PodView: View {
     private var actionBar: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 10) {
+                if missionMode == .flex {
+                    ActionChip(icon: "calendar.badge.plus", label: "Availability") {
+                        showScheduleSheet = true
+                    }
+                }
                 ActionChip(icon: "clock", label: "Vote time") {
                     voteSheetType = "time"
                     showVoteSheet = true
@@ -250,6 +278,25 @@ struct PodView: View {
         ScrollViewReader { proxy in
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 8) {
+                    // Flex scheduling hint when no messages yet
+                    if missionMode == .flex && viewModel.messages.isEmpty && !viewModel.isLoading {
+                        VStack(spacing: 8) {
+                            Image(systemName: "calendar.badge.clock")
+                                .font(.system(size: 32))
+                                .foregroundStyle(OrbitTheme.gradient)
+                            Text("Scheduling in progress")
+                                .font(.subheadline)
+                                .fontWeight(.semibold)
+                            Text("Add your availability above, then chat with your pod while you wait for others.")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                                .multilineTextAlignment(.center)
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 40)
+                        .padding(.horizontal, 24)
+                    }
+
                     ForEach(viewModel.messages) { message in
                         if message.isSystemMessage {
                             SystemMessageBubble(message: message)

@@ -6,6 +6,7 @@ from OrbitServer.models.models import (
 )
 
 
+
 def create_new_signal(data, creator_id):
     """Create and persist a signal. Returns (signal, None)."""
     signal = create_signal(data, creator_id)
@@ -108,7 +109,8 @@ def _add_member_to_pod(pod_id, user_id, max_size):
 def _resolve_pod_ids(signals, user_id):
     """Replace pod_ids list with a single pod_id for the requesting user's pod.
 
-    If the user is in a pod, sets pod_id to their specific pod.
+    If the user is in a pod, sets pod_id to their specific pod and includes
+    scheduled_time when the meeting has been confirmed.
     Otherwise, removes pod-related fields from the response.
     """
     uid = int(user_id)
@@ -118,5 +120,8 @@ def _resolve_pod_ids(signals, user_id):
         s.pop('pod_ids', None)
         if user_pod:
             s['pod_id'] = user_pod
+            pod = get_pod(user_pod)
+            if pod and pod.get('scheduled_time'):
+                s['scheduled_time'] = pod['scheduled_time']
         else:
             s.pop('pod_id', None)

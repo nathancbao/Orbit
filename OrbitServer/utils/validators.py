@@ -292,6 +292,29 @@ def validate_signal_data(data):
     return True, None
 
 
+def validate_schedule_slots(slots):
+    if not isinstance(slots, list):
+        return False, "slots must be a list"
+    for slot in slots:
+        if not isinstance(slot, dict):
+            return False, "Each slot must be an object"
+        if 'date' not in slot or not isinstance(slot.get('date'), str):
+            return False, "Each slot must have a 'date' string (YYYY-MM-DD)"
+        try:
+            datetime.date.fromisoformat(slot['date'])
+        except (ValueError, AttributeError):
+            return False, f"Invalid date: {slot.get('date')}"
+        if 'hour' not in slot:
+            return False, "Each slot must have an 'hour' integer (0-23)"
+        try:
+            h = int(slot['hour'])
+            if h < 0 or h > 23:
+                return False, f"Invalid hour: {h}. Must be 0-23"
+        except (TypeError, ValueError):
+            return False, "hour must be an integer (0-23)"
+    return True, None
+
+
 def validate_message_data(data):
     errors = []
     content = data.get('content', '')

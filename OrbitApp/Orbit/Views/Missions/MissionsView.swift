@@ -10,6 +10,8 @@ struct MissionsView: View {
     @State private var selectedMission: Mission?
     @State private var showCreate = false
     @State private var showProfile = false
+    @State private var createdFlexPodId: String? = nil
+    @State private var showCreatedFlexPod = false
 
     private let allTags = [
         "Hiking", "Gaming", "Music", "Food", "Sports",
@@ -149,9 +151,19 @@ struct MissionsView: View {
                 viewModel: viewModel,
                 onCreated: { mission in
                     viewModel.insertCreatedMission(mission)
-                    segment = .mine
+                    if mission.isFlexMode, let podId = mission.podId {
+                        createdFlexPodId = podId
+                        showCreatedFlexPod = true
+                    } else {
+                        segment = .mine
+                    }
                 }
             )
+        }
+        .sheet(isPresented: $showCreatedFlexPod) {
+            if let podId = createdFlexPodId {
+                PodView(podId: podId, title: "New Mission", missionMode: .flex)
+            }
         }
         .sheet(isPresented: $showProfile) {
             ProfileDisplayView(
@@ -290,10 +302,17 @@ struct MissionListCard: View {
                         // Flex mode info
                         HStack(spacing: 12) {
                             HStack(spacing: 4) {
-                                Image(systemName: "antenna.radiowaves.left.and.right")
-                                    .font(.caption2)
-                                Text("Flex \u{00B7} group picks time")
-                                    .font(.caption)
+                                if let confirmedTime = mission.scheduledTime {
+                                    Image(systemName: "calendar.badge.checkmark")
+                                        .font(.caption2)
+                                    Text(confirmedTime)
+                                        .font(.caption)
+                                } else {
+                                    Image(systemName: "antenna.radiowaves.left.and.right")
+                                        .font(.caption2)
+                                    Text("Flex \u{00B7} group picks time")
+                                        .font(.caption)
+                                }
                             }
                         }
                         .foregroundColor(.secondary)

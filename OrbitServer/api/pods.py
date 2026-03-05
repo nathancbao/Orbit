@@ -6,6 +6,8 @@ from OrbitServer.models.models import get_pod, update_pod
 from OrbitServer.services.pod_service import (
     get_pod_with_members, vote_to_kick, confirm_attendance, leave_pod,
 )
+from OrbitServer.services.schedule_service import submit_availability, confirm_slot
+from OrbitServer.utils.validators import validate_schedule_slots
 from OrbitServer.utils.helpers import safe_int
 
 pods_bp = Blueprint('pods', __name__, url_prefix='/api/pods')
@@ -77,3 +79,37 @@ def confirm(pod_id):
     if err:
         return error(err, status_code)
     return success({'pod': pod, 'message': "Attendance confirmed! Points awarded."})
+
+
+@pods_bp.route('/<pod_id>/schedule/availability', methods=['POST'])
+@require_auth
+def submit_schedule_availability(pod_id):
+    data = request.get_json(silent=True) or {}
+    name = data.get('name', '')
+    join_index = data.get('join_index', 0)
+    slots = data.get('slots', [])
+
+    valid, err = validate_schedule_slots(slots)
+    if not valid:
+        return error(err, 400)
+
+    pod, err = submit_availability(pod_id, g.user_id, name, join_index, slots)
+    if err:
+        return error(err, 400)
+    return success(pod)
+
+
+@pods_bp.route('/<pod_id>/schedule/confirm', methods=['POST'])
+@require_auth
+def confirm_schedule_slot(pod_id):
+    data = request.get_json(silent=True) or {}
+    date_str = data.get('date')
+    hour = data.get('hour')
+
+    if not date_str or hour is None:
+        return error("date and hour are required", 400)
+
+    pod, err = confirm_slot(pod_id, g.user_id, date_str, hour)
+    if err:
+        return error(err, 400)
+    return success(pod)

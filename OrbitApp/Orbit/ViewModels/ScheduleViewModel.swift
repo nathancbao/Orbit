@@ -64,6 +64,13 @@ class ScheduleViewModel: ObservableObject {
             startDate: startDate
         )
 
+        // Register the current user immediately so they appear in the legend
+        // before they've saved any slots. Join index 0 is a safe default;
+        // saveAvailability() will recompute the correct index from pod.memberIds.
+        if grid.entries.first(where: { $0.userId == currentUserId }) == nil {
+            grid.entryForUser(currentUserId, name: currentUserName, joinIndex: 0)
+        }
+
         // Load current user's existing slots (if they saved before)
         if let entry = grid.entries.first(where: { $0.userId == currentUserId }) {
             currentUserSlots = entry.slots

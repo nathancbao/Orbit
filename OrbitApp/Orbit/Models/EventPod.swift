@@ -12,6 +12,7 @@ struct Pod: Codable, Identifiable {
     var confirmedAttendees: [Int]
     var members: [PodMember]?   // Enriched — only present in GET /pods/<id>
     var missionTitle: String?   // Enriched — present in GET /users/me/pods
+    var scheduleData: PodScheduleData?  // Availability grid entries from backend
 
     // ── Local-only schedule fields (not from API — TODO: migrate to backend) ──
     var confirmedTime: Date?
@@ -36,6 +37,7 @@ struct Pod: Codable, Identifiable {
         case confirmedAttendees = "confirmed_attendees"
         case members
         case missionTitle = "mission_title"
+        case scheduleData = "schedule_data"
     }
 
     init(from decoder: Decoder) throws {
@@ -56,6 +58,7 @@ struct Pod: Codable, Identifiable {
         confirmedAttendees = (try? container.decode([Int].self, forKey: .confirmedAttendees)) ?? []
         members = try? container.decodeIfPresent([PodMember].self, forKey: .members)
         missionTitle = try? container.decodeIfPresent(String.self, forKey: .missionTitle)
+        scheduleData = try? container.decodeIfPresent(PodScheduleData.self, forKey: .scheduleData)
 
         // Local-only fields — not decoded from API
         confirmedTime = nil
@@ -71,6 +74,30 @@ struct Pod: Codable, Identifiable {
         status == "open" || status == "full"
     }
 }
+
+// MARK: - Pod Schedule Data
+
+struct PodScheduleData: Codable {
+    var entries: [String: PodScheduleEntry]
+}
+
+struct PodScheduleEntry: Codable {
+    var slots: [PodTimeSlot]
+    var name: String
+    var joinIndex: Int
+
+    enum CodingKeys: String, CodingKey {
+        case slots, name
+        case joinIndex = "join_index"
+    }
+}
+
+struct PodTimeSlot: Codable {
+    var date: String  // "YYYY-MM-DD"
+    var hour: Int
+}
+
+// MARK: - Pod Member
 
 struct PodMember: Codable, Identifiable {
     var userId: Int

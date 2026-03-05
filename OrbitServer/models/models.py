@@ -237,6 +237,7 @@ def create_pod(mission_id, max_size=4, first_member_id=None):
         'scheduled_place': None,
         'confirmed_attendees': [],
         'kick_votes': {},
+        'schedule_data': {'entries': {}},
         'created_at': now,
         'expires_at': now + datetime.timedelta(days=2),
     })
@@ -263,7 +264,7 @@ def update_pod(pod_id, data):
         return None
     allowed = [
         'member_ids', 'status', 'scheduled_time', 'scheduled_place',
-        'confirmed_attendees', 'kick_votes', 'expires_at', 'name',
+        'confirmed_attendees', 'kick_votes', 'expires_at', 'name', 'schedule_data',
     ]
     for field in allowed:
         if field in data:
@@ -646,6 +647,7 @@ def create_signal_pod(pod_id, signal_id, max_size=6, first_member_id=None):
         'scheduled_place': None,
         'confirmed_attendees': [],
         'kick_votes': {},
+        'schedule_data': {'entries': {}},
         'created_at': now,
         'expires_at': now + datetime.timedelta(days=2),
     })

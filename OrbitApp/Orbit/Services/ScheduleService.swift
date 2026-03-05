@@ -3,7 +3,7 @@
 //  Orbit
 //
 //  Local-first schedule management for flex mode pods.
-//  In-memory storage with TODO stubs for backend API endpoints.
+//  In-memory grid as cache, synced to backend via API calls.
 //
 
 import Foundation
@@ -13,7 +13,6 @@ class ScheduleService {
     private init() {}
 
     /// In-memory grids keyed by podId.
-    /// TODO: Replace with API calls when backend supports schedule grids.
     private var grids: [String: ScheduleGrid] = [:]
 
     // MARK: - Get / Create Grid
@@ -40,10 +39,61 @@ class ScheduleService {
         grids[podId]
     }
 
+    // MARK: - Populate from Backend
+
+    /// Merge backend schedule_data into the local in-memory grid.
+    /// Called after a pod loads. Preserves any unsaved local selections.
+    func populateFromBackend(podId: String, data: PodScheduleData?) {
+        guard let data = data, !data.entries.isEmpty else { return }
+
+        // Parse the earliest date across all entries to anchor the grid
+        let dateFormatter = DateFormatter()
+        dateFormatter.dateFormat = "yyyy-MM-dd"
+        dateFormatter.locale = Locale(identifier: "en_US_POSIX")
+
+        var allDates: [Date] = []
+        for entry in data.entries.values {
+            for slot in entry.slots {
+                if let d = dateFormatter.date(from: slot.date) {
+                    allDates.append(d)
+                }
+            }
+        }
+
+        let cal = Calendar.current
+        let startDate = allDates.min().map { cal.startOfDay(for: $0) } ?? cal.startOfDay(for: Date())
+        let endDate = cal.date(byAdding: .day, value: 9, to: startDate) ?? startDate
+
+        var grid = grids[podId] ?? ScheduleGrid(
+            missionId: "",
+            podId: podId,
+            startDate: startDate,
+            endDate: endDate,
+            entries: []
+        )
+
+        // Merge backend entries — overwrite existing entries from backend,
+        // but keep any local-only entry not yet on the backend.
+        for (userIdStr, backendEntry) in data.entries {
+            guard let userId = Int(userIdStr) else { continue }
+            // Convert PodTimeSlot → TimeSlot
+            var slots = Set<TimeSlot>()
+            for podSlot in backendEntry.slots {
+                if let date = dateFormatter.date(from: podSlot.date) {
+                    slots.insert(TimeSlot(date: date, hour: podSlot.hour))
+                }
+            }
+            let joinIndex = backendEntry.joinIndex
+            grid.entryForUser(userId, name: backendEntry.name, joinIndex: joinIndex)
+            grid.updateSlots(for: userId, slots: slots)
+        }
+
+        grids[podId] = grid
+    }
+
     // MARK: - Save Availability
 
-    /// Save a user's selected time slots.
-    /// TODO: POST /pods/{podId}/schedule/availability { user_id, slots: [{date, hour}] }
+    /// Save a user's selected time slots locally and sync to backend.
     func saveAvailability(
         podId: String,
         userId: Int,
@@ -55,19 +105,55 @@ class ScheduleService {
         grid.entryForUser(userId, name: name, joinIndex: joinIndex)
         grid.updateSlots(for: userId, slots: slots)
         grids[podId] = grid
+
+        // Build slot payload for backend
+        let dateFormatter = DateFormatter()
+        dateFormatter.dateFormat = "yyyy-MM-dd"
+        dateFormatter.locale = Locale(identifier: "en_US_POSIX")
+
+        let slotsPayload: [[String: Any]] = slots.map { slot in
+            [
+                "date": dateFormatter.string(from: slot.date),
+                "hour": slot.hour,
+            ]
+        }
+
+        Task {
+            let body: [String: Any] = [
+                "name": name,
+                "join_index": joinIndex,
+                "slots": slotsPayload,
+            ]
+            let endpoint = Constants.API.Endpoints.podScheduleAvailability(podId)
+            _ = try? await APIService.shared.request(
+                endpoint: endpoint,
+                method: "POST",
+                body: body,
+                authenticated: true
+            ) as Pod
+        }
     }
 
     // MARK: - Confirm Slot (Leader Action)
 
-    /// Record the leader's confirmed time slot.
-    /// TODO: POST /pods/{podId}/schedule/confirm { date, hour }
-    /// This should update the pod status to "meeting_confirmed" on the backend.
+    /// Record the leader's confirmed time slot locally and on backend.
     func confirmSlot(podId: String, slot: TimeSlot) {
-        // Local-only: the ViewModel handles status transitions.
-        // When backend is ready, this would:
-        // 1. POST to backend
-        // 2. Backend updates pod.status → "meeting_confirmed"
-        // 3. Backend sets pod.scheduledTime
+        let dateFormatter = DateFormatter()
+        dateFormatter.dateFormat = "yyyy-MM-dd"
+        dateFormatter.locale = Locale(identifier: "en_US_POSIX")
+
+        let body: [String: Any] = [
+            "date": dateFormatter.string(from: slot.date),
+            "hour": slot.hour,
+        ]
+        Task {
+            _ = try? await APIService.shared.request(
+                endpoint: Constants.API.Endpoints.podScheduleConfirm(podId),
+                method: "POST",
+                body: body,
+                authenticated: true
+            ) as Pod
+        }
     }
 
     // MARK: - Clear

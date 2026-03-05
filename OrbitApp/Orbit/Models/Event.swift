@@ -58,6 +58,7 @@ struct Mission: Codable, Identifiable {
     var links: [String]?
     var signalStatus: SignalStatus?  // pending | active (flex mode status)
     var podId: String?              // user's pod from RSVP (flex mode)
+    var scheduledTime: String?      // confirmed meeting time (flex mode, set by leader)
     var createdAt: String?
 
     // ── CodingKeys ──────────────────────────────────────────────────────
@@ -83,6 +84,7 @@ struct Mission: Codable, Identifiable {
         case links
         case signalStatus       = "signal_status"
         case podId              = "pod_id"
+        case scheduledTime      = "scheduled_time"
         case createdAt          = "created_at"
     }
 
@@ -122,6 +124,7 @@ struct Mission: Codable, Identifiable {
         links             = try? c.decode([String].self, forKey: .links)
         signalStatus      = try? c.decode(SignalStatus.self, forKey: .signalStatus)
         podId             = try? c.decode(String.self, forKey: .podId)
+        scheduledTime     = try? c.decode(String.self, forKey: .scheduledTime)
         createdAt         = try? c.decode(String.self, forKey: .createdAt)
     }
 
@@ -155,6 +158,7 @@ struct Mission: Codable, Identifiable {
         links: [String]? = nil,
         signalStatus: SignalStatus? = nil,
         podId: String? = nil,
+        scheduledTime: String? = nil,
         createdAt: String? = nil
     ) {
         self.id = id
@@ -184,6 +188,7 @@ struct Mission: Codable, Identifiable {
         self.links = links
         self.signalStatus = signalStatus
         self.podId = podId
+        self.scheduledTime = scheduledTime
         self.createdAt = createdAt
     }
 
@@ -280,6 +285,7 @@ struct Mission: Codable, Identifiable {
             links: signal.links,
             signalStatus: signal.status,
             podId: signal.podId,
+            scheduledTime: signal.scheduledTime,
             createdAt: signal.createdAt
         )
     }
