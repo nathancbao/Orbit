@@ -66,6 +66,12 @@ struct MissionDetailView: View {
     @State private var localToast = false
     @State private var joinedPodId: String?
     @State private var showPod = false
+
+    // Member profiles
+    @State private var podMembers: [PodMember] = []
+    @State private var selectedMemberForPreview: PodMember?
+    @State private var selectedMemberProfile: Profile?
+
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
@@ -117,12 +123,23 @@ struct MissionDetailView: View {
                 PodView(podId: podId, title: mission.displayTitle, missionMode: mission.mode)
             }
         }
+        .sheet(item: $selectedMemberForPreview) { member in
+            MemberPreviewSheet(member: member)
+                .presentationDetents([.medium])
+        }
+        .sheet(item: $selectedMemberProfile) { profile in
+            ProfileDisplayView(profile: profile)
+        }
         .onAppear {
-            if mission.isFlexMode, let podId = mission.podId {
-                showSignedUp = true
-                joinedPodId = podId
+            if mission.isFlexMode {
+                let resolvedPodId = mission.userPodId ?? mission.podId ?? mission.pods?.first?.podId
+                if let podId = resolvedPodId {
+                    showSignedUp = true
+                    joinedPodId = podId
+                }
             }
         }
+        .task { await fetchPodMembers() }
     }
 
     // MARK: - Set Mode Content (unchanged)
@@ -176,6 +193,14 @@ struct MissionDetailView: View {
                 Divider()
 
                 MissionPodStatusSection(mission: mission)
+
+                if !podMembers.isEmpty {
+                    MissionMemberSection(
+                        members: podMembers,
+                        isInPod: isInPod,
+                        onTapMember: handleMemberTap
+                    )
+                }
 
                 if let error = errorMessage {
                     Text(error)
@@ -367,6 +392,14 @@ struct MissionDetailView: View {
                         }
                     }
 
+                    if !podMembers.isEmpty {
+                        MissionMemberSection(
+                            members: podMembers,
+                            isInPod: isInPod,
+                            onTapMember: handleMemberTap
+                        )
+                    }
+
                     Spacer(minLength: 80)
                 }
                 .padding(.horizontal, 24)
@@ -489,6 +522,124 @@ struct MissionDetailView: View {
                 joinedPod = pod
             }
         }
+    }
+
+    // MARK: - Member Fetching
+
+    private func fetchPodMembers() async {
+        // Unified fallback: user's pod → mission-level podId → first pod from list
+        let targetPodId = mission.userPodId ?? mission.podId ?? mission.pods?.first?.podId
+        guard let podId = targetPodId else { return }
+        if let pod = try? await PodService.shared.getPod(id: podId) {
+            podMembers = pod.members ?? []
+        }
+    }
+
+    private var isInPod: Bool {
+        mission.userPodStatus == "in_pod"
+    }
+
+    private func handleMemberTap(_ member: PodMember) {
+        if isInPod {
+            // Full profile for pod members
+            Task {
+                if let profile = try? await ProfileService.shared.getUserProfile(id: member.userId) {
+                    selectedMemberProfile = profile
+                }
+            }
+        } else {
+            // Limited preview for non-members
+            selectedMemberForPreview = member
+        }
+    }
+}
+
+// MARK: - Mission Member Section
+
+struct MissionMemberSection: View {
+    let members: [PodMember]
+    let isInPod: Bool
+    let onTapMember: (PodMember) -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Text("members")
+                    .font(.headline)
+                Spacer()
+                Text("\(members.count)")
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
+            }
+
+            if members.isEmpty {
+                Text("No members yet")
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
+            } else {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 16) {
+                        ForEach(members) { member in
+                            Button { onTapMember(member) } label: {
+                                VStack(spacing: 6) {
+                                    ProfileAvatarView(photo: member.photo, size: 44)
+                                    Text(member.name.components(separatedBy: " ").first ?? member.name)
+                                        .font(.caption)
+                                        .foregroundColor(.primary)
+                                        .lineLimit(1)
+                                    if !member.collegeYear.isEmpty {
+                                        Text(member.collegeYear)
+                                            .font(.caption2)
+                                            .foregroundColor(.secondary)
+                                    }
+                                }
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+// MARK: - Member Preview Sheet (limited profile for non-pod browsers)
+
+struct MemberPreviewSheet: View {
+    let member: PodMember
+
+    var body: some View {
+        VStack(spacing: 20) {
+            ProfileAvatarView(photo: member.photo, size: 80)
+
+            Text(member.name)
+                .font(.title2)
+                .fontWeight(.bold)
+
+            if !member.collegeYear.isEmpty {
+                Text(member.collegeYear)
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
+            }
+
+            if !member.interests.isEmpty {
+                FlowLayout(spacing: 8) {
+                    ForEach(member.interests, id: \.self) { interest in
+                        Text(interest)
+                            .font(.caption)
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 6)
+                            .background(OrbitTheme.purple.opacity(0.12))
+                            .clipShape(Capsule())
+                            .foregroundColor(OrbitTheme.purple)
+                    }
+                }
+            }
+
+            Spacer()
+        }
+        .padding(.top, 32)
+        .padding(.horizontal, 24)
     }
 }
 

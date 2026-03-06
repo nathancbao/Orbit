@@ -287,6 +287,7 @@ final class MissionModelTests: XCTestCase {
             creatorId: 42,
             createdAt: "2026-03-01",
             podId: nil,
+            scheduledTime: nil,
             links: ["https://example.com"],
             timeRangeStart: 9,
             timeRangeEnd: 17
@@ -383,6 +384,56 @@ final class MissionModelTests: XCTestCase {
 
         let pod = try! JSONDecoder().decode(PodSummary.self, from: json)
         XCTAssertEqual(pod.spotsLeft, 0)
+    }
+
+    // MARK: - MemberPreview Tests
+
+    func testMemberPreviewDecoding() throws {
+        let json = """
+        {"user_id": 42, "name": "Alice", "photo": "https://example.com/photo.jpg"}
+        """.data(using: .utf8)!
+        let member = try JSONDecoder().decode(MemberPreview.self, from: json)
+        XCTAssertEqual(member.userId, 42)
+        XCTAssertEqual(member.name, "Alice")
+        XCTAssertEqual(member.photo, "https://example.com/photo.jpg")
+        XCTAssertEqual(member.id, 42)
+    }
+
+    func testMemberPreviewDecodingWithoutPhoto() throws {
+        let json = """
+        {"user_id": 7, "name": "Bob"}
+        """.data(using: .utf8)!
+        let member = try JSONDecoder().decode(MemberPreview.self, from: json)
+        XCTAssertEqual(member.userId, 7)
+        XCTAssertEqual(member.name, "Bob")
+        XCTAssertNil(member.photo)
+    }
+
+    func testPodSummaryWithMemberPreviews() throws {
+        let json = """
+        {
+            "pod_id": "p1",
+            "member_count": 3,
+            "max_size": 4,
+            "status": "open",
+            "member_previews": [
+                {"user_id": 1, "name": "Alice", "photo": "https://example.com/a.jpg"},
+                {"user_id": 2, "name": "Bob"}
+            ]
+        }
+        """.data(using: .utf8)!
+        let pod = try JSONDecoder().decode(PodSummary.self, from: json)
+        XCTAssertEqual(pod.memberPreviews?.count, 2)
+        XCTAssertEqual(pod.memberPreviews?[0].name, "Alice")
+        XCTAssertNil(pod.memberPreviews?[1].photo)
+    }
+
+    func testPodSummaryWithoutMemberPreviews() throws {
+        let json = """
+        {"pod_id": "p2", "member_count": 2, "max_size": 4, "status": "open"}
+        """.data(using: .utf8)!
+        let pod = try JSONDecoder().decode(PodSummary.self, from: json)
+        XCTAssertNil(pod.memberPreviews)
     }
 
     // MARK: - Helpers

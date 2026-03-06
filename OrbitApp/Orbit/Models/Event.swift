@@ -298,13 +298,15 @@ struct PodSummary: Codable {
     var memberCount: Int
     var maxSize: Int
     var status: String
+    var memberPreviews: [MemberPreview]?
 
     var spotsLeft: Int { max(0, maxSize - memberCount) }
 
     enum CodingKeys: String, CodingKey {
-        case podId       = "pod_id"
-        case memberCount = "member_count"
-        case maxSize     = "max_size"
+        case podId           = "pod_id"
+        case memberCount     = "member_count"
+        case maxSize         = "max_size"
         case status
+        case memberPreviews  = "member_previews"
     }
 }

@@ -97,6 +97,22 @@ struct PodTimeSlot: Codable {
     var hour: Int
 }
 
+// MARK: - Member Preview (lightweight, for mission cards)
+
+struct MemberPreview: Codable, Identifiable {
+    var userId: Int
+    var name: String
+    var photo: String?
+
+    var id: Int { userId }
+
+    enum CodingKeys: String, CodingKey {
+        case userId = "user_id"
+        case name
+        case photo
+    }
+}
+
 // MARK: - Pod Member
 
 struct PodMember: Codable, Identifiable {

@@ -302,4 +302,145 @@ final class ScheduleGridTests: XCTestCase {
         XCTAssertNotEqual(FlexPodPhase.locked(hasOverlap: true), FlexPodPhase.locked(hasOverlap: false))
         XCTAssertNotEqual(FlexPodPhase.forming, FlexPodPhase.dissolved)
     }
+
+    // MARK: - Drag Interaction (ScheduleViewModel)
+
+    private func makeScheduleVM() -> ScheduleViewModel {
+        ScheduleViewModel(
+            podId: "pod-1",
+            missionId: "mission-1",
+            currentUserId: 1,
+            currentUserName: "Alice",
+            startDate: makeDate(day: 1)
+        )
+    }
+
+    func testBeginDragOnEmptyCellSelectsMode() async {
+        let vm = makeScheduleVM()
+        let slot = makeSlot(day: 3, hour: 14)
+        XCTAssertFalse(vm.currentUserSlots.contains(slot))
+
+        vm.beginDrag(at: slot)
+
+        XCTAssertTrue(vm.isDragging)
+        XCTAssertEqual(vm.dragMode, .selecting)
+        XCTAssertTrue(vm.currentUserSlots.contains(slot))
+    }
+
+    func testBeginDragOnFilledCellDeselectsMode() async {
+        let vm = makeScheduleVM()
+        let slot = makeSlot(day: 3, hour: 14)
+        vm.currentUserSlots.insert(slot)
+
+        vm.beginDrag(at: slot)
+
+        XCTAssertTrue(vm.isDragging)
+        XCTAssertEqual(vm.dragMode, .deselecting)
+        XCTAssertFalse(vm.currentUserSlots.contains(slot))
+    }
+
+    func testContinueDragAppliesCorrectMode() async {
+        let vm = makeScheduleVM()
+        let slotA = makeSlot(day: 3, hour: 14)
+        let slotB = makeSlot(day: 3, hour: 15)
+        let slotC = makeSlot(day: 3, hour: 16)
+
+        // Start selecting
+        vm.beginDrag(at: slotA)
+        XCTAssertEqual(vm.dragMode, .selecting)
+
+        vm.continueDrag(over: slotB)
+        vm.continueDrag(over: slotC)
+
+        XCTAssertTrue(vm.currentUserSlots.contains(slotA))
+        XCTAssertTrue(vm.currentUserSlots.contains(slotB))
+        XCTAssertTrue(vm.currentUserSlots.contains(slotC))
+    }
+
+    func testEndDragResetsState() async {
+        let vm = makeScheduleVM()
+        let slot = makeSlot(day: 3, hour: 14)
+
+        vm.beginDrag(at: slot)
+        XCTAssertTrue(vm.isDragging)
+
+        vm.endDrag()
+        XCTAssertFalse(vm.isDragging)
+    }
+
+    func testDragModeLockedForEntireGesture() async {
+        let vm = makeScheduleVM()
+        let emptySlot = makeSlot(day: 3, hour: 14)
+        let filledSlot = makeSlot(day: 3, hour: 15)
+        vm.currentUserSlots.insert(filledSlot)
+
+        // Begin on empty → selecting mode
+        vm.beginDrag(at: emptySlot)
+        XCTAssertEqual(vm.dragMode, .selecting)
+
+        // Continue over filled slot — should still ADD (not switch to deselecting)
+        vm.continueDrag(over: filledSlot)
+        XCTAssertTrue(vm.currentUserSlots.contains(filledSlot), "Selecting mode should keep filled slot")
+        XCTAssertTrue(vm.currentUserSlots.contains(emptySlot))
+    }
+
+    func testToggleSlotWorks() async {
+        let vm = makeScheduleVM()
+        let slot = makeSlot(day: 3, hour: 14)
+
+        XCTAssertFalse(vm.currentUserSlots.contains(slot))
+        vm.toggleSlot(slot)
+        XCTAssertTrue(vm.currentUserSlots.contains(slot))
+        vm.toggleSlot(slot)
+        XCTAssertFalse(vm.currentUserSlots.contains(slot))
+    }
+
+    // MARK: - Save / Load (ScheduleService)
+
+    func testSaveAvailabilityPersistsLocally() async {
+        let slots: Set<TimeSlot> = [makeSlot(day: 3, hour: 14), makeSlot(day: 3, hour: 15)]
+        ScheduleService.shared.saveAvailability(
+            podId: "test-save-pod",
+            userId: 99,
+            name: "Tester",
+            joinIndex: 0,
+            slots: slots
+        )
+        let grid = ScheduleService.shared.getGrid(podId: "test-save-pod", missionId: "m1", startDate: makeDate(day: 1))
+        let entry = grid.entries.first(where: { $0.userId == 99 })
+        XCTAssertNotNil(entry)
+        XCTAssertEqual(entry?.slots.count, 2)
+        XCTAssertTrue(entry?.hasSubmitted == true)
+        // Cleanup
+        ScheduleService.shared.clearGrid(podId: "test-save-pod")
+    }
+
+    func testScheduleVMLoadsPreExistingSlots() async {
+        let slots: Set<TimeSlot> = [makeSlot(day: 3, hour: 10), makeSlot(day: 4, hour: 11)]
+        ScheduleService.shared.saveAvailability(
+            podId: "test-preload-pod",
+            userId: 1,
+            name: "Alice",
+            joinIndex: 0,
+            slots: slots
+        )
+        let vm = ScheduleViewModel(
+            podId: "test-preload-pod",
+            missionId: "m1",
+            currentUserId: 1,
+            currentUserName: "Alice",
+            startDate: makeDate(day: 1)
+        )
+        XCTAssertEqual(vm.currentUserSlots.count, 2)
+        XCTAssertTrue(vm.currentUserSlots.contains(makeSlot(day: 3, hour: 10)))
+        // Cleanup
+        ScheduleService.shared.clearGrid(podId: "test-preload-pod")
+    }
+
+    func testHasSubmittedReflectsSlotState() async {
+        let entry1 = makeEntry(userId: 1, name: "A", index: 0, slots: [makeSlot(day: 1, hour: 10)])
+        let entry2 = makeEntry(userId: 2, name: "B", index: 1, slots: [])
+        XCTAssertTrue(entry1.hasSubmitted)
+        XCTAssertFalse(entry2.hasSubmitted)
+    }
 }

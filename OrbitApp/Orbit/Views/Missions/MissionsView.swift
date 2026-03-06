@@ -393,6 +393,9 @@ struct MissionListCard: View {
                             }
                         }
                     }
+
+                    // Member avatars (shared for both modes)
+                    memberAvatarsRow
                 }
 
                 Spacer()
@@ -407,6 +410,52 @@ struct MissionListCard: View {
             .shadow(color: .black.opacity(0.06), radius: 8, x: 0, y: 2)
         }
         .buttonStyle(.plain)
+    }
+
+    // MARK: - Member Avatars Row
+
+    private var memberAvatarsRow: some View {
+        let previews = allMemberPreviews
+        let memberCount = totalMemberCount
+        let maxSize = mission.maxPodSize
+
+        return Group {
+            if memberCount > 0 {
+                HStack(spacing: 4) {
+                    // Overlapping avatar stack
+                    HStack(spacing: -8) {
+                        ForEach(Array(previews.prefix(5).enumerated()), id: \.element.id) { index, member in
+                            ProfileAvatarView(photo: member.photo, size: 24)
+                                .zIndex(Double(5 - index))
+                        }
+                    }
+
+                    if previews.count > 5 {
+                        Text("+\(previews.count - 5)")
+                            .font(.caption2)
+                            .foregroundColor(.secondary)
+                    }
+
+                    Text("\(memberCount)/\(maxSize) members")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+            }
+        }
+    }
+
+    private var allMemberPreviews: [MemberPreview] {
+        if let pods = mission.pods {
+            return pods.compactMap(\.memberPreviews).flatMap { $0 }
+        }
+        return []
+    }
+
+    private var totalMemberCount: Int {
+        if let pods = mission.pods {
+            return pods.reduce(0) { $0 + $1.memberCount }
+        }
+        return 0
     }
 }
 
@@ -599,6 +648,9 @@ struct MissionCreateView: View {
     @State private var link1 = ""
     @State private var link2 = ""
 
+    // Creator availability (flex mode — filled during creation)
+    @State private var creatorSlots: Set<TimeSlot> = []
+
     @State private var isSubmitting = false
     @State private var errorMessage: String?
 
@@ -632,6 +684,7 @@ struct MissionCreateView: View {
             if selectedCategory == .custom && customActivityName.trimmingCharacters(in: .whitespaces).isEmpty {
                 return false
             }
+            if creatorSlots.isEmpty { return false }
             return true
         }
     }
@@ -832,6 +885,33 @@ struct MissionCreateView: View {
 
             // Links
             linksSection
+
+            // Creator availability grid
+            VStack(alignment: .leading, spacing: 12) {
+                OrbitSectionHeader(title: "When are you free?")
+                Text("Select the hours you're available — your pod will coordinate around this")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+
+                CreatorAvailabilityGridView(
+                    selectedSlots: $creatorSlots,
+                    startDate: Date(),
+                    memberColor: MemberColor.pink.color
+                )
+                .frame(height: 520)
+
+                HStack {
+                    Text("\(creatorSlots.count) hour\(creatorSlots.count == 1 ? "" : "s") selected")
+                        .font(.caption)
+                        .foregroundColor(creatorSlots.isEmpty ? .red : .secondary)
+                    Spacer()
+                    if !creatorSlots.isEmpty {
+                        Button("Clear") { creatorSlots.removeAll() }
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                }
+            }
         }
     }
 
@@ -1197,6 +1277,7 @@ struct MissionCreateView: View {
             timeBlocks: TimeBlock.allCases,
             hours: []
         )
+        let slotsToSave = creatorSlots
         Task {
             if let created = await viewModel.createFlexMission(
                 title: title.trimmingCharacters(in: .whitespaces),
@@ -1208,6 +1289,18 @@ struct MissionCreateView: View {
                 description: description.trimmingCharacters(in: .whitespaces),
                 links: linksArray
             ) {
+                // Save creator availability to ScheduleService so PodView loads it pre-populated
+                if let podId = created.podId, !slotsToSave.isEmpty {
+                    let userId = UserDefaults.standard.integer(forKey: "orbit_user_id")
+                    let userName = UserDefaults.standard.string(forKey: "orbit_user_name") ?? "You"
+                    ScheduleService.shared.saveAvailability(
+                        podId: podId,
+                        userId: userId,
+                        name: userName,
+                        joinIndex: 0,
+                        slots: slotsToSave
+                    )
+                }
                 onCreated?(created)
                 dismiss()
             } else {

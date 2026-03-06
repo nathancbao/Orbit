@@ -101,7 +101,16 @@ class ScheduleService {
         joinIndex: Int,
         slots: Set<TimeSlot>
     ) {
-        guard var grid = grids[podId] else { return }
+        var grid: ScheduleGrid
+        if let existing = grids[podId] {
+            grid = existing
+        } else {
+            // Auto-create grid (e.g. creator saving availability before PodView loads)
+            let cal = Calendar.current
+            let start = cal.startOfDay(for: Date())
+            let end = cal.date(byAdding: .day, value: 9, to: start)!
+            grid = ScheduleGrid(missionId: "", podId: podId, startDate: start, endDate: end, entries: [])
+        }
         grid.entryForUser(userId, name: name, joinIndex: joinIndex)
         grid.updateSlots(for: userId, slots: slots)
         grids[podId] = grid

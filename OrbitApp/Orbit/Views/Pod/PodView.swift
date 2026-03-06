@@ -56,7 +56,9 @@ struct PodView: View {
                 createScheduleVMIfNeeded()
                 if missionMode == .flex,
                    let pod = viewModel.pod,
-                   pod.scheduleData?.entries[String(currentUserId)] == nil {
+                   pod.scheduleData?.entries[String(currentUserId)] == nil,
+                   ScheduleService.shared.existingGrid(podId: podId)?
+                       .entries.first(where: { $0.userId == currentUserId })?.hasSubmitted != true {
                     showScheduleSheet = true
                 }
             }
