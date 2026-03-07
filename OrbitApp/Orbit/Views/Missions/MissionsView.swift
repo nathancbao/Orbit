@@ -70,7 +70,7 @@ struct MissionsView: View {
                             }
 
                             // Missions List
-                            if viewModel.isLoading {
+                            if viewModel.isLoading && viewModel.allMissions.isEmpty && viewModel.allFlexMissions.isEmpty {
                                 HStack { Spacer(); ProgressView(); Spacer() }
                                     .padding(.vertical, 40)
                             } else {
@@ -142,8 +142,10 @@ struct MissionsView: View {
         }
         .sheet(item: $selectedMission) { mission in
             MissionDetailView(mission: mission, onJoined: {
-                Task { await viewModel.reload() }
                 selectedMission = nil
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                    Task { await viewModel.reload() }
+                }
             })
         }
         .sheet(isPresented: $showCreate) {

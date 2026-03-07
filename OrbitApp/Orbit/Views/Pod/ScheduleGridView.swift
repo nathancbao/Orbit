@@ -64,7 +64,7 @@ struct ScheduleGridView: View {
     // MARK: - Grid Content
 
     private var gridContent: some View {
-        ScrollView([.horizontal, .vertical], showsIndicators: true) {
+        ScrollView(.vertical, showsIndicators: true) {
             VStack(spacing: 0) {
                 // Day column headers
                 dayHeaders
@@ -122,7 +122,8 @@ struct ScheduleGridView: View {
             ForEach(viewModel.grid.dates, id: \.self) { date in
                 let slot = TimeSlot(date: date, hour: hour)
                 cellView(for: slot)
-                    .frame(width: 48, height: cellHeight)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: cellHeight)
                     .background(
                         GeometryReader { proxy in
                             Color.clear.preference(
@@ -366,7 +367,7 @@ struct CreatorAvailabilityGridView: View {
     }
 
     var body: some View {
-        ScrollView([.horizontal, .vertical], showsIndicators: true) {
+        ScrollView(.vertical, showsIndicators: true) {
             VStack(spacing: 0) {
                 dayHeaders
                 ForEach(Array(ScheduleGrid.hourRange), id: \.self) { hour in
@@ -419,7 +420,8 @@ struct CreatorAvailabilityGridView: View {
                 let isSelected = selectedSlots.contains(slot)
                 RoundedRectangle(cornerRadius: 4)
                     .fill(isSelected ? memberColor.opacity(0.6) : Color(.systemGray5))
-                    .frame(width: 48, height: cellHeight)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: cellHeight)
                     .background(
                         GeometryReader { proxy in
                             Color.clear.preference(

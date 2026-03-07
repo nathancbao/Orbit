@@ -18,7 +18,7 @@ struct PodsView: View {
             ZStack {
                 Color(.systemBackground).ignoresSafeArea()
 
-                if isLoading {
+                if isLoading && pods.isEmpty && rsvpedSignals.isEmpty {
                     ProgressView()
                         .tint(OrbitTheme.purple)
                         .frame(maxWidth: .infinity, maxHeight: .infinity)

@@ -77,6 +77,29 @@ class ScheduleViewModel: ObservableObject {
         }
     }
 
+    // MARK: - Reload Grid from Service
+
+    /// Re-read the grid from ScheduleService to pick up newly populated backend data.
+    func reloadGrid() {
+        let freshGrid = ScheduleService.shared.getGrid(
+            podId: podId,
+            missionId: missionId,
+            startDate: grid.startDate
+        )
+        grid = freshGrid
+        print("[Schedule] reloadGrid: \(grid.entries.count) entries: \(grid.entries.map { "\($0.userId):\($0.slots.count)slots" })")
+
+        // Re-register current user if absent (e.g., first time before save)
+        if grid.entries.first(where: { $0.userId == currentUserId }) == nil {
+            grid.entryForUser(currentUserId, name: currentUserName, joinIndex: 0)
+        }
+
+        // Merge live unsaved selections with backend data
+        if let entry = grid.entries.first(where: { $0.userId == currentUserId }) {
+            currentUserSlots = currentUserSlots.union(entry.slots)
+        }
+    }
+
     // MARK: - Grid Interaction (Single Tap)
 
     func toggleSlot(_ slot: TimeSlot) {
@@ -129,9 +152,13 @@ class ScheduleViewModel: ObservableObject {
             userId: currentUserId,
             name: currentUserName,
             joinIndex: joinIndex,
-            slots: currentUserSlots
+            slots: currentUserSlots,
+            onServerSync: { [weak self] in
+                // Backend responded with all members' data — refresh grid
+                self?.reloadGrid()
+            }
         )
-        // Refresh grid from service
+        // Refresh grid from service (immediate local update)
         grid = ScheduleService.shared.getGrid(podId: podId, missionId: missionId, startDate: grid.startDate)
         // Recompute phase
         computePhase(pod: pod)

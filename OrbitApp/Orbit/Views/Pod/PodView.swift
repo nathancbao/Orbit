@@ -49,7 +49,10 @@ struct PodView: View {
                 if viewModel.didLeave { dismiss() }
             }
             .onChange(of: viewModel.isLoading) {
-                if !viewModel.isLoading { createScheduleVMIfNeeded() }
+                if !viewModel.isLoading {
+                    createScheduleVMIfNeeded()
+                    scheduleVM?.reloadGrid()
+                }
             }
             .task {
                 await viewModel.load()

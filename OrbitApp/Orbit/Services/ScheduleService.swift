@@ -44,7 +44,11 @@ class ScheduleService {
     /// Merge backend schedule_data into the local in-memory grid.
     /// Called after a pod loads. Preserves any unsaved local selections.
     func populateFromBackend(podId: String, data: PodScheduleData?) {
-        guard let data = data, !data.entries.isEmpty else { return }
+        print("[Schedule] populateFromBackend podId=\(podId) entryCount=\(data?.entries.count ?? 0)")
+        guard let data = data, !data.entries.isEmpty else {
+            print("[Schedule] populateFromBackend: no data or empty entries — skipping")
+            return
+        }
 
         // Parse the earliest date across all entries to anchor the grid
         let dateFormatter = DateFormatter()
@@ -75,6 +79,7 @@ class ScheduleService {
         // Merge backend entries — overwrite existing entries from backend,
         // but keep any local-only entry not yet on the backend.
         for (userIdStr, backendEntry) in data.entries {
+            print("[Schedule]   user \(userIdStr): \(backendEntry.slots.count) slots, name=\(backendEntry.name)")
             guard let userId = Int(userIdStr) else { continue }
             // Convert PodTimeSlot → TimeSlot
             var slots = Set<TimeSlot>()
@@ -94,12 +99,15 @@ class ScheduleService {
     // MARK: - Save Availability
 
     /// Save a user's selected time slots locally and sync to backend.
+    /// The `onServerSync` callback fires on the main thread after the backend
+    /// responds, allowing the caller to refresh its grid with all members' data.
     func saveAvailability(
         podId: String,
         userId: Int,
         name: String,
         joinIndex: Int,
-        slots: Set<TimeSlot>
+        slots: Set<TimeSlot>,
+        onServerSync: (() -> Void)? = nil
     ) {
         var grid: ScheduleGrid
         if let existing = grids[podId] {
@@ -134,12 +142,16 @@ class ScheduleService {
                 "slots": slotsPayload,
             ]
             let endpoint = Constants.API.Endpoints.podScheduleAvailability(podId)
-            _ = try? await APIService.shared.request(
+            if let updatedPod = try? await APIService.shared.request(
                 endpoint: endpoint,
                 method: "POST",
                 body: body,
                 authenticated: true
-            ) as Pod
+            ) as Pod {
+                // Merge all members' schedule data from server response
+                self.populateFromBackend(podId: podId, data: updatedPod.scheduleData)
+                await MainActor.run { onServerSync?() }
+            }
         }
     }
 

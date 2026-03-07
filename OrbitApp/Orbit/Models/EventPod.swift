@@ -58,7 +58,13 @@ struct Pod: Codable, Identifiable {
         confirmedAttendees = (try? container.decode([Int].self, forKey: .confirmedAttendees)) ?? []
         members = try? container.decodeIfPresent([PodMember].self, forKey: .members)
         missionTitle = try? container.decodeIfPresent(String.self, forKey: .missionTitle)
-        scheduleData = try? container.decodeIfPresent(PodScheduleData.self, forKey: .scheduleData)
+        do {
+            scheduleData = try container.decodeIfPresent(PodScheduleData.self, forKey: .scheduleData)
+            print("[Schedule] Pod \(id) decoded schedule_data: \(scheduleData?.entries.count ?? 0) entries")
+        } catch {
+            print("[Schedule] Pod \(id) FAILED to decode schedule_data: \(error)")
+            scheduleData = nil
+        }
 
         // Local-only fields — not decoded from API
         confirmedTime = nil
