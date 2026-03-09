@@ -15,28 +15,47 @@ struct MainTabView: View {
         case discovery
         case missions
         case pods
+        case friends
 
         var label: String {
             switch self {
             case .discovery: return "Discovery"
             case .missions:  return "Missions"
             case .pods:      return "Pods"
+            case .friends:   return "Friends"
             }
         }
 
-        var blankIcon: String {
+        var blankIcon: String? {
             switch self {
             case .discovery: return "discoveryNavBlank"
             case .missions:  return "missionNavBlank"
             case .pods:      return "podsNavBlank"
+            case .friends:   return nil
             }
         }
 
-        var colorIcon: String {
+        var colorIcon: String? {
             switch self {
             case .discovery: return "discoveryNavColor"
             case .missions:  return "missionNavColor"
             case .pods:      return "podsNavColor"
+            case .friends:   return nil
+            }
+        }
+
+        /// SF Symbol fallback for tabs without custom assets.
+        var sfSymbol: String {
+            switch self {
+            case .friends: return "person.2"
+            default: return ""
+            }
+        }
+
+        var sfSymbolFilled: String {
+            switch self {
+            case .friends: return "person.2.fill"
+            default: return ""
             }
         }
     }
@@ -56,6 +75,10 @@ struct MainTabView: View {
                 PodsView(userProfile: $profile, isActive: selectedTab == .pods)
                     .opacity(selectedTab == .pods ? 1 : 0)
                     .allowsHitTesting(selectedTab == .pods)
+
+                FriendsView(userProfile: $profile, isActive: selectedTab == .friends)
+                    .opacity(selectedTab == .friends ? 1 : 0)
+                    .allowsHitTesting(selectedTab == .friends)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
 
@@ -68,11 +91,20 @@ struct MainTabView: View {
                         }
                     } label: {
                         VStack(spacing: 4) {
-                            Image(selectedTab == tab ? tab.colorIcon : tab.blankIcon)
-                                .renderingMode(.original)
-                                .resizable()
-                                .aspectRatio(contentMode: .fit)
-                                .frame(width: 24, height: 24)
+                            Group {
+                                if let icon = selectedTab == tab ? tab.colorIcon : tab.blankIcon {
+                                    Image(icon)
+                                        .renderingMode(.original)
+                                        .resizable()
+                                        .aspectRatio(contentMode: .fit)
+                                } else {
+                                    Image(systemName: selectedTab == tab ? tab.sfSymbolFilled : tab.sfSymbol)
+                                        .resizable()
+                                        .aspectRatio(contentMode: .fit)
+                                        .foregroundColor(selectedTab == tab ? OrbitTheme.purple : .gray)
+                                }
+                            }
+                            .frame(width: 24, height: 24)
 
                             Text(tab.label)
                                 .font(.caption2)

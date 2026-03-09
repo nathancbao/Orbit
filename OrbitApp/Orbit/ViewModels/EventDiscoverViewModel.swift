@@ -45,31 +45,29 @@ class MissionsViewModel: ObservableObject {
     }
 
     /// Missions the user has joined (in a pod for set, or created/RSVPed for flex).
+    /// Sorted newest-created first so newly joined missions appear at the top.
     var myMissions: [Mission] {
         let uid = currentUserId
-        return combinedMissions.filter { m in
-            if m.mode == .flex {
-                // podId set = pod formed after RSVP
-                // creatorId == uid = creator (even if pod not formed yet)
-                // userPodStatus = "in_pod" = stamped locally after creation
-                return m.podId != nil || m.creatorId == uid || m.userPodStatus == "in_pod"
+        return combinedMissions
+            .filter { m in
+                if m.mode == .flex {
+                    return m.podId != nil || m.creatorId == uid || m.userPodStatus == "in_pod"
+                }
+                return m.userPodStatus == "in_pod"
             }
-            return m.userPodStatus == "in_pod"
-        }
+            .sorted { $0.createdAtDate > $1.createdAtDate }
     }
 
     /// Missions available to discover.
-    /// User's own missions appear at the top so they can track who's joining.
+    /// Sorted by event time (soonest first), with flex missions at the bottom.
     var discoverMissions: [Mission] {
         let uid = currentUserId
-        // "Mine" section at top: SET missions joined + FLEX missions I created/RSVPed/have a pod for
         let mine = combinedMissions.filter { m in
             if m.mode == .flex {
                 return m.creatorId == uid || m.userPodStatus == "in_pod" || m.podId != nil
             }
             return m.userPodStatus == "in_pod"
         }
-        // Rest: missions not yet joined by this user
         let mineIds = Set(mine.map { $0.id })
         let rest = combinedMissions.filter { m in
             guard !mineIds.contains(m.id) else { return false }
@@ -78,7 +76,12 @@ class MissionsViewModel: ObservableObject {
             }
             return m.userPodStatus != "in_pod"
         }
-        return mine + rest
+        // Sort each group: set missions by event time, flex at the end
+        let sortByTime: (Mission, Mission) -> Bool = { a, b in
+            if a.isFlexMode != b.isFlexMode { return !a.isFlexMode }
+            return a.sortDate < b.sortDate
+        }
+        return mine.sorted(by: sortByTime) + rest.sorted(by: sortByTime)
     }
 
     private var hasLoaded = false

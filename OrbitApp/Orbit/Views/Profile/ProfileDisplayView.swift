@@ -4,10 +4,13 @@ struct ProfileDisplayView: View {
     let profile: Profile
     var onEdit: (() -> Void)? = nil
     var onProfileUpdated: ((Profile) -> Void)? = nil
+    var otherUserId: Int? = nil
 
     @Environment(\.dismiss) private var dismiss
     @State private var showEdit = false
     @State private var galleryIndex = 0
+    @State private var friendStatus: FriendStatus?
+    @State private var isSendingRequest = false
 
     var body: some View {
         NavigationStack {
@@ -94,6 +97,29 @@ struct ProfileDisplayView: View {
                         // Trust score (only show once they have real ratings)
                         if let score = profile.trustScore, score > 0 {
                             TrustScoreView(score: score)
+                        }
+
+                        // Add Friend button (only when viewing someone else's profile)
+                        if let targetId = otherUserId {
+                            FriendActionButton(
+                                friendStatus: friendStatus,
+                                isSending: isSendingRequest,
+                                onSend: {
+                                    isSendingRequest = true
+                                    Task {
+                                        _ = try? await FriendService.shared.sendRequest(toUserId: targetId)
+                                        friendStatus = FriendStatus(status: "pending_sent", requestId: nil)
+                                        isSendingRequest = false
+                                    }
+                                },
+                                onAccept: {
+                                    guard let reqId = friendStatus?.requestId else { return }
+                                    Task {
+                                        _ = try? await FriendService.shared.acceptRequest(requestId: reqId)
+                                        friendStatus = FriendStatus(status: "friends", requestId: nil)
+                                    }
+                                }
+                            )
                         }
 
                         Divider().padding(.horizontal, 32)
@@ -217,6 +243,11 @@ struct ProfileDisplayView: View {
                     }
                 }
             }
+            .task {
+                if let targetId = otherUserId {
+                    friendStatus = try? await FriendService.shared.checkFriendStatus(userId: targetId)
+                }
+            }
             .navigationDestination(isPresented: $showEdit) {
                 QuickProfileSetupView(
                     onComplete: { updatedProfile, _ in
@@ -266,6 +297,63 @@ struct TrustScoreView: View {
             Text("trust score")
                 .font(.caption2)
                 .foregroundColor(.secondary)
+        }
+    }
+}
+
+// MARK: - Friend Action Button
+
+struct FriendActionButton: View {
+    let friendStatus: FriendStatus?
+    let isSending: Bool
+    let onSend: () -> Void
+    let onAccept: () -> Void
+
+    var body: some View {
+        Group {
+            switch friendStatus?.status {
+            case "friends":
+                Label("Friends", systemImage: "checkmark.circle.fill")
+                    .font(.subheadline)
+                    .fontWeight(.semibold)
+                    .foregroundColor(.green)
+            case "pending_sent":
+                Label("Request Sent", systemImage: "clock")
+                    .font(.subheadline)
+                    .fontWeight(.semibold)
+                    .foregroundColor(.orange)
+            case "pending_received":
+                Button(action: onAccept) {
+                    HStack {
+                        Image(systemName: "person.badge.plus")
+                        Text("Accept Friend Request")
+                    }
+                    .fontWeight(.semibold)
+                    .foregroundColor(.white)
+                    .padding(.horizontal, 24)
+                    .padding(.vertical, 10)
+                    .background(OrbitTheme.gradientFill)
+                    .clipShape(Capsule())
+                }
+            default:
+                Button(action: onSend) {
+                    HStack {
+                        if isSending {
+                            ProgressView().tint(.white)
+                        } else {
+                            Image(systemName: "person.badge.plus")
+                            Text("Add Friend")
+                        }
+                    }
+                    .fontWeight(.semibold)
+                    .foregroundColor(.white)
+                    .padding(.horizontal, 24)
+                    .padding(.vertical, 10)
+                    .background(OrbitTheme.gradientFill)
+                    .clipShape(Capsule())
+                }
+                .disabled(isSending)
+            }
         }
     }
 }

@@ -269,12 +269,9 @@ struct MissionListCard: View {
             HStack(alignment: .top, spacing: 14) {
                 Rectangle()
                     .fill(
-                        LinearGradient(
-                            colors: mission.isFlexMode
-                                ? [OrbitTheme.purple, OrbitTheme.pink]
-                                : [OrbitTheme.pink, OrbitTheme.blue],
-                            startPoint: .top, endPoint: .bottom
-                        )
+                        mission.isFlexMode
+                            ? LinearGradient(colors: [.white.opacity(0.5), .white.opacity(0.2)], startPoint: .top, endPoint: .bottom)
+                            : LinearGradient(colors: [OrbitTheme.pink, OrbitTheme.blue], startPoint: .top, endPoint: .bottom)
                     )
                     .frame(width: 4)
                     .cornerRadius(2)
@@ -283,7 +280,7 @@ struct MissionListCard: View {
                     HStack(alignment: .top, spacing: 8) {
                         Text(mission.isFlexMode ? mission.displayTitle : mission.title)
                             .font(.headline)
-                            .foregroundColor(.primary)
+                            .foregroundColor(mission.isFlexMode ? .white : .primary)
                             .lineLimit(2)
                         Spacer(minLength: 0)
                         Text(mission.isFlexMode ? "FLEX" : "SET")
@@ -293,10 +290,10 @@ struct MissionListCard: View {
                             .padding(.vertical, 3)
                             .background(
                                 mission.isFlexMode
-                                    ? OrbitTheme.purple.opacity(0.15)
+                                    ? Color.white.opacity(0.15)
                                     : OrbitTheme.pink.opacity(0.15)
                             )
-                            .foregroundColor(mission.isFlexMode ? OrbitTheme.purple : OrbitTheme.pink)
+                            .foregroundColor(mission.isFlexMode ? .white : OrbitTheme.pink)
                             .clipShape(Capsule())
                     }
 
@@ -317,7 +314,7 @@ struct MissionListCard: View {
                                 }
                             }
                         }
-                        .foregroundColor(.secondary)
+                        .foregroundColor(.white.opacity(0.6))
 
                         if let summary = mission.flexAvailabilitySummary {
                             HStack(spacing: 4) {
@@ -326,7 +323,7 @@ struct MissionListCard: View {
                                 Text(summary)
                                     .font(.caption)
                             }
-                            .foregroundColor(.secondary)
+                            .foregroundColor(.white.opacity(0.6))
                         }
 
                         if let cat = mission.activityCategory {
@@ -336,7 +333,7 @@ struct MissionListCard: View {
                                 Text(cat.displayName)
                                     .font(.caption)
                             }
-                            .foregroundColor(.secondary)
+                            .foregroundColor(.white.opacity(0.6))
                         }
 
                         HStack(spacing: 8) {
@@ -347,7 +344,7 @@ struct MissionListCard: View {
                                     Text(label)
                                         .font(.caption)
                                 }
-                                .foregroundColor(.secondary)
+                                .foregroundColor(.white.opacity(0.6))
                             }
                             if let status = mission.signalStatus {
                                 FlexStatusBadge(status: status)
@@ -404,12 +401,12 @@ struct MissionListCard: View {
 
                 Image(systemName: "chevron.right")
                     .font(.caption)
-                    .foregroundColor(.secondary)
+                    .foregroundColor(mission.isFlexMode ? .white.opacity(0.5) : .secondary)
             }
             .padding(16)
-            .background(Color.white)
+            .background(mission.isFlexMode ? Color(red: 0.1, green: 0.1, blue: 0.14) : Color.white)
             .cornerRadius(16)
-            .shadow(color: .black.opacity(0.06), radius: 8, x: 0, y: 2)
+            .shadow(color: .black.opacity(mission.isFlexMode ? 0.15 : 0.06), radius: 8, x: 0, y: 2)
         }
         .buttonStyle(.plain)
     }
@@ -435,12 +432,12 @@ struct MissionListCard: View {
                     if previews.count > 5 {
                         Text("+\(previews.count - 5)")
                             .font(.caption2)
-                            .foregroundColor(.secondary)
+                            .foregroundColor(mission.isFlexMode ? .white.opacity(0.6) : .secondary)
                     }
 
                     Text("\(memberCount)/\(maxSize) members")
                         .font(.caption)
-                        .foregroundColor(.secondary)
+                        .foregroundColor(mission.isFlexMode ? .white.opacity(0.6) : .secondary)
                 }
             }
         }
@@ -466,19 +463,22 @@ struct MissionListCard: View {
 struct FlexStatusBadge: View {
     let status: SignalStatus
 
+    private var statusColor: Color {
+        switch status {
+        case .pending: return .orange
+        case .active:  return .green
+        }
+    }
+
     var body: some View {
         Text(status.label)
             .font(.caption2)
             .fontWeight(.semibold)
             .padding(.horizontal, 9)
             .padding(.vertical, 4)
-            .background(
-                status == .pending
-                    ? OrbitTheme.purple.opacity(0.15)
-                    : OrbitTheme.blue.opacity(0.15)
-            )
+            .background(statusColor.opacity(0.25))
             .clipShape(Capsule())
-            .foregroundColor(status == .pending ? OrbitTheme.purple : OrbitTheme.blue)
+            .foregroundColor(statusColor)
     }
 }
 
@@ -716,6 +716,13 @@ struct MissionCreateView: View {
                         Text("Flex").tag(MissionMode.flex)
                     }
                     .pickerStyle(.segmented)
+
+                    Text(mode == .set
+                         ? "Plan an event with a set date, time, and place."
+                         : "Throw out a hangout idea and let your group vote on when to meet.")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                        .frame(maxWidth: .infinity, alignment: .leading)
 
                     if mode == .set {
                         setModeForm

@@ -196,6 +196,28 @@ struct Mission: Codable, Identifiable {
 
     var isFlexMode: Bool { mode == .flex }
 
+    /// Parsed event date+time for sorting. Set missions use date+startTime; flex returns `.distantFuture`.
+    var sortDate: Date {
+        guard mode == .set, !date.isEmpty else { return .distantFuture }
+        let f = DateFormatter()
+        if let start = startTime {
+            f.dateFormat = "yyyy-MM-dd HH:mm"
+            if let d = f.date(from: "\(date) \(start)") { return d }
+        }
+        f.dateFormat = "yyyy-MM-dd"
+        return f.date(from: date) ?? .distantFuture
+    }
+
+    /// Parsed createdAt for "newest first" sorting.
+    var createdAtDate: Date {
+        guard let raw = createdAt, !raw.isEmpty else { return .distantPast }
+        let f = ISO8601DateFormatter()
+        f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        if let d = f.date(from: raw) { return d }
+        f.formatOptions = [.withInternetDateTime]
+        return f.date(from: raw) ?? .distantPast
+    }
+
     /// Display title — flex mode uses category/custom name, set mode uses title.
     var displayTitle: String {
         if mode == .flex {

@@ -3,6 +3,11 @@ import SwiftUI
 // MARK: - Pods View
 // Unified list of all pods the user has joined (missions + signals).
 
+enum PodSegment: String, CaseIterable {
+    case set = "Set"
+    case flex = "Flex"
+}
+
 struct PodsView: View {
     @Binding var userProfile: Profile
     var isActive: Bool = false
@@ -10,8 +15,22 @@ struct PodsView: View {
     @State private var rsvpedSignals: [Signal] = []
     @State private var isLoading = false
     @State private var showProfile = false
+    @State private var segment: PodSegment = .set
 
     private var isEmpty: Bool { pods.isEmpty && rsvpedSignals.isEmpty }
+
+    /// Set pods sorted by scheduled time (soonest first).
+    private var sortedPods: [Pod] {
+        pods.sorted { a, b in
+            let dateA = a.parsedScheduledTime ?? .distantFuture
+            let dateB = b.parsedScheduledTime ?? .distantFuture
+            return dateA < dateB
+        }
+    }
+
+    private var isSegmentEmpty: Bool {
+        segment == .set ? pods.isEmpty : rsvpedSignals.isEmpty
+    }
 
     var body: some View {
         NavigationStack {
@@ -36,28 +55,53 @@ struct PodsView: View {
                             .padding(.horizontal, 40)
                     }
                 } else {
-                    ScrollView {
-                        VStack(spacing: 14) {
-                            ForEach(pods) { pod in
-                                PodRowCard(pod: pod, title: pod.displayName) {
-                                    Task { await loadData() }
-                                }
-                                    .padding(.horizontal, 20)
-                            }
-
-                            if !rsvpedSignals.isEmpty {
-                                ForEach(rsvpedSignals) { signal in
-                                    SignalRsvpCard(signal: signal) {
-                                        Task { await loadData() }
-                                    }
-                                        .padding(.horizontal, 20)
-                                }
+                    VStack(spacing: 0) {
+                        Picker("", selection: $segment) {
+                            ForEach(PodSegment.allCases, id: \.self) { s in
+                                Text(s.rawValue).tag(s)
                             }
                         }
-                        .padding(.top, 16)
-                        .padding(.bottom, 80)
+                        .pickerStyle(.segmented)
+                        .padding(.horizontal, 20)
+                        .padding(.vertical, 12)
+
+                        if isSegmentEmpty {
+                            VStack(spacing: 12) {
+                                Spacer()
+                                Image(systemName: segment == .set ? "calendar" : "antenna.radiowaves.left.and.right")
+                                    .font(.system(size: 36))
+                                    .foregroundColor(.secondary)
+                                Text(segment == .set ? "no set pods yet" : "no flex pods yet")
+                                    .font(.headline)
+                                    .foregroundColor(.secondary)
+                                Spacer()
+                            }
+                            .frame(maxWidth: .infinity)
+                        } else {
+                            ScrollView {
+                                VStack(spacing: 14) {
+                                    if segment == .set {
+                                        ForEach(sortedPods) { pod in
+                                            PodRowCard(pod: pod, title: pod.displayName) {
+                                                Task { await loadData() }
+                                            }
+                                            .padding(.horizontal, 20)
+                                        }
+                                    } else {
+                                        ForEach(rsvpedSignals) { signal in
+                                            SignalRsvpCard(signal: signal) {
+                                                Task { await loadData() }
+                                            }
+                                            .padding(.horizontal, 20)
+                                        }
+                                    }
+                                }
+                                .padding(.top, 16)
+                                .padding(.bottom, 80)
+                            }
+                            .refreshable { await loadData() }
+                        }
                     }
-                    .refreshable { await loadData() }
                 }
             }
             .navigationTitle("Pods")
@@ -102,8 +146,12 @@ struct PodsView: View {
             endpoint: Constants.API.Endpoints.myRsvps,
             authenticated: true
         )
-        pods = await podsResult ?? []
-        rsvpedSignals = await rsvpsResult ?? []
+        if let newPods = await podsResult {
+            pods = newPods
+        }
+        if let newSignals = await rsvpsResult {
+            rsvpedSignals = newSignals
+        }
         isLoading = false
     }
 }

@@ -75,6 +75,22 @@ struct Pod: Codable, Identifiable {
     /// The leader of the pod (first member in join order).
     var leaderId: Int? { memberIds.first }
 
+    /// Parsed scheduled time for sorting (tries common date formats).
+    var parsedScheduledTime: Date? {
+        guard let raw = scheduledTime, !raw.isEmpty else { return nil }
+        let iso = ISO8601DateFormatter()
+        iso.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        if let d = iso.date(from: raw) { return d }
+        iso.formatOptions = [.withInternetDateTime]
+        if let d = iso.date(from: raw) { return d }
+        let f = DateFormatter()
+        for fmt in ["yyyy-MM-dd HH:mm", "yyyy-MM-dd'T'HH:mm:ss", "yyyy-MM-dd"] {
+            f.dateFormat = fmt
+            if let d = f.date(from: raw) { return d }
+        }
+        return nil
+    }
+
     /// Whether this pod is still in pre-scheduling state (not yet confirmed/cancelled).
     var isFlexForming: Bool {
         status == "open" || status == "full"

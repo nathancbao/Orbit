@@ -71,6 +71,7 @@ struct MissionDetailView: View {
     @State private var podMembers: [PodMember] = []
     @State private var selectedMemberForPreview: PodMember?
     @State private var selectedMemberProfile: Profile?
+    @State private var selectedMemberUserId: Int?
 
     @Environment(\.dismiss) private var dismiss
 
@@ -128,7 +129,7 @@ struct MissionDetailView: View {
                 .presentationDetents([.medium])
         }
         .sheet(item: $selectedMemberProfile) { profile in
-            ProfileDisplayView(profile: profile)
+            ProfileDisplayView(profile: profile, otherUserId: selectedMemberUserId)
         }
         .onAppear {
             if mission.isFlexMode {
@@ -542,6 +543,7 @@ struct MissionDetailView: View {
     private func handleMemberTap(_ member: PodMember) {
         if isInPod {
             // Full profile for pod members
+            selectedMemberUserId = member.userId
             Task {
                 if let profile = try? await ProfileService.shared.getUserProfile(id: member.userId) {
                     selectedMemberProfile = profile

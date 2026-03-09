@@ -19,6 +19,7 @@ struct PodView: View {
     @State private var renameText = ""
     @State private var showLeaveAlert = false
     @State private var selectedMemberProfile: Profile?
+    @State private var selectedMemberUserId: Int?
     @State private var isLoadingProfile = false
     @Environment(\.dismiss) private var dismiss
 
@@ -80,7 +81,10 @@ struct PodView: View {
                 )
             }
             .sheet(item: $selectedMemberProfile) { profile in
-                ProfileDisplayView(profile: profile)
+                ProfileDisplayView(
+                    profile: profile,
+                    otherUserId: selectedMemberUserId != currentUserId ? selectedMemberUserId : nil
+                )
             }
             .sheet(isPresented: $showScheduleSheet) {
                 if let pod = viewModel.pod, let svm = scheduleVM {
@@ -217,6 +221,7 @@ struct PodView: View {
 
     private func loadMemberProfile(userId: Int) {
         isLoadingProfile = true
+        selectedMemberUserId = userId
         Task {
             do {
                 let profile = try await ProfileService.shared.getUserProfile(id: userId)

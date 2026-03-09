@@ -49,6 +49,16 @@ enum Constants {
             static func signal(_ id: String) -> String { "/signals/\(id)" }
             static func rsvpSignal(_ id: String) -> String { "/signals/\(id)/rsvp" }
 
+            // Friends
+            static let friends = "/friends"
+            static let friendRequests = "/friends/requests"
+            static let friendRequestsIncoming = "/friends/requests/incoming"
+            static let friendRequestsOutgoing = "/friends/requests/outgoing"
+            static func friendRequestAccept(_ id: Int) -> String { "/friends/requests/\(id)/accept" }
+            static func friendRequestDecline(_ id: Int) -> String { "/friends/requests/\(id)/decline" }
+            static func friendRemove(_ id: Int) -> String { "/friends/\(id)" }
+            static func friendStatus(_ userId: Int) -> String { "/friends/status/\(userId)" }
+
             // Chat
             static func podMessages(_ id: String) -> String { "/pods/\(id)/messages" }
             static func podVotes(_ id: String) -> String { "/pods/\(id)/votes" }

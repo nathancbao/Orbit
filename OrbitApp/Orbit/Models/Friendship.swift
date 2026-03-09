@@ -1,0 +1,96 @@
+import Foundation
+
+// MARK: - Friend Request Status
+
+enum FriendRequestStatus: String, Codable {
+    case pending
+    case accepted
+    case declined
+}
+
+// MARK: - Friend Request
+
+struct FriendRequest: Codable, Identifiable {
+    var id: Int
+    var fromUserId: Int
+    var toUserId: Int
+    var status: FriendRequestStatus
+    var createdAt: String
+
+    // Enriched profile of the other user (populated by backend)
+    var fromUser: FriendProfile?
+    var toUser: FriendProfile?
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case fromUserId = "from_user_id"
+        case toUserId   = "to_user_id"
+        case status
+        case createdAt  = "created_at"
+        case fromUser   = "from_user"
+        case toUser     = "to_user"
+    }
+}
+
+// MARK: - Friendship (accepted)
+
+struct Friendship: Codable, Identifiable {
+    var id: Int
+    var userId: Int
+    var friendId: Int
+    var createdAt: String
+
+    var friend: FriendProfile?
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case userId   = "user_id"
+        case friendId = "friend_id"
+        case createdAt = "created_at"
+        case friend
+    }
+}
+
+// MARK: - Friend Profile (lightweight, like PodMember)
+
+struct FriendProfile: Codable, Identifiable {
+    var userId: Int
+    var name: String
+    var collegeYear: String
+    var interests: [String]
+    var photo: String?
+    var bio: String
+
+    var id: Int { userId }
+
+    enum CodingKeys: String, CodingKey {
+        case userId      = "user_id"
+        case name
+        case collegeYear = "college_year"
+        case interests
+        case photo
+        case bio
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        userId      = (try? c.decode(Int.self, forKey: .userId)) ?? 0
+        name        = (try? c.decode(String.self, forKey: .name)) ?? "User"
+        collegeYear = (try? c.decode(String.self, forKey: .collegeYear)) ?? ""
+        interests   = (try? c.decode([String].self, forKey: .interests)) ?? []
+        photo       = try? c.decodeIfPresent(String.self, forKey: .photo)
+        bio         = (try? c.decode(String.self, forKey: .bio)) ?? ""
+    }
+}
+
+// MARK: - Friend Status (relationship check between two users)
+
+struct FriendStatus: Codable {
+    var status: String   // "none" | "pending_sent" | "pending_received" | "friends"
+    var requestId: Int?
+
+    enum CodingKeys: String, CodingKey {
+        case status
+        case requestId = "request_id"
+    }
+}
