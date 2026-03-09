@@ -47,3 +47,23 @@ indexes:
     properties:
       - name: tags
       - name: status
+
+  # ── FriendRequest ──────────────────────────────────────────────────────────────
+  # list_incoming_friend_requests: filter by to_user_id AND status
+  - kind: FriendRequest
+    properties:
+      - name: to_user_id
+      - name: status
+
+  # list_outgoing_friend_requests: filter by from_user_id AND status
+  - kind: FriendRequest
+    properties:
+      - name: from_user_id
+      - name: status
+
+  # find_pending_request: filter by from_user_id, to_user_id, AND status
+  - kind: FriendRequest
+    properties:
+      - name: from_user_id
+      - name: to_user_id
+      - name: status

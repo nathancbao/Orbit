@@ -10,6 +10,7 @@ from OrbitServer.api.pods import pods_bp
 from OrbitServer.api.chat import chat_bp
 from OrbitServer.api.signals import signals_bp
 from OrbitServer.api.notifications import notifications_bp
+from OrbitServer.api.friends import friends_bp
 
 app = Flask(__name__)
 
@@ -22,6 +23,7 @@ app.register_blueprint(pods_bp)
 app.register_blueprint(chat_bp)
 app.register_blueprint(signals_bp)
 app.register_blueprint(notifications_bp)
+app.register_blueprint(friends_bp)
 
 
 @app.route('/')

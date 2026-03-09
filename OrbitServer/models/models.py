@@ -739,3 +739,102 @@ def get_verification_code(email):
 def delete_verification_code(email):
     key = client.key('VerificationCode', email)
     client.delete(key)
+
+
+# ── FriendRequest ─────────────────────────────────────────────────────────────
+
+def create_friend_request(from_user_id, to_user_id):
+    key = client.key('FriendRequest')
+    entity = datastore.Entity(key=key)
+    entity.update({
+        'from_user_id': int(from_user_id),
+        'to_user_id': int(to_user_id),
+        'status': 'pending',
+        'created_at': datetime.datetime.utcnow(),
+    })
+    client.put(entity)
+    return _entity_to_dict(entity)
+
+
+def get_friend_request(request_id):
+    key = client.key('FriendRequest', int(request_id))
+    entity = client.get(key)
+    return _entity_to_dict(entity)
+
+
+def update_friend_request_status(request_id, status):
+    key = client.key('FriendRequest', int(request_id))
+    entity = client.get(key)
+    if not entity:
+        return None
+    entity['status'] = status
+    client.put(entity)
+    return _entity_to_dict(entity)
+
+
+def list_incoming_friend_requests(user_id):
+    query = client.query(kind='FriendRequest')
+    query.add_filter(filter=PropertyFilter('to_user_id', '=', int(user_id)))
+    query.add_filter(filter=PropertyFilter('status', '=', 'pending'))
+    results = list(query.fetch(limit=100))
+    return [_entity_to_dict(e) for e in results]
+
+
+def list_outgoing_friend_requests(user_id):
+    query = client.query(kind='FriendRequest')
+    query.add_filter(filter=PropertyFilter('from_user_id', '=', int(user_id)))
+    query.add_filter(filter=PropertyFilter('status', '=', 'pending'))
+    results = list(query.fetch(limit=100))
+    return [_entity_to_dict(e) for e in results]
+
+
+def find_pending_request(from_user_id, to_user_id):
+    """Find a pending FriendRequest between two users (one direction)."""
+    query = client.query(kind='FriendRequest')
+    query.add_filter(filter=PropertyFilter('from_user_id', '=', int(from_user_id)))
+    query.add_filter(filter=PropertyFilter('to_user_id', '=', int(to_user_id)))
+    query.add_filter(filter=PropertyFilter('status', '=', 'pending'))
+    results = list(query.fetch(limit=1))
+    return _entity_to_dict(results[0]) if results else None
+
+
+# ── Friendship ────────────────────────────────────────────────────────────────
+
+def create_friendship(user_id, friend_id):
+    """Create a single directional Friendship entity."""
+    key = client.key('Friendship')
+    entity = datastore.Entity(key=key)
+    entity.update({
+        'user_id': int(user_id),
+        'friend_id': int(friend_id),
+        'created_at': datetime.datetime.utcnow(),
+    })
+    client.put(entity)
+    return _entity_to_dict(entity)
+
+
+def get_friendship(friendship_id):
+    key = client.key('Friendship', int(friendship_id))
+    entity = client.get(key)
+    return _entity_to_dict(entity)
+
+
+def list_friendships(user_id):
+    query = client.query(kind='Friendship')
+    query.add_filter(filter=PropertyFilter('user_id', '=', int(user_id)))
+    results = list(query.fetch(limit=500))
+    return [_entity_to_dict(e) for e in results]
+
+
+def find_friendship(user_id, friend_id):
+    """Find a Friendship entity for user_id -> friend_id."""
+    query = client.query(kind='Friendship')
+    query.add_filter(filter=PropertyFilter('user_id', '=', int(user_id)))
+    query.add_filter(filter=PropertyFilter('friend_id', '=', int(friend_id)))
+    results = list(query.fetch(limit=1))
+    return _entity_to_dict(results[0]) if results else None
+
+
+def delete_friendship(friendship_id):
+    key = client.key('Friendship', int(friendship_id))
+    client.delete(key)
