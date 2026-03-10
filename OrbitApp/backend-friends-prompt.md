@@ -171,5 +171,17 @@ This matches the existing `PodMember` enrichment pattern — pull from the user'
 ## Blueprint Setup
 Create a new blueprint file `api/friends.py` with `friends_bp = Blueprint('friends', __name__, url_prefix='/api/friends')` and register it in the app factory alongside the existing blueprints.
 
-## Deep Link Route (Optional)
-Add a web route `GET /friend/{user_id}` that redirects to the iOS app via Universal Link or shows a simple "Open in Orbit" page. This supports the QR code / share link feature on the frontend.
+## Deep Link Route — `GET /friend/<user_id>`
+
+This is the URL users share (via QR code or copy-link) to let others add them as a friend. When someone opens this link in a browser, the backend should:
+
+1. **Look up the user** by `user_id`. If the user doesn't exist, show a simple error page ("User not found").
+2. **Render a lightweight HTML page** that shows:
+   - The user's name and profile photo (if available)
+   - A message like "**Alex Chen** invited you to connect on Orbit"
+   - A big "Open in Orbit" button that attempts to open the iOS app via a custom URL scheme or universal link (e.g., `orbit://friend/<user_id>`)
+   - A fallback message: "Don't have Orbit? Download it here." (link to App Store once available)
+3. **No authentication required** — this is a public page so anyone can view it.
+4. This route should NOT live under `/api/` — just `GET /friend/<user_id>` at the top level.
+
+This does NOT auto-send a friend request. It just gets the person into the app where they can view the profile and tap "Add Friend" themselves.

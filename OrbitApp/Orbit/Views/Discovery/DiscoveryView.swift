@@ -759,6 +759,11 @@ struct DiscoveryView: View {
     @State private var createPrefillTags: [String] = []
     @State private var showRecommendationsSheet = false
     @State private var showProfile = false
+    @State private var showShareSheet = false
+
+    private var currentUserId: Int {
+        UserDefaults.standard.integer(forKey: "orbit_user_id")
+    }
 
     init(userProfile: Binding<Profile>, isActive: Bool = false) {
         _userProfile = userProfile
@@ -881,12 +886,20 @@ struct DiscoveryView: View {
                         Spacer()
                         DiscoveryLegend()
                         Spacer()
-                        Button { showProfile = true } label: {
-                            ProfileAvatarView(
-                                photo: userProfile.photo,
-                                size: 30,
-                                name: userProfile.name
-                            )
+                        HStack(spacing: 16) {
+                            Button { showShareSheet = true } label: {
+                                Image(systemName: "qrcode")
+                                    .font(.system(size: 18))
+                                    .fontWeight(.medium)
+                                    .foregroundStyle(Color.black)
+                            }
+                            Button { showProfile = true } label: {
+                                ProfileAvatarView(
+                                    photo: userProfile.photo,
+                                    size: 34,
+                                    name: userProfile.name
+                                )
+                            }
                         }
                     }
                     .padding(.horizontal, 16)
@@ -944,6 +957,9 @@ struct DiscoveryView: View {
                     onEdit: { showProfile = false },
                     onProfileUpdated: { updated in userProfile = updated }
                 )
+            }
+            .sheet(isPresented: $showShareSheet) {
+                FriendShareView(userId: currentUserId, userName: userProfile.name)
             }
         }
     }

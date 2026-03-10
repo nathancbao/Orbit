@@ -90,6 +90,7 @@ struct FriendsView: View {
                     Button { showInbox = true } label: {
                         ZStack(alignment: .topTrailing) {
                             Image(systemName: "tray")
+                                .font(.system(size: 18))
                                 .fontWeight(.medium)
                                 .foregroundStyle(Color.primary)
                             if viewModel.inboxCount > 0 {
@@ -105,14 +106,15 @@ struct FriendsView: View {
                     }
                 }
                 ToolbarItem(placement: .navigationBarTrailing) {
-                    HStack(spacing: 12) {
+                    HStack(spacing: 16) {
                         Button { showShareSheet = true } label: {
                             Image(systemName: "qrcode")
+                                .font(.system(size: 18))
                                 .fontWeight(.medium)
                                 .foregroundStyle(Color.primary)
                         }
                         Button { showProfile = true } label: {
-                            ProfileAvatarView(photo: userProfile.photo, size: 30, name: userProfile.name)
+                            ProfileAvatarView(photo: userProfile.photo, size: 34, name: userProfile.name)
                         }
                     }
                 }

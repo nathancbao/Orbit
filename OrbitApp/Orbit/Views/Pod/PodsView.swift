@@ -15,6 +15,11 @@ struct PodsView: View {
     @State private var rsvpedSignals: [Signal] = []
     @State private var isLoading = false
     @State private var showProfile = false
+    @State private var showShareSheet = false
+
+    private var currentUserId: Int {
+        UserDefaults.standard.integer(forKey: "orbit_user_id")
+    }
     @State private var segment: PodSegment = .set
     @State private var searchText = ""
 
@@ -143,13 +148,22 @@ struct PodsView: View {
                 ToolbarItem(placement: .navigationBarLeading) {
                     Button { } label: {
                         Image(systemName: "bell")
+                            .font(.system(size: 18))
                             .fontWeight(.medium)
                             .foregroundStyle(Color.primary)
                     }
                 }
                 ToolbarItem(placement: .navigationBarTrailing) {
-                    Button { showProfile = true } label: {
-                        ProfileAvatarView(photo: userProfile.photo, size: 30, name: userProfile.name)
+                    HStack(spacing: 16) {
+                        Button { showShareSheet = true } label: {
+                            Image(systemName: "qrcode")
+                                .font(.system(size: 18))
+                                .fontWeight(.medium)
+                                .foregroundStyle(Color.primary)
+                        }
+                        Button { showProfile = true } label: {
+                            ProfileAvatarView(photo: userProfile.photo, size: 34, name: userProfile.name)
+                        }
                     }
                 }
             }
@@ -160,6 +174,9 @@ struct PodsView: View {
                 onEdit: { showProfile = false },
                 onProfileUpdated: { updated in userProfile = updated }
             )
+        }
+        .sheet(isPresented: $showShareSheet) {
+            FriendShareView(userId: currentUserId, userName: userProfile.name)
         }
         .task { await loadData() }
         .onChange(of: isActive) { _, active in

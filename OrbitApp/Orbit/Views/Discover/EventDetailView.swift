@@ -258,6 +258,55 @@ struct MissionDetailView: View {
         }
     }
 
+    @ViewBuilder
+    private var flexActionButton: some View {
+        if showSignedUp, let podId = joinedPodId {
+            Button(action: { showPod = true }) {
+                Label("open your pod", systemImage: "person.3.fill")
+                    .font(.system(size: 16, weight: .semibold))
+                    .tracking(0.5)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 16)
+                    .background(OrbitTheme.gradientFill)
+                    .foregroundColor(.white)
+                    .clipShape(Capsule())
+            }
+            .padding(.horizontal, 24)
+            .padding(.bottom, 16)
+        } else if showSignedUp {
+            Text("You're signed up — waiting for a pod")
+                .font(.subheadline)
+                .foregroundColor(.secondary)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 16)
+                .padding(.horizontal, 24)
+                .padding(.bottom, 16)
+        } else {
+            Button {
+                UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                joinFlexMission()
+            } label: {
+                ZStack {
+                    if isJoining {
+                        ProgressView().tint(.white)
+                    } else {
+                        Text("join a pod \u{2192}")
+                            .font(.system(size: 16, weight: .semibold))
+                            .tracking(0.5)
+                    }
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 16)
+                .background(OrbitTheme.gradientFill)
+                .foregroundColor(.white)
+                .clipShape(Capsule())
+            }
+            .disabled(isJoining)
+            .padding(.horizontal, 24)
+            .padding(.bottom, 16)
+        }
+    }
+
     // MARK: - Flex Mode Content
 
     private var flexContent: some View {
@@ -408,59 +457,13 @@ struct MissionDetailView: View {
             }
 
             // Flex action button area
-            if showSignedUp {
-                if joinedPodId != nil {
-                    Button(action: { showPod = true }) {
-                        Label("open your pod", systemImage: "person.3.fill")
-                            .font(.headline)
-                            .fontWeight(.semibold)
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 16)
-                            .background(OrbitTheme.gradientFill)
-                            .foregroundColor(.white)
-                            .clipShape(RoundedRectangle(cornerRadius: 14))
-                    }
-                    .padding(.horizontal, 24)
-                    .padding(.bottom, 16)
-                } else {
-                    Text("You already signed up for this event!")
-                        .font(.subheadline)
-                        .foregroundColor(.secondary)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 16)
-                        .padding(.horizontal, 24)
-                        .padding(.bottom, 16)
-                }
-            } else {
-                Button {
-                    UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-                    joinFlexMission()
-                } label: {
-                    ZStack {
-                        if isJoining {
-                            ProgressView().tint(.white)
-                        } else {
-                            Text("I'm Down")
-                                .font(.headline)
-                                .fontWeight(.semibold)
-                        }
-                    }
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 16)
-                    .background(OrbitTheme.gradientFill)
-                    .foregroundColor(.white)
-                    .clipShape(RoundedRectangle(cornerRadius: 14))
-                }
-                .disabled(isJoining)
-                .padding(.horizontal, 24)
-                .padding(.bottom, 16)
+            flexActionButton
 
-                if let error = errorMessage {
-                    Text(error)
-                        .font(.caption)
-                        .foregroundColor(.red)
-                        .padding(.horizontal, 24)
-                }
+            if let error = errorMessage {
+                Text(error)
+                    .font(.caption)
+                    .foregroundColor(.red)
+                    .padding(.horizontal, 24)
             }
         }
     }
@@ -805,31 +808,27 @@ struct SignalDetailView: View {
                     }
 
                     // Action button area
-                    if showSignedUp {
-                        if joinedPodId != nil {
-                            // Open pod button (like Missions)
-                            Button(action: { showPod = true }) {
-                                Label("open your pod", systemImage: "person.3.fill")
-                                    .font(.headline)
-                                    .fontWeight(.semibold)
-                                    .frame(maxWidth: .infinity)
-                                    .padding(.vertical, 16)
-                                    .background(OrbitTheme.gradientFill)
-                                    .foregroundColor(.white)
-                                    .clipShape(RoundedRectangle(cornerRadius: 14))
-                            }
-                            .padding(.horizontal, 24)
-                            .padding(.bottom, 16)
-                        } else {
-                            // Fallback when backend hasn't added pod_id yet
-                            Text("You already signed up for this event!")
-                                .font(.subheadline)
-                                .foregroundColor(.secondary)
+                    if showSignedUp, joinedPodId != nil {
+                        Button(action: { showPod = true }) {
+                            Label("open your pod", systemImage: "person.3.fill")
+                                .font(.system(size: 16, weight: .semibold))
+                                .tracking(0.5)
                                 .frame(maxWidth: .infinity)
                                 .padding(.vertical, 16)
-                                .padding(.horizontal, 24)
-                                .padding(.bottom, 16)
+                                .background(OrbitTheme.gradientFill)
+                                .foregroundColor(.white)
+                                .clipShape(Capsule())
                         }
+                        .padding(.horizontal, 24)
+                        .padding(.bottom, 16)
+                    } else if showSignedUp {
+                        Text("You're signed up — waiting for a pod")
+                            .font(.subheadline)
+                            .foregroundColor(.secondary)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 16)
+                            .padding(.horizontal, 24)
+                            .padding(.bottom, 16)
                     } else {
                         Button {
                             UIImpactFeedbackGenerator(style: .medium).impactOccurred()
@@ -839,16 +838,16 @@ struct SignalDetailView: View {
                                 if isRsvping {
                                     ProgressView().tint(.white)
                                 } else {
-                                    Text("I'm Down")
-                                        .font(.headline)
-                                        .fontWeight(.semibold)
+                                    Text("join a pod \u{2192}")
+                                        .font(.system(size: 16, weight: .semibold))
+                                        .tracking(0.5)
                                 }
                             }
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, 16)
                             .background(OrbitTheme.gradientFill)
                             .foregroundColor(.white)
-                            .clipShape(RoundedRectangle(cornerRadius: 14))
+                            .clipShape(Capsule())
                         }
                         .disabled(isRsvping)
                         .padding(.horizontal, 24)

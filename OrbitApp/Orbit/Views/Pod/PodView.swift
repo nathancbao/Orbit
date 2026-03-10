@@ -206,6 +206,11 @@ struct PodView: View {
 
             Divider()
 
+            // Confirmed time/place banner (flex pods)
+            if missionMode == .flex {
+                confirmedDetailsBanner
+            }
+
             // Action bar
             actionBar
 
@@ -246,14 +251,14 @@ struct PodView: View {
                     ActionChip(icon: "calendar.badge.plus", label: "Availability") {
                         showScheduleSheet = true
                     }
-                }
-                ActionChip(icon: "clock", label: "Vote time") {
-                    voteSheetType = "time"
-                    showVoteSheet = true
-                }
-                ActionChip(icon: "mappin", label: "Vote place") {
-                    voteSheetType = "place"
-                    showVoteSheet = true
+                    ActionChip(icon: "clock", label: "Vote time") {
+                        voteSheetType = "time"
+                        showVoteSheet = true
+                    }
+                    ActionChip(icon: "mappin", label: "Vote place") {
+                        voteSheetType = "place"
+                        showVoteSheet = true
+                    }
                 }
                 if let time = viewModel.pod?.scheduledTime {
                     ActionChip(icon: "calendar.badge.checkmark", label: "Add to Calendar") {
@@ -280,6 +285,51 @@ struct PodView: View {
         let hasTime = pod.scheduledTime != nil
         let notConfirmed = !(pod.confirmedAttendees.contains(currentUserId))
         return hasTime && notConfirmed
+    }
+
+    // MARK: - Confirmed Details Banner
+
+    @ViewBuilder
+    private var confirmedDetailsBanner: some View {
+        let time = viewModel.pod?.scheduledTime
+        let place = viewModel.pod?.scheduledPlace
+        if time != nil || place != nil {
+            HStack(spacing: 12) {
+                Image(systemName: "checkmark.seal.fill")
+                    .font(.system(size: 20))
+                    .foregroundStyle(OrbitTheme.gradient)
+
+                VStack(alignment: .leading, spacing: 2) {
+                    if let time = time {
+                        HStack(spacing: 4) {
+                            Image(systemName: "clock.fill")
+                                .font(.caption2)
+                                .foregroundColor(.secondary)
+                            Text(time)
+                                .font(.subheadline)
+                                .fontWeight(.semibold)
+                        }
+                    }
+                    if let place = place, !place.isEmpty {
+                        HStack(spacing: 4) {
+                            Image(systemName: "mappin.circle.fill")
+                                .font(.caption2)
+                                .foregroundColor(.secondary)
+                            Text(place)
+                                .font(.subheadline)
+                                .fontWeight(.semibold)
+                        }
+                    }
+                }
+
+                Spacer()
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 10)
+            .background(OrbitTheme.gradient.opacity(0.08))
+
+            Divider()
+        }
     }
 
     // MARK: - Chat Body
@@ -540,22 +590,57 @@ struct CreateVoteSheet: View {
     let onCreate: ([String]) -> Void
     let onCancel: () -> Void
 
+    private var isTimeVote: Bool { voteType == "time" }
+
+    // Text options (for place votes)
     @State private var options: [String] = ["", ""]
-    @State private var newOption: String = ""
+
+    // Date options (for time votes)
+    @State private var dateOptions: [Date] = {
+        let now = Date()
+        return [now, now.addingTimeInterval(3600)]
+    }()
 
     private var isValid: Bool {
-        options.filter { !$0.trimmingCharacters(in: .whitespaces).isEmpty }.count >= 2
+        if isTimeVote {
+            return dateOptions.count >= 2
+        }
+        return options.filter { !$0.trimmingCharacters(in: .whitespaces).isEmpty }.count >= 2
     }
+
+    private static let displayFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.dateFormat = "EEE, MMM d · h:mm a"
+        return f
+    }()
 
     var body: some View {
         NavigationStack {
             Form {
-                Section("Options (2–4)") {
-                    ForEach(0..<options.count, id: \.self) { i in
-                        TextField("Option \(i + 1)", text: $options[i])
+                if isTimeVote {
+                    Section("Pick date & time options (2–4)") {
+                        ForEach(0..<dateOptions.count, id: \.self) { i in
+                            DatePicker(
+                                "Option \(i + 1)",
+                                selection: $dateOptions[i],
+                                in: Date()...,
+                                displayedComponents: [.date, .hourAndMinute]
+                            )
+                        }
+                        if dateOptions.count < 4 {
+                            Button("Add option") {
+                                dateOptions.append(Date().addingTimeInterval(Double(dateOptions.count) * 3600))
+                            }
+                        }
                     }
-                    if options.count < 4 {
-                        Button("Add option") { options.append("") }
+                } else {
+                    Section("Options (2–4)") {
+                        ForEach(0..<options.count, id: \.self) { i in
+                            TextField("Option \(i + 1)", text: $options[i])
+                        }
+                        if options.count < 4 {
+                            Button("Add option") { options.append("") }
+                        }
                     }
                 }
             }
@@ -567,9 +652,14 @@ struct CreateVoteSheet: View {
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Create") {
-                        let cleaned = options.map { $0.trimmingCharacters(in: .whitespaces) }
-                                            .filter { !$0.isEmpty }
-                        onCreate(cleaned)
+                        if isTimeVote {
+                            let formatted = dateOptions.map { Self.displayFormatter.string(from: $0) }
+                            onCreate(formatted)
+                        } else {
+                            let cleaned = options.map { $0.trimmingCharacters(in: .whitespaces) }
+                                                .filter { !$0.isEmpty }
+                            onCreate(cleaned)
+                        }
                     }
                     .disabled(!isValid)
                 }

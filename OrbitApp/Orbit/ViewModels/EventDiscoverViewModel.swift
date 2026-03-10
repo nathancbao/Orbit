@@ -95,35 +95,32 @@ class MissionsViewModel: ObservableObject {
         errorMessage = nil
 
         // Fetch set missions + flex missions concurrently.
-        do {
-            async let setMissions = MissionService.shared.listMissions(
-                tag: filterTag,
-                year: showMyYearOnly ? userYear : nil
-            )
-            async let flexMissions = MissionService.shared.listFlexMissions()
-            async let myFlex = MissionService.shared.myFlexMissions()
+        // Each call is independent — one failing should not wipe the others.
+        async let setResult: [Mission]? = try? MissionService.shared.listMissions(
+            tag: filterTag,
+            year: showMyYearOnly ? userYear : nil
+        )
+        async let flexResult: [Mission]? = try? MissionService.shared.listFlexMissions()
+        async let myFlexResult: [Mission]? = try? MissionService.shared.myFlexMissions()
 
-            let (s, f, mf) = try await (setMissions, flexMissions, myFlex)
+        let (s, f, mf) = await (setResult, flexResult, myFlexResult)
+
+        // Only update each array when its API call actually returned data.
+        if let s = s {
             allMissions = s
+        }
 
-            // Merge discover + my flex, dedup by id
+        // Merge discover + my flex, dedup by id (only if at least one call succeeded)
+        if f != nil || mf != nil {
             var seen = Set<String>()
             var merged: [Mission] = []
-            for m in f + mf {
+            for m in (f ?? []) + (mf ?? []) {
                 if seen.insert(m.id).inserted { merged.append(m) }
             }
-            allFlexMissions = merged
-        } catch {
-            // If concurrent fetch fails, try individually
-            if let s = try? await MissionService.shared.listMissions(tag: filterTag, year: showMyYearOnly ? userYear : nil) {
-                allMissions = s
+            // Only replace if we got results; don't wipe existing data on total failure
+            if !merged.isEmpty || (f != nil && mf != nil) {
+                allFlexMissions = merged
             }
-            // Merge discover + my flex so creator's own missions are included
-            var fallbackFlex: [Mission] = []
-            if let f = try? await MissionService.shared.listFlexMissions() { fallbackFlex += f }
-            if let mf = try? await MissionService.shared.myFlexMissions() { fallbackFlex += mf }
-            var seen = Set<String>()
-            allFlexMissions = fallbackFlex.filter { seen.insert($0.id).inserted }
         }
         isLoading = false
         hasLoaded = true
