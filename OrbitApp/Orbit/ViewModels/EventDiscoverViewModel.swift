@@ -200,6 +200,7 @@ class MissionsViewModel: ObservableObject {
         availability: [AvailabilitySlot],
         description: String,
         links: [String] = [],
+        tags: [String] = [],
         timeRangeStart: Int = 9,
         timeRangeEnd: Int = 21
     ) async -> Mission? {
@@ -217,6 +218,7 @@ class MissionsViewModel: ObservableObject {
                 availability: availability,
                 description: description,
                 links: links,
+                tags: tags,
                 timeRangeStart: timeRangeStart,
                 timeRangeEnd: timeRangeEnd
             )
@@ -229,6 +231,7 @@ class MissionsViewModel: ObservableObject {
                 rsvped.creatorId = currentUserId
             }
             rsvped.userPodStatus = "in_pod"
+            rsvped.tags = tags
             showToastMessage("Mission created!")
             return rsvped
         } catch {

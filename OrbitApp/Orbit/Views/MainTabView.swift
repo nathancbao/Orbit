@@ -106,7 +106,7 @@ struct MainTabView: View {
                                     Image(systemName: selectedTab == tab ? tab.sfSymbolFilled : tab.sfSymbol)
                                         .resizable()
                                         .aspectRatio(contentMode: .fit)
-                                        .foregroundColor(selectedTab == tab ? OrbitTheme.purple : .gray)
+                                        .foregroundColor(selectedTab == tab ? OrbitTheme.purple : .black)
                                 }
                             }
                             .frame(width: 24, height: 24)

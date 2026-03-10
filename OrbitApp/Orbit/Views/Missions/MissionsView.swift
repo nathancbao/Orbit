@@ -345,16 +345,6 @@ struct MissionListCard: View {
                             .foregroundColor(.white.opacity(0.6))
                         }
 
-                        if let cat = mission.activityCategory {
-                            HStack(spacing: 4) {
-                                Image(systemName: cat.icon)
-                                    .font(.caption2)
-                                Text(cat.displayName)
-                                    .font(.caption)
-                            }
-                            .foregroundColor(.white.opacity(0.6))
-                        }
-
                         if !mission.tags.isEmpty {
                             ScrollView(.horizontal, showsIndicators: false) {
                                 HStack(spacing: 6) {
@@ -688,6 +678,8 @@ struct MissionCreateView: View {
     // Creator availability (flex mode — filled during creation)
     @State private var creatorSlots: Set<TimeSlot> = []
 
+    @State private var customTagText = ""
+
     @State private var isSubmitting = false
     @State private var errorMessage: String?
 
@@ -718,9 +710,6 @@ struct MissionCreateView: View {
         if mode == .set {
             return !title.trimmingCharacters(in: .whitespaces).isEmpty
         } else {
-            if selectedCategory == .custom && customActivityName.trimmingCharacters(in: .whitespaces).isEmpty {
-                return false
-            }
             if creatorSlots.isEmpty { return false }
             return true
         }
@@ -855,6 +844,46 @@ struct MissionCreateView: View {
 
             tagPickerSection
 
+            // Custom tags (set mode only)
+            VStack(alignment: .leading, spacing: 8) {
+                HStack(spacing: 8) {
+                    TextField("Add a custom tag", text: $customTagText)
+                        .textFieldStyle(.roundedBorder)
+                        .submitLabel(.done)
+                        .onSubmit { addCustomTag() }
+                    Button(action: addCustomTag) {
+                        Image(systemName: "plus.circle.fill")
+                            .font(.title3)
+                            .foregroundStyle(OrbitTheme.gradient)
+                    }
+                    .disabled(customTagText.trimmingCharacters(in: .whitespaces).isEmpty)
+                }
+
+                let customTags = tags.filter { !availableTags.contains($0) }
+                if !customTags.isEmpty {
+                    FlowLayout(spacing: 8) {
+                        ForEach(customTags, id: \.self) { tag in
+                            HStack(spacing: 4) {
+                                Text(tag)
+                                    .font(.caption)
+                                    .fontWeight(.medium)
+                                Button {
+                                    tags.removeAll { $0 == tag }
+                                } label: {
+                                    Image(systemName: "xmark.circle.fill")
+                                        .font(.caption2)
+                                }
+                            }
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 6)
+                            .background(OrbitTheme.gradient.opacity(0.15))
+                            .foregroundColor(OrbitTheme.purple)
+                            .clipShape(Capsule())
+                        }
+                    }
+                }
+            }
+
             // Date + Time grouped in a single card
             VStack(alignment: .leading, spacing: 10) {
                 OrbitSectionHeader(title: "When")
@@ -942,17 +971,6 @@ struct MissionCreateView: View {
                     .textFieldStyle(.roundedBorder)
             }
 
-            // Category picker
-            categorySection
-
-            if selectedCategory == .custom {
-                VStack(alignment: .leading, spacing: 8) {
-                    OrbitSectionHeader(title: "Activity Name")
-                    TextField("Name your activity", text: $customActivityName)
-                        .textFieldStyle(.roundedBorder)
-                }
-            }
-
             // Group size
             groupSizeSection
 
@@ -972,6 +990,46 @@ struct MissionCreateView: View {
 
             // Tags
             tagPickerSection
+
+            // Custom tags
+            VStack(alignment: .leading, spacing: 8) {
+                HStack(spacing: 8) {
+                    TextField("Add a custom tag", text: $customTagText)
+                        .textFieldStyle(.roundedBorder)
+                        .submitLabel(.done)
+                        .onSubmit { addCustomTag() }
+                    Button(action: addCustomTag) {
+                        Image(systemName: "plus.circle.fill")
+                            .font(.title3)
+                            .foregroundStyle(OrbitTheme.gradient)
+                    }
+                    .disabled(customTagText.trimmingCharacters(in: .whitespaces).isEmpty)
+                }
+
+                let customTags = tags.filter { !availableTags.contains($0) }
+                if !customTags.isEmpty {
+                    FlowLayout(spacing: 8) {
+                        ForEach(customTags, id: \.self) { tag in
+                            HStack(spacing: 4) {
+                                Text(tag)
+                                    .font(.caption)
+                                    .fontWeight(.medium)
+                                Button {
+                                    tags.removeAll { $0 == tag }
+                                } label: {
+                                    Image(systemName: "xmark.circle.fill")
+                                        .font(.caption2)
+                                }
+                            }
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 6)
+                            .background(OrbitTheme.gradient.opacity(0.15))
+                            .foregroundColor(OrbitTheme.purple)
+                            .clipShape(Capsule())
+                        }
+                    }
+                }
+            }
 
             // Location
             VStack(alignment: .leading, spacing: 8) {
@@ -1378,13 +1436,14 @@ struct MissionCreateView: View {
         Task {
             if let created = await viewModel.createFlexMission(
                 title: title.trimmingCharacters(in: .whitespaces),
-                activityCategory: selectedCategory,
-                customActivityName: selectedCategory == .custom ? customActivityName.trimmingCharacters(in: .whitespaces) : nil,
+                activityCategory: .hangout,
+                customActivityName: nil,
                 minGroupSize: minGroupSize,
                 maxGroupSize: maxGroupSize,
                 availability: [defaultSlot],
                 description: description.trimmingCharacters(in: .whitespaces),
-                links: linksArray
+                links: linksArray,
+                tags: tags
             ) {
                 // Save creator availability to ScheduleService so PodView loads it pre-populated
                 if let podId = created.podId, !slotsToSave.isEmpty {
@@ -1407,6 +1466,13 @@ struct MissionCreateView: View {
     }
 
     // MARK: - Helpers
+
+    private func addCustomTag() {
+        let tag = customTagText.trimmingCharacters(in: .whitespaces)
+        guard !tag.isEmpty, !tags.contains(tag) else { return }
+        tags.append(tag)
+        customTagText = ""
+    }
 
     private func hourString(_ hour: Int) -> String {
         let h = hour % 12 == 0 ? 12 : hour % 12
