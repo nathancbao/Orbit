@@ -3,12 +3,17 @@ import SwiftUI
 struct MainTabView: View {
     @State var profile: Profile
     let onEditProfile: () -> Void
+    @Binding var deepLinkFriendId: Int?
 
     @State private var selectedTab: Tab = .discovery
+    @State private var deepLinkProfile: Profile?
+    @State private var deepLinkUserId: Int?
+    @State private var showDeepLinkProfile = false
 
-    init(profile: Profile, onEditProfile: @escaping () -> Void) {
+    init(profile: Profile, onEditProfile: @escaping () -> Void, deepLinkFriendId: Binding<Int?>) {
         _profile = State(initialValue: profile)
         self.onEditProfile = onEditProfile
+        _deepLinkFriendId = deepLinkFriendId
     }
 
     enum Tab: CaseIterable {
@@ -127,5 +132,37 @@ struct MainTabView: View {
             )
         }
         .ignoresSafeArea(edges: .bottom)
+        .onAppear { handleDeepLinkIfNeeded() }
+        .onChange(of: deepLinkFriendId) { _, friendId in
+            guard let friendId else { return }
+            Task {
+                if let friendProfile = try? await ProfileService.shared.getUserProfile(id: friendId) {
+                    deepLinkProfile = friendProfile
+                    deepLinkUserId = friendId
+                    showDeepLinkProfile = true
+                }
+                deepLinkFriendId = nil
+            }
+        }
+        .sheet(isPresented: $showDeepLinkProfile) {
+            if let friendProfile = deepLinkProfile, let userId = deepLinkUserId {
+                ProfileDisplayView(
+                    profile: friendProfile,
+                    otherUserId: userId
+                )
+            }
+        }
+    }
+
+    private func handleDeepLinkIfNeeded() {
+        guard let friendId = deepLinkFriendId else { return }
+        Task {
+            if let friendProfile = try? await ProfileService.shared.getUserProfile(id: friendId) {
+                deepLinkProfile = friendProfile
+                deepLinkUserId = friendId
+                showDeepLinkProfile = true
+            }
+            deepLinkFriendId = nil
+        }
     }
 }

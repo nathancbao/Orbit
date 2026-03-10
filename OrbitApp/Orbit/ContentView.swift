@@ -12,6 +12,7 @@ enum AppState {
 // MARK: - Content View
 
 struct ContentView: View {
+    @Binding var deepLinkFriendId: Int?
     @State private var appState: AppState = .launch
     @State private var currentProfile: Profile?
 
@@ -50,7 +51,8 @@ struct ContentView: View {
                         profile: profile,
                         onEditProfile: {
                             appState = .profileSetup
-                        }
+                        },
+                        deepLinkFriendId: $deepLinkFriendId
                     )
                 } else {
                     HomeView()
@@ -97,5 +99,5 @@ struct HomeView: View {
 }
 
 #Preview {
-    ContentView()
+    ContentView(deepLinkFriendId: .constant(nil))
 }
