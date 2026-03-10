@@ -80,7 +80,9 @@ struct FriendProfile: Codable, Identifiable {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         let fb = try decoder.container(keyedBy: FallbackKeys.self)
         userId      = (try? c.decode(Int.self, forKey: .userId))
+                    ?? Int((try? c.decode(String.self, forKey: .userId)) ?? "")
                     ?? (try? fb.decode(Int.self, forKey: .id))
+                    ?? Int((try? fb.decode(String.self, forKey: .id)) ?? "")
                     ?? 0
         name        = (try? c.decode(String.self, forKey: .name)) ?? "User"
         collegeYear = (try? c.decode(String.self, forKey: .collegeYear)) ?? ""
