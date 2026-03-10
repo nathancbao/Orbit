@@ -3,6 +3,7 @@ import SwiftUI
 struct FriendRowCard: View {
     let friendship: Friendship
     @State private var showProfile = false
+    @State private var showDMChat = false
 
     var body: some View {
         Button(action: { showProfile = true }) {
@@ -27,6 +28,19 @@ struct FriendRowCard: View {
 
                 Spacer()
 
+                // DM button
+                Button {
+                    showDMChat = true
+                } label: {
+                    Image(systemName: "bubble.left.fill")
+                        .font(.system(size: 16))
+                        .foregroundStyle(OrbitTheme.gradient)
+                        .frame(width: 36, height: 36)
+                        .background(Color(.systemGray6))
+                        .clipShape(Circle())
+                }
+                .buttonStyle(.plain)
+
                 Image(systemName: "chevron.right")
                     .font(.caption)
                     .foregroundColor(.secondary)
@@ -48,6 +62,15 @@ struct FriendRowCard: View {
                         bio: friend.bio
                     ),
                     otherUserId: friend.userId
+                )
+            }
+        }
+        .sheet(isPresented: $showDMChat) {
+            if let friend = friendship.friend {
+                DMChatView(
+                    friendId: friend.userId,
+                    friendName: friend.name,
+                    friendPhoto: friend.photo
                 )
             }
         }

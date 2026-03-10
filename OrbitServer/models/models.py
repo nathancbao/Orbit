@@ -91,30 +91,6 @@ def update_user(user_id, data):
     return _entity_to_dict(entity)
 
 
-def search_users(query_str, exclude_user_id=None, limit=20):
-    """Search users by partial match on email or name (case-insensitive).
-
-    Datastore doesn't support LIKE queries, so we fetch all User entities
-    and filter in Python.  This is fine for a college-scale user base.
-    """
-    q = query_str.lower()
-    ds_query = client.query(kind='User')
-    results = []
-    for entity in ds_query.fetch():
-        d = _entity_to_dict(entity)
-        if d is None:
-            continue
-        if exclude_user_id is not None and str(d['id']) == str(exclude_user_id):
-            continue
-        name = (d.get('name') or '').lower()
-        email = (d.get('email') or '').lower()
-        if q in name or q in email:
-            results.append(d)
-            if len(results) >= limit:
-                break
-    return results
-
-
 def adjust_trust_score(user_id, delta):
     """Add delta to a user's trust_score, clamped to [0.0, 5.0].
     Uses a transaction to avoid lost updates from concurrent adjustments."""
@@ -884,3 +860,92 @@ def find_friendship(user_id, friend_id):
 def delete_friendship(friendship_id):
     key = client.key('Friendship', int(friendship_id))
     client.delete(key)
+
+
+# ── DM Helpers ────────────────────────────────────────────────────────────────
+
+def dm_conversation_id(user_a, user_b):
+    """Deterministic conversation ID for a DM between two users."""
+    a, b = sorted([int(user_a), int(user_b)])
+    return f"dm_{a}_{b}"
+
+
+def list_dm_conversations(user_id):
+    """Return distinct DM conversation IDs this user participates in,
+    along with the last message in each conversation.
+
+    DMs reuse the ChatMessage entity with pod_id = 'dm_<a>_<b>'.
+    """
+    uid = int(user_id)
+    query = client.query(kind='ChatMessage')
+    # Fetch DM messages — filter by prefix isn't possible in Datastore,
+    # so we scan and filter in Python (fine for moderate DM volume).
+    results = list(query.fetch(limit=5000))
+    conversations = {}
+    for entity in results:
+        pid = entity.get('pod_id', '')
+        if not pid.startswith('dm_'):
+            continue
+        # Check if this user is a participant
+        parts = pid.split('_')
+        if len(parts) != 3:
+            continue
+        if str(uid) not in (parts[1], parts[2]):
+            continue
+        d = _entity_to_dict(entity)
+        existing = conversations.get(pid)
+        if existing is None or d['created_at'] > existing['created_at']:
+            conversations[pid] = d
+    return list(conversations.values())
+
+
+# ── PodInvite ────────────────────────────────────────────────────────────────
+# Fields: id, pod_id, from_user_id, to_user_id, status (pending|accepted|declined),
+#         created_at
+
+def create_pod_invite(pod_id, from_user_id, to_user_id):
+    key = client.key('PodInvite')
+    entity = datastore.Entity(key=key)
+    entity.update({
+        'pod_id': str(pod_id),
+        'from_user_id': int(from_user_id),
+        'to_user_id': int(to_user_id),
+        'status': 'pending',
+        'created_at': datetime.datetime.utcnow(),
+    })
+    client.put(entity)
+    return _entity_to_dict(entity)
+
+
+def get_pod_invite(invite_id):
+    key = client.key('PodInvite', int(invite_id))
+    entity = client.get(key)
+    return _entity_to_dict(entity)
+
+
+def update_pod_invite_status(invite_id, status):
+    key = client.key('PodInvite', int(invite_id))
+    entity = client.get(key)
+    if not entity:
+        return None
+    entity['status'] = status
+    client.put(entity)
+    return _entity_to_dict(entity)
+
+
+def list_incoming_pod_invites(user_id):
+    query = client.query(kind='PodInvite')
+    query.add_filter(filter=PropertyFilter('to_user_id', '=', int(user_id)))
+    query.add_filter(filter=PropertyFilter('status', '=', 'pending'))
+    results = list(query.fetch(limit=100))
+    return [_entity_to_dict(e) for e in results]
+
+
+def find_pending_pod_invite(pod_id, from_user_id, to_user_id):
+    """Find an existing pending invite for this pod/user pair."""
+    query = client.query(kind='PodInvite')
+    query.add_filter(filter=PropertyFilter('pod_id', '=', str(pod_id)))
+    query.add_filter(filter=PropertyFilter('to_user_id', '=', int(to_user_id)))
+    query.add_filter(filter=PropertyFilter('status', '=', 'pending'))
+    results = list(query.fetch(limit=1))
+    return _entity_to_dict(results[0]) if results else None

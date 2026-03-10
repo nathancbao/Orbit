@@ -18,8 +18,8 @@ struct PodView: View {
     @State private var showRenameAlert = false
     @State private var renameText = ""
     @State private var showLeaveAlert = false
-    @State private var selectedMemberProfile: Profile?
-    @State private var selectedMemberUserId: Int?
+    @State private var showInviteSheet = false
+    @State private var selectedMember: (profile: Profile, userId: Int)?
     @State private var isLoadingProfile = false
     @Environment(\.dismiss) private var dismiss
 
@@ -80,10 +80,21 @@ struct PodView: View {
                     onCancel: { showVoteSheet = false }
                 )
             }
-            .sheet(item: $selectedMemberProfile) { profile in
-                ProfileDisplayView(
-                    profile: profile,
-                    otherUserId: selectedMemberUserId != currentUserId ? selectedMemberUserId : nil
+            .sheet(isPresented: Binding(
+                get: { selectedMember != nil },
+                set: { if !$0 { selectedMember = nil } }
+            )) {
+                if let member = selectedMember {
+                    ProfileDisplayView(
+                        profile: member.profile,
+                        otherUserId: member.userId != currentUserId ? member.userId : nil
+                    )
+                }
+            }
+            .sheet(isPresented: $showInviteSheet) {
+                PodInviteSheet(
+                    podId: podId,
+                    currentMemberIds: viewModel.pod?.memberIds ?? []
                 )
             }
             .sheet(isPresented: $showScheduleSheet) {
@@ -226,13 +237,12 @@ struct PodView: View {
 
     private func loadMemberProfile(userId: Int) {
         isLoadingProfile = true
-        selectedMemberUserId = userId
         Task {
             do {
                 let profile = try await ProfileService.shared.getUserProfile(id: userId)
                 await MainActor.run {
                     isLoadingProfile = false
-                    selectedMemberProfile = profile
+                    selectedMember = (profile: profile, userId: userId)
                 }
             } catch {
                 await MainActor.run {
@@ -269,6 +279,9 @@ struct PodView: View {
                     ActionChip(icon: "checkmark.seal", label: "I showed up!") {
                         Task { await viewModel.confirmAttendance() }
                     }
+                }
+                ActionChip(icon: "person.badge.plus", label: "Invite") {
+                    showInviteSheet = true
                 }
                 ActionChip(icon: "rectangle.portrait.and.arrow.right", label: "Leave Pod") {
                     showLeaveAlert = true

@@ -42,7 +42,9 @@
       "WebSearch",
       "WebFetch(domain:github.com)",
       "WebFetch(domain:raw.githubusercontent.com)",
-      "Bash(git -C /Users/jonathan/Desktop/ECS_191/Orbit status)"
+      "Bash(git -C /Users/jonathan/Desktop/ECS_191/Orbit status)",
+      "Bash(mdfind:*)",
+      "Bash(sudo xcode-select:*)"
     ]
   }
 }

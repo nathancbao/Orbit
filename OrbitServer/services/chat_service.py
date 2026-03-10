@@ -4,7 +4,9 @@ from OrbitServer.models.models import (
     get_pod, create_chat_message, list_chat_messages,
     create_vote, get_vote, update_vote, list_votes_for_pod,
     update_pod, transactional_vote_update,
+    dm_conversation_id, list_dm_conversations, get_user,
 )
+from OrbitServer.models.models import find_friendship
 from OrbitServer.utils.profanity import filter_message
 
 
@@ -135,3 +137,54 @@ def get_votes_for_pod(pod_id, requesting_user_id):
     if int(requesting_user_id) not in (pod.get('member_ids') or []):
         return None, "You are not a member of this pod"
     return list_votes_for_pod(pod_id), None
+
+
+# ── DM Functions ─────────────────────────────────────────────────────────────
+
+def get_dm_messages(current_user_id, friend_id):
+    """Return messages in a DM conversation. Both users must be friends."""
+    if not find_friendship(current_user_id, friend_id):
+        return None, "You are not friends with this user"
+    conv_id = dm_conversation_id(current_user_id, friend_id)
+    messages = list_chat_messages(conv_id)
+    return messages, None
+
+
+def send_dm_message(current_user_id, friend_id, content):
+    """Send a DM to a friend."""
+    if not find_friendship(current_user_id, friend_id):
+        return None, "You are not friends with this user"
+
+    is_clean, reason = filter_message(content)
+    if not is_clean:
+        return None, reason
+
+    conv_id = dm_conversation_id(current_user_id, friend_id)
+    msg = create_chat_message(conv_id, current_user_id, content.strip(), message_type='text')
+    return msg, None
+
+
+def get_dm_conversations(user_id):
+    """Return list of DM conversations for this user, with last message and friend profile."""
+    last_messages = list_dm_conversations(user_id)
+    uid = int(user_id)
+    result = []
+    for msg in last_messages:
+        conv_id = msg.get('pod_id', '')
+        parts = conv_id.split('_')
+        if len(parts) != 3:
+            continue
+        friend_id = int(parts[1]) if int(parts[2]) == uid else int(parts[2])
+        friend = get_user(friend_id)
+        result.append({
+            'conversation_id': conv_id,
+            'friend_id': friend_id,
+            'friend_name': friend.get('name', '') if friend else '',
+            'friend_photo': friend.get('photo') if friend else None,
+            'last_message': msg.get('content', ''),
+            'last_message_at': msg.get('created_at', ''),
+            'last_message_user_id': msg.get('user_id'),
+        })
+    # Sort by most recent message first
+    result.sort(key=lambda x: x['last_message_at'], reverse=True)
+    return result, None

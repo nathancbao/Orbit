@@ -6,6 +6,7 @@ class FriendsViewModel: ObservableObject {
     @Published var friends: [Friendship] = []
     @Published var incomingRequests: [FriendRequest] = []
     @Published var outgoingRequests: [FriendRequest] = []
+    @Published var podInvites: [PodInvite] = []
     @Published var isLoading = false
     @Published var errorMessage: String?
     @Published var searchText: String = ""
@@ -26,7 +27,7 @@ class FriendsViewModel: ObservableObject {
         }
     }
 
-    var inboxCount: Int { incomingRequests.count }
+    var inboxCount: Int { incomingRequests.count + podInvites.count }
 
     // MARK: - Load
 
@@ -36,10 +37,12 @@ class FriendsViewModel: ObservableObject {
         async let friendsResult = FriendService.shared.getFriends()
         async let incomingResult = FriendService.shared.getIncomingRequests()
         async let outgoingResult = FriendService.shared.getOutgoingRequests()
+        async let podInvitesResult = PodService.shared.getIncomingInvites()
 
         do { friends = try await friendsResult } catch { print("[Friends] friends error: \(error)") }
         do { incomingRequests = try await incomingResult } catch { print("[Friends] incoming error: \(error)") }
         do { outgoingRequests = try await outgoingResult } catch { print("[Friends] outgoing error: \(error)") }
+        do { podInvites = try await podInvitesResult } catch { print("[Friends] pod invites error: \(error)") }
 
         isLoading = false
     }
@@ -82,6 +85,26 @@ class FriendsViewModel: ObservableObject {
         } catch {
             errorMessage = error.localizedDescription
             return false
+        }
+    }
+
+    // MARK: - Pod Invites
+
+    func acceptPodInvite(_ invite: PodInvite) async {
+        do {
+            _ = try await PodService.shared.acceptInvite(inviteId: invite.id)
+            podInvites.removeAll { $0.id == invite.id }
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    func declinePodInvite(_ invite: PodInvite) async {
+        do {
+            try await PodService.shared.declineInvite(inviteId: invite.id)
+            podInvites.removeAll { $0.id == invite.id }
+        } catch {
+            errorMessage = error.localizedDescription
         }
     }
 

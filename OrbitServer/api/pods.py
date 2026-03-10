@@ -7,6 +7,9 @@ from OrbitServer.services.pod_service import (
     get_pod_with_members, vote_to_kick, confirm_attendance, leave_pod,
 )
 from OrbitServer.services.schedule_service import submit_availability, confirm_slot
+from OrbitServer.services.pod_invite_service import (
+    send_pod_invite, accept_pod_invite, decline_pod_invite, get_incoming_invites,
+)
 from OrbitServer.utils.validators import validate_schedule_slots
 from OrbitServer.utils.helpers import safe_int
 
@@ -113,3 +116,45 @@ def confirm_schedule_slot(pod_id):
     if err:
         return error(err, 400)
     return success(pod)
+
+
+# ── Pod Invites ──────────────────────────────────────────────────────────────
+
+@pods_bp.route('/<pod_id>/invite', methods=['POST'])
+@require_auth
+def invite_to_pod(pod_id):
+    data = request.get_json(silent=True) or {}
+    to_user_id = data.get('to_user_id')
+    if to_user_id is None:
+        return error("to_user_id is required", 400)
+    invite, err, status_code = send_pod_invite(pod_id, g.user_id, int(to_user_id))
+    if err:
+        return error(err, status_code)
+    return success(invite)
+
+
+@pods_bp.route('/invites/incoming', methods=['GET'])
+@require_auth
+def incoming_invites():
+    data, err = get_incoming_invites(g.user_id)
+    if err:
+        return error(err, 500)
+    return success(data)
+
+
+@pods_bp.route('/invites/<int:invite_id>/accept', methods=['POST'])
+@require_auth
+def accept_invite(invite_id):
+    pod, err, status_code = accept_pod_invite(invite_id, g.user_id)
+    if err:
+        return error(err, status_code)
+    return success(pod)
+
+
+@pods_bp.route('/invites/<int:invite_id>/decline', methods=['POST'])
+@require_auth
+def decline_invite(invite_id):
+    result, err, status_code = decline_pod_invite(invite_id, g.user_id)
+    if err:
+        return error(err, status_code)
+    return success(result)

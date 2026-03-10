@@ -70,8 +70,7 @@ struct MissionDetailView: View {
     // Member profiles
     @State private var podMembers: [PodMember] = []
     @State private var selectedMemberForPreview: PodMember?
-    @State private var selectedMemberProfile: Profile?
-    @State private var selectedMemberUserId: Int?
+    @State private var selectedMember: (profile: Profile, userId: Int)?
 
     @Environment(\.dismiss) private var dismiss
 
@@ -128,8 +127,13 @@ struct MissionDetailView: View {
             MemberPreviewSheet(member: member)
                 .presentationDetents([.medium])
         }
-        .sheet(item: $selectedMemberProfile) { profile in
-            ProfileDisplayView(profile: profile, otherUserId: selectedMemberUserId)
+        .sheet(isPresented: Binding(
+            get: { selectedMember != nil },
+            set: { if !$0 { selectedMember = nil } }
+        )) {
+            if let member = selectedMember {
+                ProfileDisplayView(profile: member.profile, otherUserId: member.userId)
+            }
         }
         .onAppear {
             if mission.isFlexMode {
@@ -546,10 +550,10 @@ struct MissionDetailView: View {
     private func handleMemberTap(_ member: PodMember) {
         if isInPod {
             // Full profile for pod members
-            selectedMemberUserId = member.userId
+            let uid = member.userId
             Task {
-                if let profile = try? await ProfileService.shared.getUserProfile(id: member.userId) {
-                    selectedMemberProfile = profile
+                if let profile = try? await ProfileService.shared.getUserProfile(id: uid) {
+                    selectedMember = (profile: profile, userId: uid)
                 }
             }
         } else {

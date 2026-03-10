@@ -9,12 +9,7 @@ struct FriendsView: View {
     @StateObject private var viewModel = FriendsViewModel()
     @State private var showProfile = false
     @State private var showInbox = false
-    @State private var showShareSheet = false
     @State private var showSearch = false
-
-    private var currentUserId: Int {
-        UserDefaults.standard.integer(forKey: "orbit_user_id")
-    }
 
     var body: some View {
         NavigationStack {
@@ -33,7 +28,7 @@ struct FriendsView: View {
                             .foregroundStyle(OrbitTheme.gradient)
                         Text("no friends yet")
                             .font(.headline)
-                        Text("search by email or share your link to add friends")
+                        Text("search by email or name to add friends")
                             .font(.subheadline)
                             .foregroundColor(.secondary)
                             .multilineTextAlignment(.center)
@@ -115,16 +110,8 @@ struct FriendsView: View {
                     }
                 }
                 ToolbarItem(placement: .navigationBarTrailing) {
-                    HStack(spacing: 16) {
-                        Button { showShareSheet = true } label: {
-                            Image(systemName: "qrcode")
-                                .font(.system(size: 18))
-                                .fontWeight(.medium)
-                                .foregroundStyle(Color.primary)
-                        }
-                        Button { showProfile = true } label: {
-                            ProfileAvatarView(photo: userProfile.photo, size: 34, name: userProfile.name)
-                        }
+                    Button { showProfile = true } label: {
+                        ProfileAvatarView(photo: userProfile.photo, size: 34, name: userProfile.name)
                     }
                 }
             }
@@ -138,9 +125,6 @@ struct FriendsView: View {
         }
         .sheet(isPresented: $showInbox) {
             FriendInboxView(viewModel: viewModel)
-        }
-        .sheet(isPresented: $showShareSheet) {
-            FriendShareView(userId: currentUserId, userName: userProfile.name)
         }
         .sheet(isPresented: $showSearch) {
             FriendSearchView(viewModel: viewModel)

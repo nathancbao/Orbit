@@ -4,14 +4,38 @@ struct FriendInboxView: View {
     @ObservedObject var viewModel: FriendsViewModel
     @Environment(\.dismiss) private var dismiss
 
+    private var hasContent: Bool {
+        !viewModel.incomingRequests.isEmpty ||
+        !viewModel.outgoingRequests.isEmpty ||
+        !viewModel.podInvites.isEmpty
+    }
+
     var body: some View {
         NavigationStack {
             ScrollView {
                 VStack(spacing: 24) {
+                    // Pod Invites
+                    if !viewModel.podInvites.isEmpty {
+                        VStack(alignment: .leading, spacing: 12) {
+                            Text("Pod Invites")
+                                .font(.headline)
+                                .padding(.horizontal, 20)
+
+                            ForEach(viewModel.podInvites) { invite in
+                                PodInviteCard(
+                                    invite: invite,
+                                    onAccept: { Task { await viewModel.acceptPodInvite(invite) } },
+                                    onDecline: { Task { await viewModel.declinePodInvite(invite) } }
+                                )
+                                .padding(.horizontal, 20)
+                            }
+                        }
+                    }
+
                     // Incoming Requests
                     if !viewModel.incomingRequests.isEmpty {
                         VStack(alignment: .leading, spacing: 12) {
-                            Text("Incoming Requests")
+                            Text("Friend Requests")
                                 .font(.headline)
                                 .padding(.horizontal, 20)
 
@@ -41,13 +65,13 @@ struct FriendInboxView: View {
                     }
 
                     // Empty state
-                    if viewModel.incomingRequests.isEmpty && viewModel.outgoingRequests.isEmpty {
+                    if !hasContent {
                         VStack(spacing: 12) {
                             Spacer(minLength: 80)
                             Image(systemName: "tray")
                                 .font(.system(size: 36))
                                 .foregroundColor(.secondary)
-                            Text("no pending requests")
+                            Text("no notifications")
                                 .font(.headline)
                                 .foregroundColor(.secondary)
                         }
@@ -57,7 +81,7 @@ struct FriendInboxView: View {
                 .padding(.top, 16)
                 .padding(.bottom, 40)
             }
-            .navigationTitle("Friend Requests")
+            .navigationTitle("Inbox")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
@@ -70,6 +94,62 @@ struct FriendInboxView: View {
             }
         }
         .task { await viewModel.loadAll() }
+    }
+}
+
+// MARK: - Pod Invite Card
+
+struct PodInviteCard: View {
+    let invite: PodInvite
+    let onAccept: () -> Void
+    let onDecline: () -> Void
+
+    var body: some View {
+        HStack(spacing: 12) {
+            ProfileAvatarView(
+                photo: invite.fromUser?.photo,
+                size: 44,
+                name: invite.fromUser?.name
+            )
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(invite.fromUser?.name ?? "Someone")
+                    .font(.subheadline)
+                    .fontWeight(.semibold)
+                Text("invited you to join their pod for \(invite.activityLabel)")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                    .lineLimit(2)
+            }
+
+            Spacer()
+
+            HStack(spacing: 8) {
+                Button(action: onDecline) {
+                    Image(systemName: "xmark")
+                        .font(.caption)
+                        .fontWeight(.bold)
+                        .foregroundColor(.secondary)
+                        .frame(width: 32, height: 32)
+                        .background(Color(.systemGray5))
+                        .clipShape(Circle())
+                }
+
+                Button(action: onAccept) {
+                    Image(systemName: "checkmark")
+                        .font(.caption)
+                        .fontWeight(.bold)
+                        .foregroundColor(.white)
+                        .frame(width: 32, height: 32)
+                        .background(OrbitTheme.gradientFill)
+                        .clipShape(Circle())
+                }
+            }
+        }
+        .padding(14)
+        .background(Color.white)
+        .cornerRadius(14)
+        .shadow(color: .black.opacity(0.06), radius: 8, x: 0, y: 2)
     }
 }
 

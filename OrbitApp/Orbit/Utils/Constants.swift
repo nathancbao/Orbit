@@ -66,6 +66,16 @@ enum Constants {
             static func podVoteRespond(_ podId: String, _ voteId: String) -> String {
                 "/pods/\(podId)/votes/\(voteId)/respond"
             }
+
+            // DMs
+            static let dmConversations = "/dm/conversations"
+            static func dmMessages(_ friendId: Int) -> String { "/dm/\(friendId)/messages" }
+
+            // Pod Invites
+            static func podInvite(_ podId: String) -> String { "/pods/\(podId)/invite" }
+            static let podInvitesIncoming = "/pods/invites/incoming"
+            static func podInviteAccept(_ id: Int) -> String { "/pods/invites/\(id)/accept" }
+            static func podInviteDecline(_ id: Int) -> String { "/pods/invites/\(id)/decline" }
         }
     }
 

@@ -46,6 +46,41 @@ class PodService {
             authenticated: true
         )
     }
+
+    // MARK: - Pod Invites
+
+    func sendInvite(podId: String, toUserId: Int) async throws -> PodInvite {
+        let body: [String: Any] = ["to_user_id": toUserId]
+        return try await APIService.shared.request(
+            endpoint: Constants.API.Endpoints.podInvite(podId),
+            method: "POST",
+            body: body,
+            authenticated: true
+        )
+    }
+
+    func getIncomingInvites() async throws -> [PodInvite] {
+        return try await APIService.shared.request(
+            endpoint: Constants.API.Endpoints.podInvitesIncoming,
+            authenticated: true
+        )
+    }
+
+    func acceptInvite(inviteId: Int) async throws -> Pod {
+        return try await APIService.shared.request(
+            endpoint: Constants.API.Endpoints.podInviteAccept(inviteId),
+            method: "POST",
+            authenticated: true
+        )
+    }
+
+    func declineInvite(inviteId: Int) async throws {
+        let _: EmptyResponse = try await APIService.shared.request(
+            endpoint: Constants.API.Endpoints.podInviteDecline(inviteId),
+            method: "POST",
+            authenticated: true
+        )
+    }
 }
 
 struct KickResponse: Codable {
