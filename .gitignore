@@ -87,3 +87,6 @@ Thumbs.db
 # Xcode user data
 *.xcuserstate
 xcuserdata/
+
+# auth key file
+AuthKey_DSPV6J64KX.p8
