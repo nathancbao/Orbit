@@ -69,6 +69,16 @@ class FriendService {
         )
     }
 
+    // MARK: - Search Users
+
+    func searchUsers(query: String) async throws -> [FriendProfile] {
+        let encoded = query.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? query
+        return try await APIService.shared.request(
+            endpoint: Constants.API.Endpoints.friendSearch(encoded),
+            authenticated: true
+        )
+    }
+
     // MARK: - Check Status
 
     func checkFriendStatus(userId: Int) async throws -> FriendStatus {

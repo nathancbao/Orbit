@@ -10,6 +10,13 @@ class FriendsViewModel: ObservableObject {
     @Published var errorMessage: String?
     @Published var searchText: String = ""
 
+    // User search
+    @Published var userSearchText: String = ""
+    @Published var userSearchResults: [FriendProfile] = []
+    @Published var isSearching = false
+    @Published var sentRequestUserIds: Set<Int> = []
+    private var searchTask: Task<Void, Never>?
+
     var filteredFriends: [Friendship] {
         if searchText.isEmpty { return friends }
         return friends.filter {
@@ -73,6 +80,44 @@ class FriendsViewModel: ObservableObject {
         } catch {
             errorMessage = error.localizedDescription
             return false
+        }
+    }
+
+    // MARK: - User Search
+
+    func searchUsers() {
+        let query = userSearchText.trimmingCharacters(in: .whitespaces)
+        searchTask?.cancel()
+
+        guard query.count >= 3 else {
+            userSearchResults = []
+            isSearching = false
+            return
+        }
+
+        isSearching = true
+        searchTask = Task {
+            // Debounce — wait a beat before hitting the API
+            try? await Task.sleep(for: .milliseconds(400))
+            guard !Task.isCancelled else { return }
+
+            if let results = try? await FriendService.shared.searchUsers(query: query) {
+                guard !Task.isCancelled else { return }
+                // Filter out yourself and existing friends
+                let currentUserId = UserDefaults.standard.integer(forKey: "orbit_user_id")
+                let friendIds = Set(friends.compactMap { $0.friend?.userId })
+                userSearchResults = results.filter { $0.userId != currentUserId && !friendIds.contains($0.userId) }
+            } else {
+                userSearchResults = []
+            }
+            isSearching = false
+        }
+    }
+
+    func sendRequestFromSearch(toUserId: Int) async {
+        let success = await sendRequest(toUserId: toUserId)
+        if success {
+            sentRequestUserIds.insert(toUserId)
         }
     }
 }

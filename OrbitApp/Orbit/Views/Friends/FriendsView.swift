@@ -10,6 +10,7 @@ struct FriendsView: View {
     @State private var showProfile = false
     @State private var showInbox = false
     @State private var showShareSheet = false
+    @State private var showSearch = false
 
     private var currentUserId: Int {
         UserDefaults.standard.integer(forKey: "orbit_user_id")
@@ -32,14 +33,14 @@ struct FriendsView: View {
                             .foregroundStyle(OrbitTheme.gradient)
                         Text("no friends yet")
                             .font(.headline)
-                        Text("share your link or QR code to add friends")
+                        Text("search by email or share your link to add friends")
                             .font(.subheadline)
                             .foregroundColor(.secondary)
                             .multilineTextAlignment(.center)
                             .padding(.horizontal, 40)
 
-                        Button { showShareSheet = true } label: {
-                            Label("Share My Link", systemImage: "square.and.arrow.up")
+                        Button { showSearch = true } label: {
+                            Label("Find Friends", systemImage: "magnifyingglass")
                                 .fontWeight(.semibold)
                                 .foregroundColor(.white)
                                 .padding(.horizontal, 24)
@@ -87,21 +88,29 @@ struct FriendsView: View {
             .navigationBarTitleDisplayMode(.large)
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
-                    Button { showInbox = true } label: {
-                        ZStack(alignment: .topTrailing) {
-                            Image(systemName: "tray")
+                    HStack(spacing: 16) {
+                        Button { showInbox = true } label: {
+                            ZStack(alignment: .topTrailing) {
+                                Image(systemName: "tray")
+                                    .font(.system(size: 18))
+                                    .fontWeight(.medium)
+                                    .foregroundStyle(Color.primary)
+                                if viewModel.inboxCount > 0 {
+                                    Text("\(viewModel.inboxCount)")
+                                        .font(.system(size: 10, weight: .bold))
+                                        .foregroundColor(.white)
+                                        .padding(3)
+                                        .background(Color.red)
+                                        .clipShape(Circle())
+                                        .offset(x: 6, y: -6)
+                                }
+                            }
+                        }
+                        Button { showSearch = true } label: {
+                            Image(systemName: "person.badge.plus")
                                 .font(.system(size: 18))
                                 .fontWeight(.medium)
                                 .foregroundStyle(Color.primary)
-                            if viewModel.inboxCount > 0 {
-                                Text("\(viewModel.inboxCount)")
-                                    .font(.system(size: 10, weight: .bold))
-                                    .foregroundColor(.white)
-                                    .padding(3)
-                                    .background(Color.red)
-                                    .clipShape(Circle())
-                                    .offset(x: 6, y: -6)
-                            }
                         }
                     }
                 }
@@ -132,6 +141,9 @@ struct FriendsView: View {
         }
         .sheet(isPresented: $showShareSheet) {
             FriendShareView(userId: currentUserId, userName: userProfile.name)
+        }
+        .sheet(isPresented: $showSearch) {
+            FriendSearchView(viewModel: viewModel)
         }
         .task { await viewModel.loadAll() }
         .onChange(of: isActive) { _, active in
