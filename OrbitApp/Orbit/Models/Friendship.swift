@@ -30,6 +30,21 @@ struct FriendRequest: Codable, Identifiable {
         case fromUser   = "from_user"
         case toUser     = "to_user"
     }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        // Backend may return id as string or int
+        id          = (try? c.decode(Int.self, forKey: .id))
+                    ?? Int((try? c.decode(String.self, forKey: .id)) ?? "") ?? 0
+        fromUserId  = (try? c.decode(Int.self, forKey: .fromUserId))
+                    ?? Int((try? c.decode(String.self, forKey: .fromUserId)) ?? "") ?? 0
+        toUserId    = (try? c.decode(Int.self, forKey: .toUserId))
+                    ?? Int((try? c.decode(String.self, forKey: .toUserId)) ?? "") ?? 0
+        status      = (try? c.decode(FriendRequestStatus.self, forKey: .status)) ?? .pending
+        createdAt   = (try? c.decode(String.self, forKey: .createdAt)) ?? ""
+        fromUser    = try? c.decodeIfPresent(FriendProfile.self, forKey: .fromUser)
+        toUser      = try? c.decodeIfPresent(FriendProfile.self, forKey: .toUser)
+    }
 }
 
 // MARK: - Friendship (accepted)
@@ -48,6 +63,19 @@ struct Friendship: Codable, Identifiable {
         case friendId = "friend_id"
         case createdAt = "created_at"
         case friend
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        // Backend may return id as string or int
+        id        = (try? c.decode(Int.self, forKey: .id))
+                  ?? Int((try? c.decode(String.self, forKey: .id)) ?? "") ?? 0
+        userId    = (try? c.decode(Int.self, forKey: .userId))
+                  ?? Int((try? c.decode(String.self, forKey: .userId)) ?? "") ?? 0
+        friendId  = (try? c.decode(Int.self, forKey: .friendId))
+                  ?? Int((try? c.decode(String.self, forKey: .friendId)) ?? "") ?? 0
+        createdAt = (try? c.decode(String.self, forKey: .createdAt)) ?? ""
+        friend    = try? c.decodeIfPresent(FriendProfile.self, forKey: .friend)
     }
 }
 
@@ -101,5 +129,12 @@ struct FriendStatus: Codable {
     enum CodingKeys: String, CodingKey {
         case status
         case requestId = "request_id"
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        status    = (try? c.decode(String.self, forKey: .status)) ?? "none"
+        requestId = (try? c.decode(Int.self, forKey: .requestId))
+                  ?? Int((try? c.decode(String.self, forKey: .requestId)) ?? "")
     }
 }

@@ -13,7 +13,7 @@ def _friend_profile(user):
     if not user:
         return None
     return {
-        'user_id': user.get('id'),
+        'user_id': int(user.get('id', 0)),
         'name': user.get('name', ''),
         'college_year': user.get('college_year', ''),
         'interests': user.get('interests', []),
@@ -158,4 +158,4 @@ def get_friendship_status(current_user_id, target_user_id):
 def search_users(query, current_user_id):
     """Search users by name or email, returning FriendProfile shapes."""
     users = ds_search_users(query, exclude_user_id=current_user_id, limit=20)
-    return [_friend_profile(u) for u in users], None
+    return [p for u in users if (p := _friend_profile(u)) is not None], None
