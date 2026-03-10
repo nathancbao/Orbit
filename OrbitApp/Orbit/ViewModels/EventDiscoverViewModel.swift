@@ -56,7 +56,10 @@ class MissionsViewModel: ObservableObject {
             all = all.filter { $0.mode == mode }
         }
         if let tag = filterTag {
-            all = all.filter { $0.tags.contains(tag) }
+            all = all.filter {
+                $0.tags.contains(tag)
+                || $0.activityCategory?.displayName == tag
+            }
         }
         return all
     }
