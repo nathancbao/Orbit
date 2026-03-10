@@ -36,9 +36,10 @@ def discover():
         limit = 20
     cursor = request.args.get('cursor') or None
     category = request.args.get('category') or None
+    tag = request.args.get('tag') or None
 
     signals, next_cursor, err = get_all_signals(
-        g.user_id, limit=limit, cursor=cursor, category=category,
+        g.user_id, limit=limit, cursor=cursor, category=category, tag=tag,
     )
     if err:
         return error(err, 500)

@@ -533,6 +533,7 @@ def create_signal(data, creator_id):
         'min_group_size': int(data.get('min_group_size', 3)),
         'max_group_size': int(data.get('max_group_size', 6)),
         'availability': data.get('availability', []),
+        'tags': data.get('tags', []),
         'links': data.get('links', []),
         'time_range_start': int(data.get('time_range_start', 9)),
         'time_range_end': int(data.get('time_range_end', 21)),
@@ -563,15 +564,17 @@ def list_signals_for_user(user_id, limit=100):
     return [_entity_to_dict(e) for e in results]
 
 
-def list_all_signals(limit=50, cursor=None, category=None):
+def list_all_signals(limit=50, cursor=None, category=None, tag=None):
     """Return Signal entities, newest first (for discover feed).
 
-    Supports cursor-based pagination and optional category filter.
+    Supports cursor-based pagination and optional category/tag filter.
     Returns (list_of_dicts, next_cursor_string_or_None).
     """
     query = client.query(kind='Signal')
     if category:
         query.add_filter(filter=PropertyFilter('activity_category', '=', category))
+    if tag:
+        query.add_filter(filter=PropertyFilter('tags', '=', tag))
     query.order = ['-created_at']
     # Cursor comes in as a string from the API — encode to bytes for Datastore
     start = cursor.encode('utf-8') if isinstance(cursor, str) else cursor

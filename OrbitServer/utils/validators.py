@@ -222,6 +222,19 @@ def validate_signal_data(data):
                     errors.append("Each link must be 500 characters or fewer")
                     break
 
+    tags = data.get('tags')
+    if tags is not None:
+        if not isinstance(tags, list):
+            errors.append("tags must be a list")
+        elif len(tags) > 6:
+            errors.append("Maximum 6 tags allowed")
+        else:
+            valid_tags = {'Hiking', 'Gaming', 'Food', 'Sports', 'Study', 'Other'}
+            for tag in tags:
+                if not isinstance(tag, str) or tag not in valid_tags:
+                    errors.append(f"Each tag must be one of: {', '.join(sorted(valid_tags))}")
+                    break
+
     try:
         min_gs = int(data['min_group_size'])
         max_gs = int(data['max_group_size'])

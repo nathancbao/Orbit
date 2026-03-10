@@ -2,7 +2,7 @@ from OrbitServer.models.models import (
     get_pod, get_user, update_pod,
     create_pod_invite, get_pod_invite, update_pod_invite_status,
     list_incoming_pod_invites, find_pending_pod_invite,
-    find_friendship, transactional_pod_update,
+    find_friendship, transactional_pod_update, record_action,
 )
 
 
@@ -73,6 +73,14 @@ def accept_pod_invite(invite_id, user_id):
         return None, "Pod is full", 409
 
     update_pod_invite_status(invite_id, 'accepted')
+
+    # Record the join action so the mission shows in user's history
+    mission_id = pod.get('mission_id') or pod.get('signal_id')
+    if mission_id:
+        record_action(user_id, mission_id, 'joined',
+                      pod_id=pod['id'],
+                      tags_snapshot=pod.get('tags') or [])
+
     return pod, None, None
 
 
