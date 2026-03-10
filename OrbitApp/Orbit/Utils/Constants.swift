@@ -58,7 +58,7 @@ enum Constants {
             static func friendRequestDecline(_ id: Int) -> String { "/friends/requests/\(id)/decline" }
             static func friendRemove(_ id: Int) -> String { "/friends/\(id)" }
             static func friendStatus(_ userId: Int) -> String { "/friends/status/\(userId)" }
-            static func friendSearch(_ query: String) -> String { "/friends/search?q=\(query)" }
+            static let friendSearch = "/friends/search"
 
             // Chat
             static func podMessages(_ id: String) -> String { "/pods/\(id)/messages" }

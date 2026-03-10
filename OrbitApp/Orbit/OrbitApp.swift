@@ -23,12 +23,20 @@ struct OrbitApp: App {
     }
 
     private func handleDeepLink(_ url: URL) {
-        // Expected format: https://orbit-app-486204.wl.r.appspot.com/friend/{user_id}
-        let path = url.pathComponents  // e.g. ["/", "friend", "123"]
-        guard path.count >= 3,
-              path[1] == "friend",
-              let userId = Int(path[2]) else { return }
-        deepLinkFriendId = userId
+        // Universal link: https://orbit-app-486204.wl.r.appspot.com/friend/{user_id}
+        //   → pathComponents = ["/", "friend", "123"]
+        // Custom scheme:  orbit://friend/{user_id}
+        //   → host = "friend", pathComponents = ["/", "123"]
+
+        if url.scheme == "orbit", url.host == "friend",
+           let first = url.pathComponents.dropFirst().first,
+           let userId = Int(first) {
+            deepLinkFriendId = userId
+        } else if url.pathComponents.count >= 3,
+                  url.pathComponents[1] == "friend",
+                  let userId = Int(url.pathComponents[2]) {
+            deepLinkFriendId = userId
+        }
     }
 }
 
