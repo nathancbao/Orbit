@@ -77,6 +77,10 @@ enum Constants {
             static let dmConversations = "/dm/conversations"
             static func dmMessages(_ friendId: Int) -> String { "/dm/\(friendId)/messages" }
 
+            // Voyage
+            static let voyageClusters = "/voyage/clusters"
+            static let voyageHeartbeat = "/voyage/heartbeat"
+
             // Pod Invites
             static func podInvite(_ podId: String) -> String { "/pods/\(podId)/invite" }
             static let podInvitesIncoming = "/pods/invites/incoming"

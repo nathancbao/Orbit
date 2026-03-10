@@ -759,6 +759,7 @@ struct DiscoveryView: View {
     @State private var createPrefillTags: [String] = []
     @State private var showRecommendationsSheet = false
     @State private var showProfile = false
+    @State private var showVoyage = false
 
     init(userProfile: Binding<Profile>, isActive: Bool = false) {
         _userProfile = userProfile
@@ -895,6 +896,30 @@ struct DiscoveryView: View {
                     // Motivational banner
                     MotivationalBannerView()
                 }
+            }
+            .overlay(alignment: .bottom) {
+                Button {
+                    UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                    showVoyage = true
+                } label: {
+                    HStack(spacing: 8) {
+                        Image(systemName: "sparkles")
+                            .font(.system(size: 14, weight: .bold))
+                        Text("VOYAGE")
+                            .font(.system(size: 15, weight: .bold, design: .rounded))
+                            .tracking(2)
+                    }
+                    .foregroundColor(.white)
+                    .padding(.horizontal, 32)
+                    .padding(.vertical, 14)
+                    .background(OrbitTheme.gradientFill)
+                    .clipShape(Capsule())
+                    .shadow(color: OrbitTheme.purple.opacity(0.4), radius: 12, y: 4)
+                }
+                .padding(.bottom, 24)
+            }
+            .fullScreenCover(isPresented: $showVoyage) {
+                VoyageView()
             }
             .onAppear {
                 generateImageStars(in: geometry.size)
