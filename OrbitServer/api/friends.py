@@ -6,22 +6,23 @@ from OrbitServer.services.friend_service import (
     get_friends, send_friend_request,
     get_incoming_requests, get_outgoing_requests,
     accept_friend_request, decline_friend_request,
-    remove_friend, get_friendship_status,
-    search_friends,
+    remove_friend, get_friendship_status, search_users,
 )
 
 friends_bp = Blueprint('friends', __name__, url_prefix='/api/friends')
 
 
-# ── GET /friends/search ───────────────────────────────────────────────────────
+# ── GET /friends/search ──────────────────────────────────────────────────────
 
 @friends_bp.route('/search', methods=['GET'])
 @require_auth
 def search():
     q = request.args.get('q', '').strip()
-    data, err = search_friends(q, g.user_id)
+    if len(q) < 3:
+        return error("Query must be at least 3 characters", 400)
+    data, err = search_users(q, g.user_id)
     if err:
-        return error(err, 400)
+        return error(err, 500)
     return success(data)
 
 
@@ -43,7 +44,7 @@ def list_friends():
 def create_request():
     body = request.get_json(silent=True) or {}
     to_user_id = body.get('to_user_id')
-    if not to_user_id:
+    if to_user_id is None:
         return error("to_user_id is required", 400)
 
     data, err = send_friend_request(g.user_id, to_user_id)

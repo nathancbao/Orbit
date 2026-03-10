@@ -153,6 +153,33 @@ Logic:
 3. Check `FriendRequest` where `from_user_id == target` and `to_user_id == g.user_id` and `status == "pending"` → `"pending_received"`
 4. Otherwise → `"none"`
 
+### 9. GET /api/friends/search?q={query}
+Search for users by email or name. Used for the "Find Friends" feature.
+
+**Query parameter:** `q` — at least 3 characters. Search against both `email` and `name` fields (case-insensitive, partial match).
+
+**Response `data`:**
+```json
+[
+  {
+    "user_id": 99,
+    "name": "Alex Chen",
+    "college_year": "junior",
+    "interests": ["Hiking", "Coffee"],
+    "photo": "https://storage.googleapis.com/...",
+    "bio": "Coffee enthusiast"
+  }
+]
+```
+
+**Logic:**
+1. Query the user/profile entities where `email` contains `q` OR `name` contains `q` (case-insensitive)
+2. Exclude the authenticated user from results
+3. Limit to 20 results
+4. Return `FriendProfile` shape for each match
+
+**Note:** This is authenticated so we know who's searching, but it returns any matching user regardless of friend status. The frontend handles filtering out existing friends.
+
 ## FriendProfile Shape
 The `friend`, `from_user`, and `to_user` embedded objects should include:
 ```json
