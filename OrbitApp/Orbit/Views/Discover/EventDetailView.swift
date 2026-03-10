@@ -317,34 +317,16 @@ struct MissionDetailView: View {
         VStack(spacing: 0) {
             ScrollView {
                 VStack(alignment: .leading, spacing: 24) {
-                    // Icon and Title
-                    HStack(spacing: 12) {
-                        if let cat = mission.activityCategory {
-                            Image(systemName: cat.icon)
-                                .font(.title)
-                                .foregroundStyle(OrbitTheme.gradient)
-                        }
-                        Text(mission.displayTitle)
-                            .font(.largeTitle)
-                            .fontWeight(.bold)
-                    }
-                    .padding(.top, 8)
+                    // Title
+                    Text(mission.displayTitle)
+                        .font(.largeTitle)
+                        .fontWeight(.bold)
+                        .padding(.top, 8)
 
-                    // Category and Status
-                    HStack(spacing: 16) {
-                        if let cat = mission.activityCategory {
-                            HStack(spacing: 6) {
-                                Image(systemName: "tag")
-                                    .foregroundStyle(OrbitTheme.gradient)
-                                Text(cat.displayName)
-                                    .font(.subheadline)
-                            }
-                        }
-                        if let status = mission.signalStatus {
-                            FlexStatusBadge(status: status)
-                        }
+                    // Status
+                    if let status = mission.signalStatus {
+                        FlexStatusBadge(status: status)
                     }
-                    .foregroundColor(.secondary)
 
                     // Group Size
                     if let label = mission.flexGroupSizeLabel {

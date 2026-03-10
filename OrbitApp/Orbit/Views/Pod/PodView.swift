@@ -230,6 +230,14 @@ struct PodView: View {
             // Chat messages
             chatBody
 
+            // Safety reminder
+            Text("Stay safe — meet in public spaces and let a friend know your plans.")
+                .font(.caption2)
+                .foregroundColor(.secondary)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, 24)
+                .padding(.vertical, 6)
+
             // Input bar
             inputBar
         }
@@ -463,14 +471,11 @@ struct MemberStripView: View {
                         onTapMember?(member)
                     } label: {
                         VStack(spacing: 4) {
-                            ZStack {
-                                Circle()
-                                    .fill(avatarColor(for: member.name))
-                                    .frame(width: 44, height: 44)
-                                Text(String(member.name.prefix(1)).uppercased())
-                                    .font(.headline)
-                                    .foregroundColor(.white)
-                            }
+                            ProfileAvatarView(
+                                photo: member.photo,
+                                size: 44,
+                                name: member.name
+                            )
 
                             Text(member.name)
                                 .font(.caption2)

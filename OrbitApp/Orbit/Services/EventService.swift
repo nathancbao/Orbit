@@ -95,6 +95,7 @@ class MissionService {
         availability: [AvailabilitySlot],
         description: String,
         links: [String] = [],
+        tags: [String] = [],
         timeRangeStart: Int = 9,
         timeRangeEnd: Int = 21
     ) async throws -> Mission {
@@ -108,10 +109,13 @@ class MissionService {
             availability: availability,
             description: description,
             links: links,
+            tags: tags,
             timeRangeStart: timeRangeStart,
             timeRangeEnd: timeRangeEnd
         )
-        return Mission.fromSignal(signal)
+        var mission = Mission.fromSignal(signal)
+        mission.tags = tags
+        return mission
     }
 
     func joinFlexMission(id: String) async throws -> Mission {
@@ -184,6 +188,7 @@ class SignalService {
         availability: [AvailabilitySlot],
         description: String,
         links: [String] = [],
+        tags: [String] = [],
         timeRangeStart: Int = 9,
         timeRangeEnd: Int = 21
     ) async throws -> Signal {
@@ -230,6 +235,9 @@ class SignalService {
         }
         if !links.isEmpty {
             body["links"] = links
+        }
+        if !tags.isEmpty {
+            body["tags"] = tags
         }
 
         return try await APIService.shared.request(
