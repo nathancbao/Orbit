@@ -664,8 +664,6 @@ struct MissionCreateView: View {
     @State private var maxPodSize = 4
 
     // Flex mode fields
-    @State private var selectedCategory: ActivityCategory = .hangout
-    @State private var customActivityName = ""
     @State private var minGroupSize = 3
     @State private var maxGroupSize = 8
     @State private var selectedDays: Set<Int> = []
@@ -1070,52 +1068,6 @@ struct MissionCreateView: View {
         }
     }
 
-    // MARK: - Category Picker
-
-    private var categorySection: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            OrbitSectionHeader(title: "What do you want to do?")
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 10) {
-                    ForEach(ActivityCategory.allCases) { category in
-                        Button {
-                            UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                            selectedCategory = category
-                        } label: {
-                            VStack(spacing: 6) {
-                                Image(systemName: category.icon)
-                                    .font(.title3)
-                                Text(category.displayName)
-                                    .font(.caption)
-                                    .fontWeight(.medium)
-                            }
-                            .padding(.horizontal, 16)
-                            .padding(.vertical, 12)
-                            .background(
-                                selectedCategory == category
-                                    ? AnyShapeStyle(OrbitTheme.gradientFill)
-                                    : AnyShapeStyle(Color(.systemGray6))
-                            )
-                            .foregroundColor(selectedCategory == category ? .white : .primary)
-                            .clipShape(RoundedRectangle(cornerRadius: 12))
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 12)
-                                    .stroke(
-                                        selectedCategory == category
-                                            ? Color.clear
-                                            : Color(.systemGray4),
-                                        lineWidth: 1
-                                    )
-                            )
-                        }
-                        .buttonStyle(.plain)
-                    }
-                }
-                .padding(.horizontal, 2)
-            }
-        }
-    }
-
     // MARK: - Day Picker
 
     private var dayPickerSection: some View {
@@ -1436,8 +1388,6 @@ struct MissionCreateView: View {
         Task {
             if let created = await viewModel.createFlexMission(
                 title: title.trimmingCharacters(in: .whitespaces),
-                activityCategory: .hangout,
-                customActivityName: nil,
                 minGroupSize: minGroupSize,
                 maxGroupSize: maxGroupSize,
                 availability: [defaultSlot],

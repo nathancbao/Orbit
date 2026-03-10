@@ -193,8 +193,6 @@ class MissionsViewModel: ObservableObject {
     @discardableResult
     func createFlexMission(
         title: String = "",
-        activityCategory: ActivityCategory,
-        customActivityName: String?,
         minGroupSize: Int,
         maxGroupSize: Int,
         availability: [AvailabilitySlot],
@@ -211,8 +209,6 @@ class MissionsViewModel: ObservableObject {
         do {
             let created = try await MissionService.shared.createFlexMission(
                 title: title,
-                activityCategory: activityCategory,
-                customActivityName: customActivityName,
                 minGroupSize: minGroupSize,
                 maxGroupSize: maxGroupSize,
                 availability: availability,

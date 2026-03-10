@@ -49,9 +49,9 @@ def discover():
 # ── POST /signals ────────────────────────────────────────────────────────────
 # Create a new signal.
 # Swift body (snake_case):
-#   activity_category, custom_activity_name?, min_group_size, max_group_size,
+#   min_group_size, max_group_size,
 #   availability: [{"date": "<ISO8601>", "time_blocks": ["morning", ...]}],
-#   description?
+#   description?, tags?, links?, activity_category? (optional, defaults to Custom)
 
 @signals_bp.route('', methods=['POST'])
 @limiter.limit("10 per minute")

@@ -191,14 +191,12 @@ def validate_signal_data(data):
     errors = []
 
     category = data.get('activity_category')
-    if not category or category not in _ACTIVITY_CATEGORIES:
+    if category and category not in _ACTIVITY_CATEGORIES:
         errors.append(f"activity_category must be one of: {', '.join(sorted(_ACTIVITY_CATEGORIES))}")
 
     if category == 'Custom':
         name = data.get('custom_activity_name', '')
-        if not name or not isinstance(name, str) or not name.strip():
-            errors.append("custom_activity_name is required for Custom activities")
-        elif len(name) > 100:
+        if name and isinstance(name, str) and len(name) > 100:
             errors.append("custom_activity_name must be 100 characters or fewer")
 
     desc = data.get('description', '')

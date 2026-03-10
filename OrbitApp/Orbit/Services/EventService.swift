@@ -88,8 +88,6 @@ class MissionService {
 
     func createFlexMission(
         title: String = "",
-        activityCategory: ActivityCategory,
-        customActivityName: String?,
         minGroupSize: Int,
         maxGroupSize: Int,
         availability: [AvailabilitySlot],
@@ -102,8 +100,6 @@ class MissionService {
         // TODO: Migrate to POST /missions with mode: "flex" on backend
         let signal = try await SignalService.shared.createSignal(
             title: title,
-            activityCategory: activityCategory,
-            customActivityName: customActivityName,
             minGroupSize: minGroupSize,
             maxGroupSize: maxGroupSize,
             availability: availability,
@@ -181,8 +177,6 @@ class SignalService {
 
     func createSignal(
         title: String = "",
-        activityCategory: ActivityCategory,
-        customActivityName: String?,
         minGroupSize: Int,
         maxGroupSize: Int,
         availability: [AvailabilitySlot],
@@ -210,19 +204,16 @@ class SignalService {
             }
         }
 
-        // Use user-provided title if given; otherwise fall back to category name
+        // Use user-provided title if given; otherwise fall back to "Flex Mission"
         let resolvedTitle: String
         if !title.trimmingCharacters(in: .whitespaces).isEmpty {
             resolvedTitle = title.trimmingCharacters(in: .whitespaces)
-        } else if activityCategory == .custom {
-            resolvedTitle = customActivityName ?? "Custom Activity"
         } else {
-            resolvedTitle = activityCategory.displayName
+            resolvedTitle = "Flex Mission"
         }
 
         var body: [String: Any] = [
             "title": resolvedTitle,
-            "activity_category": activityCategory.rawValue,
             "min_group_size": minGroupSize,
             "max_group_size": maxGroupSize,
             "availability": slotsPayload,
@@ -230,9 +221,6 @@ class SignalService {
             "time_range_start": timeRangeStart,
             "time_range_end": timeRangeEnd,
         ]
-        if let name = customActivityName, !name.isEmpty {
-            body["custom_activity_name"] = name
-        }
         if !links.isEmpty {
             body["links"] = links
         }

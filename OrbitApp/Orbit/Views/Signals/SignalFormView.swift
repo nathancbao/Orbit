@@ -7,8 +7,6 @@ struct SignalFormView: View {
     @EnvironmentObject var viewModel: SignalsViewModel
     @Environment(\.dismiss) private var dismiss
 
-    @State private var selectedCategory: ActivityCategory = .hangout
-    @State private var customActivityName: String = ""
     @State private var description: String = ""
     @State private var link1: String = ""
     @State private var link2: String = ""
@@ -33,9 +31,6 @@ struct SignalFormView: View {
     private var isOverWordLimit: Bool { wordCount > 250 }
 
     private var canSubmit: Bool {
-        if selectedCategory == .custom && customActivityName.trimmingCharacters(in: .whitespaces).isEmpty {
-            return false
-        }
         if isOverWordLimit { return false }
         return !selectedHours.isEmpty
     }
@@ -61,10 +56,6 @@ struct SignalFormView: View {
         NavigationStack {
             ScrollView {
                 VStack(spacing: 28) {
-                    categorySection
-                    if selectedCategory == .custom {
-                        customNameSection
-                    }
                     dayPickerSection
                     timeRangeSection
                     if !selectedDays.isEmpty {
@@ -86,63 +77,6 @@ struct SignalFormView: View {
                     Button("Cancel") { dismiss() }
                 }
             }
-        }
-    }
-
-    // MARK: - Category Picker
-
-    private var categorySection: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            OrbitSectionHeader(title: "What do you want to do?")
-
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 10) {
-                    ForEach(ActivityCategory.allCases) { category in
-                        Button {
-                            UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                            selectedCategory = category
-                        } label: {
-                            VStack(spacing: 6) {
-                                Image(systemName: category.icon)
-                                    .font(.title3)
-                                Text(category.displayName)
-                                    .font(.caption)
-                                    .fontWeight(.medium)
-                            }
-                            .padding(.horizontal, 16)
-                            .padding(.vertical, 12)
-                            .background(
-                                selectedCategory == category
-                                    ? AnyShapeStyle(OrbitTheme.gradientFill)
-                                    : AnyShapeStyle(Color(.systemGray6))
-                            )
-                            .foregroundColor(selectedCategory == category ? .white : .primary)
-                            .clipShape(RoundedRectangle(cornerRadius: 12))
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 12)
-                                    .stroke(
-                                        selectedCategory == category
-                                            ? Color.clear
-                                            : Color(.systemGray4),
-                                        lineWidth: 1
-                                    )
-                            )
-                        }
-                        .buttonStyle(.plain)
-                    }
-                }
-                .padding(.horizontal, 2)
-            }
-        }
-    }
-
-    // MARK: - Custom Name
-
-    private var customNameSection: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            OrbitSectionHeader(title: "Activity Name")
-            TextField("Name your activity", text: $customActivityName)
-                .textFieldStyle(.roundedBorder)
         }
     }
 
@@ -479,8 +413,6 @@ struct SignalFormView: View {
 
         Task {
             await viewModel.createSignal(
-                activityCategory: selectedCategory,
-                customActivityName: selectedCategory == .custom ? customActivityName.trimmingCharacters(in: .whitespaces) : nil,
                 minGroupSize: minGroupSize,
                 maxGroupSize: maxGroupSize,
                 availability: slots,

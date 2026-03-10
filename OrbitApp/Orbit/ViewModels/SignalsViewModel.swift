@@ -62,8 +62,6 @@ class SignalsViewModel: ObservableObject {
     // MARK: - Create
 
     func createSignal(
-        activityCategory: ActivityCategory,
-        customActivityName: String?,
         minGroupSize: Int,
         maxGroupSize: Int,
         availability: [AvailabilitySlot],
@@ -77,8 +75,6 @@ class SignalsViewModel: ObservableObject {
 
         do {
             let created = try await SignalService.shared.createSignal(
-                activityCategory: activityCategory,
-                customActivityName: customActivityName,
                 minGroupSize: minGroupSize,
                 maxGroupSize: maxGroupSize,
                 availability: availability,
