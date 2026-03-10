@@ -12,6 +12,7 @@ struct MissionsView: View {
     @State private var showProfile = false
     @State private var createdFlexPodId: String? = nil
     @State private var showCreatedFlexPod = false
+    @State private var searchText = ""
 
     private let allTags = [
         "Hiking", "Gaming", "Music", "Food", "Sports",
@@ -33,6 +34,18 @@ struct MissionsView: View {
                     .pickerStyle(.segmented)
                     .padding(.horizontal, 20)
                     .padding(.vertical, 12)
+
+                    // Search bar
+                    HStack {
+                        Image(systemName: "magnifyingglass")
+                            .foregroundColor(.secondary)
+                        TextField("Search missions", text: $searchText)
+                    }
+                    .padding(10)
+                    .background(Color(.systemGray6))
+                    .cornerRadius(12)
+                    .padding(.horizontal, 20)
+                    .padding(.bottom, 8)
 
                     ScrollView {
                         VStack(alignment: .leading, spacing: 24) {
@@ -74,9 +87,15 @@ struct MissionsView: View {
                                 HStack { Spacer(); ProgressView(); Spacer() }
                                     .padding(.vertical, 40)
                             } else {
-                                let displayedMissions = segment == .discover
+                                let baseMissions = segment == .discover
                                     ? viewModel.discoverMissions
                                     : viewModel.myMissions
+                                let displayedMissions = searchText.isEmpty
+                                    ? baseMissions
+                                    : baseMissions.filter {
+                                        $0.title.localizedCaseInsensitiveContains(searchText)
+                                        || $0.displayTitle.localizedCaseInsensitiveContains(searchText)
+                                    }
 
                                 if displayedMissions.isEmpty {
                                     EmptyMissionsView(segment: segment, onCreateTap: { showCreate = true })
@@ -720,7 +739,7 @@ struct MissionCreateView: View {
                     Text(mode == .set
                          ? "Plan an event with a set date, time, and place."
                          : "Throw out a hangout idea and let your group vote on when to meet.")
-                        .font(.caption)
+                        .font(.footnote)
                         .foregroundColor(.secondary)
                         .frame(maxWidth: .infinity, alignment: .leading)
 

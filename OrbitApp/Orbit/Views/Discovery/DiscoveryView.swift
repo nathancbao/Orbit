@@ -445,8 +445,8 @@ struct CenterNodeView: View {
             withAnimation(.easeInOut(duration: 2).repeatForever(autoreverses: true)) {
                 pulseScale = 1.15
             }
-            withAnimation(.linear(duration: 20).repeatForever(autoreverses: false)) {
-                rotationAngle = 360
+            withAnimation(.easeInOut(duration: 3).repeatForever(autoreverses: true)) {
+                rotationAngle = 8
             }
         }
     }
@@ -666,8 +666,8 @@ struct PlanetNodeView: View {
                     floatOffset = 6
                 }
                 if planet.isMission {
-                    withAnimation(.linear(duration: 8).repeatForever(autoreverses: false)) {
-                        ringRotation = 360
+                    withAnimation(.easeInOut(duration: 2.5).repeatForever(autoreverses: true)) {
+                        ringRotation = 10
                     }
                 } else if planet.isFlexMission {
                     withAnimation(.easeOut(duration: 2).repeatForever(autoreverses: false)) {

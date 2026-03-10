@@ -1,5 +1,9 @@
 import SwiftUI
 
+extension Notification.Name {
+    static let didLogout = Notification.Name("didLogout")
+}
+
 struct ProfileDisplayView: View {
     let profile: Profile
     var onEdit: (() -> Void)? = nil
@@ -11,6 +15,9 @@ struct ProfileDisplayView: View {
     @State private var galleryIndex = 0
     @State private var friendStatus: FriendStatus?
     @State private var isSendingRequest = false
+    @State private var showLogoutConfirm = false
+
+    private var isOwnProfile: Bool { otherUserId == nil && onProfileUpdated != nil }
 
     var body: some View {
         NavigationStack {
@@ -214,6 +221,32 @@ struct ProfileDisplayView: View {
                             .padding(.horizontal, 28)
                         }
 
+                        // Logout button (own profile only)
+                        if isOwnProfile {
+                            Button {
+                                showLogoutConfirm = true
+                            } label: {
+                                HStack {
+                                    Image(systemName: "rectangle.portrait.and.arrow.right")
+                                    Text("Log Out")
+                                }
+                                .font(.headline)
+                                .fontWeight(.semibold)
+                                .foregroundColor(.white)
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 16)
+                                .background(
+                                    LinearGradient(
+                                        colors: [Color.red, Color.red.opacity(0.8)],
+                                        startPoint: .leading, endPoint: .trailing
+                                    )
+                                )
+                                .cornerRadius(16)
+                            }
+                            .padding(.horizontal, 28)
+                            .padding(.top, 8)
+                        }
+
                         Spacer(minLength: 80)
                     }
                 }
@@ -221,6 +254,20 @@ struct ProfileDisplayView: View {
             }
             .background(Color.white)
             .ignoresSafeArea(edges: .top)
+            .alert("Log Out", isPresented: $showLogoutConfirm) {
+                Button("Log Out", role: .destructive) {
+                    Task {
+                        try? await AuthService.shared.logout()
+                        UserDefaults.standard.removeObject(forKey: "orbit_user_id")
+                        UserDefaults.standard.removeObject(forKey: "orbit_user_name")
+                        dismiss()
+                        NotificationCenter.default.post(name: .didLogout, object: nil)
+                    }
+                }
+                Button("Cancel", role: .cancel) {}
+            } message: {
+                Text("Are you sure you want to log out?")
+            }
             .navigationTitle("Profile")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -230,7 +277,7 @@ struct ProfileDisplayView: View {
                     } label: {
                         Image(systemName: "xmark.circle.fill")
                             .font(.title2)
-                            .foregroundStyle(.white.opacity(0.9), Color.white.opacity(0.25))
+                            .foregroundStyle(.black.opacity(0.7), Color.black.opacity(0.15))
                     }
                 }
                 if onProfileUpdated != nil {
@@ -239,7 +286,7 @@ struct ProfileDisplayView: View {
                             showEdit = true
                         }
                         .fontWeight(.semibold)
-                        .foregroundColor(.white)
+                        .foregroundColor(.black)
                     }
                 }
             }

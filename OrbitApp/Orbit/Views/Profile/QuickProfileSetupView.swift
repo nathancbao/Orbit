@@ -400,7 +400,7 @@ struct QuickProfileSetupView: View {
                                 ProgressView()
                                     .tint(.white)
                             } else {
-                                Text("let's go →")
+                                Text(initialProfile != nil ? "save changes" : "let's go →")
                                     .font(.system(size: 16, weight: .semibold))
                                     .tracking(1)
                             }

@@ -57,6 +57,10 @@ struct ContentView: View {
                 }
             }
         }
+        .onReceive(NotificationCenter.default.publisher(for: .didLogout)) { _ in
+            currentProfile = nil
+            appState = .auth
+        }
     }
 
     private func loadExistingProfile() async {

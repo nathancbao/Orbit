@@ -16,19 +16,28 @@ struct PodsView: View {
     @State private var isLoading = false
     @State private var showProfile = false
     @State private var segment: PodSegment = .set
+    @State private var searchText = ""
 
     private var isEmpty: Bool { pods.isEmpty && rsvpedSignals.isEmpty }
 
-    /// Set pods sorted by scheduled time (soonest first).
+    /// Set pods sorted by scheduled time (soonest first), filtered by search.
     private var sortedPods: [Pod] {
-        pods.sorted { a, b in
+        let sorted = pods.sorted { a, b in
             let dateA = a.parsedScheduledTime ?? .distantFuture
             let dateB = b.parsedScheduledTime ?? .distantFuture
             return dateA < dateB
         }
+        if searchText.isEmpty { return sorted }
+        return sorted.filter { $0.displayName.localizedCaseInsensitiveContains(searchText) }
     }
 
-    private var isSegmentEmpty: Bool {
+    /// Flex signals filtered by search.
+    private var filteredSignals: [Signal] {
+        if searchText.isEmpty { return rsvpedSignals }
+        return rsvpedSignals.filter { $0.displayTitle.localizedCaseInsensitiveContains(searchText) }
+    }
+
+    private var isSegmentDataEmpty: Bool {
         segment == .set ? pods.isEmpty : rsvpedSignals.isEmpty
     }
 
@@ -65,7 +74,19 @@ struct PodsView: View {
                         .padding(.horizontal, 20)
                         .padding(.vertical, 12)
 
-                        if isSegmentEmpty {
+                        // Search bar
+                        HStack {
+                            Image(systemName: "magnifyingglass")
+                                .foregroundColor(.secondary)
+                            TextField("Search pods", text: $searchText)
+                        }
+                        .padding(10)
+                        .background(Color(.systemGray6))
+                        .cornerRadius(12)
+                        .padding(.horizontal, 20)
+                        .padding(.bottom, 8)
+
+                        if isSegmentDataEmpty {
                             VStack(spacing: 12) {
                                 Spacer()
                                 Image(systemName: segment == .set ? "calendar" : "antenna.radiowaves.left.and.right")
@@ -81,6 +102,12 @@ struct PodsView: View {
                             ScrollView {
                                 VStack(spacing: 14) {
                                     if segment == .set {
+                                        if sortedPods.isEmpty {
+                                            Text("no matches")
+                                                .font(.subheadline)
+                                                .foregroundColor(.secondary)
+                                                .padding(.top, 40)
+                                        }
                                         ForEach(sortedPods) { pod in
                                             PodRowCard(pod: pod, title: pod.displayName) {
                                                 Task { await loadData() }
@@ -88,7 +115,13 @@ struct PodsView: View {
                                             .padding(.horizontal, 20)
                                         }
                                     } else {
-                                        ForEach(rsvpedSignals) { signal in
+                                        if filteredSignals.isEmpty {
+                                            Text("no matches")
+                                                .font(.subheadline)
+                                                .foregroundColor(.secondary)
+                                                .padding(.top, 40)
+                                        }
+                                        ForEach(filteredSignals) { signal in
                                             SignalRsvpCard(signal: signal) {
                                                 Task { await loadData() }
                                             }
