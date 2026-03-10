@@ -37,9 +37,9 @@ class FriendsViewModel: ObservableObject {
         async let incomingResult = FriendService.shared.getIncomingRequests()
         async let outgoingResult = FriendService.shared.getOutgoingRequests()
 
-        if let f = try? await friendsResult { friends = f }
-        if let i = try? await incomingResult { incomingRequests = i }
-        if let o = try? await outgoingResult { outgoingRequests = o }
+        do { friends = try await friendsResult } catch { print("[Friends] friends error: \(error)") }
+        do { incomingRequests = try await incomingResult } catch { print("[Friends] incoming error: \(error)") }
+        do { outgoingRequests = try await outgoingResult } catch { print("[Friends] outgoing error: \(error)") }
 
         isLoading = false
     }

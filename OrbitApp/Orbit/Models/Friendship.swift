@@ -131,6 +131,11 @@ struct FriendStatus: Codable {
         case requestId = "request_id"
     }
 
+    init(status: String, requestId: Int?) {
+        self.status = status
+        self.requestId = requestId
+    }
+
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         status    = (try? c.decode(String.self, forKey: .status)) ?? "none"

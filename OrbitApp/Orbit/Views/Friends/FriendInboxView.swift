@@ -69,6 +69,7 @@ struct FriendInboxView: View {
                 }
             }
         }
+        .task { await viewModel.loadAll() }
     }
 }
 
