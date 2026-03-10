@@ -49,11 +49,16 @@ class MissionsViewModel: ObservableObject {
 
     // MARK: - Computed: Combined + Filtered
 
-    /// All missions (set + flex), filtered by mode if set.
+    /// All missions (set + flex), filtered by mode and tag.
     private var combinedMissions: [Mission] {
-        let all = allMissions + allFlexMissions
-        guard let mode = filterMode else { return all }
-        return all.filter { $0.mode == mode }
+        var all = allMissions + allFlexMissions
+        if let mode = filterMode {
+            all = all.filter { $0.mode == mode }
+        }
+        if let tag = filterTag {
+            all = all.filter { $0.tags.contains(tag) }
+        }
+        return all
     }
 
     /// Missions the user has joined (in a pod for set, or created/RSVPed for flex).

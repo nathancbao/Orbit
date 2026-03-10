@@ -15,7 +15,7 @@ struct MissionsView: View {
     @State private var searchText = ""
 
     private let allTags = [
-        "Hiking", "Gaming", "Food", "Sports", "Study", "Other"
+        "Hiking", "Gaming", "Food", "Sports", "Study", "Hangout", "Other"
     ]
 
     var body: some View {
@@ -789,7 +789,7 @@ struct MissionCreateView: View {
 
     // MARK: - Tag Picker (shared)
 
-    private let availableTags = ["Hiking", "Gaming", "Food", "Sports", "Study", "Other"]
+    private let availableTags = ["Hiking", "Gaming", "Food", "Sports", "Study", "Hangout", "Other"]
 
     private var tagPickerSection: some View {
         VStack(alignment: .leading, spacing: 10) {
