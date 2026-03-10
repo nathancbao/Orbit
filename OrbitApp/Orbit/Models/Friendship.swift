@@ -72,9 +72,16 @@ struct FriendProfile: Codable, Identifiable {
         case bio
     }
 
+    private enum FallbackKeys: String, CodingKey {
+        case id
+    }
+
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
-        userId      = (try? c.decode(Int.self, forKey: .userId)) ?? 0
+        let fb = try decoder.container(keyedBy: FallbackKeys.self)
+        userId      = (try? c.decode(Int.self, forKey: .userId))
+                    ?? (try? fb.decode(Int.self, forKey: .id))
+                    ?? 0
         name        = (try? c.decode(String.self, forKey: .name)) ?? "User"
         collegeYear = (try? c.decode(String.self, forKey: .collegeYear)) ?? ""
         interests   = (try? c.decode([String].self, forKey: .interests)) ?? []

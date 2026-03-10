@@ -112,6 +112,28 @@ def list_all_users(limit=10000):
     return [_entity_to_dict(e) for e in results]
 
 
+def search_users(query_str, exclude_user_id=None, limit=20):
+    """Search users by name or email (case-insensitive partial match).
+
+    Datastore doesn't support LIKE queries, so we fetch users and filter
+    in Python. This is acceptable for moderate user counts.
+    """
+    q_lower = query_str.lower()
+    query = client.query(kind='User')
+    results = []
+    for entity in query.fetch(limit=2000):
+        name = (entity.get('name') or '').lower()
+        email = (entity.get('email') or '').lower()
+        if q_lower in name or q_lower in email:
+            d = _entity_to_dict(entity)
+            if exclude_user_id is not None and str(d.get('id')) == str(exclude_user_id):
+                continue
+            results.append(d)
+            if len(results) >= limit:
+                break
+    return results
+
+
 # ── Mission (was Event) ─────────────────────────────────────────────────────
 # Fixed-date activities. Browseable in the discovery feed.
 # Fields: id, title, description, tags, location, date (YYYY-MM-DD),

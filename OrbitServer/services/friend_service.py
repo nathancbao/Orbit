@@ -1,5 +1,5 @@
 from OrbitServer.models.models import (
-    get_user,
+    get_user, search_users as ds_search_users,
     create_friend_request, get_friend_request, update_friend_request_status,
     list_incoming_friend_requests, list_outgoing_friend_requests,
     find_pending_request,
@@ -151,3 +151,11 @@ def get_friendship_status(current_user_id, target_user_id):
         return {'status': 'pending_received', 'request_id': received['id']}, None
 
     return {'status': 'none', 'request_id': None}, None
+
+
+# ── GET /friends/search ──────────────────────────────────────────────────────
+
+def search_users(query, current_user_id):
+    """Search users by name or email, returning FriendProfile shapes."""
+    users = ds_search_users(query, exclude_user_id=current_user_id, limit=20)
+    return [_friend_profile(u) for u in users], None

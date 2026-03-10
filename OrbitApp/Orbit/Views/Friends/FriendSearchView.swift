@@ -67,10 +67,18 @@ struct FriendSearchView: View {
                 } else {
                     ScrollView {
                         LazyVStack(spacing: 10) {
+                            if let error = viewModel.searchError {
+                                Text(error)
+                                    .font(.caption)
+                                    .foregroundColor(.red)
+                                    .padding(.horizontal, 20)
+                            }
+
                             ForEach(viewModel.userSearchResults) { user in
                                 SearchResultCard(
                                     user: user,
                                     alreadySent: viewModel.sentRequestUserIds.contains(user.userId),
+                                    isSending: viewModel.sendingUserIds.contains(user.userId),
                                     onSendRequest: {
                                         Task { await viewModel.sendRequestFromSearch(toUserId: user.userId) }
                                     }
@@ -107,6 +115,7 @@ struct FriendSearchView: View {
 struct SearchResultCard: View {
     let user: FriendProfile
     let alreadySent: Bool
+    var isSending: Bool = false
     let onSendRequest: () -> Void
 
     var body: some View {
@@ -153,8 +162,13 @@ struct SearchResultCard: View {
                     .font(.caption)
                     .fontWeight(.semibold)
                     .foregroundColor(.orange)
+            } else if isSending {
+                ProgressView()
+                    .frame(width: 34, height: 34)
             } else {
-                Button(action: onSendRequest) {
+                Button {
+                    onSendRequest()
+                } label: {
                     Image(systemName: "person.badge.plus")
                         .font(.system(size: 16))
                         .fontWeight(.semibold)
@@ -163,6 +177,7 @@ struct SearchResultCard: View {
                         .background(OrbitTheme.gradientFill)
                         .clipShape(Circle())
                 }
+                .buttonStyle(.plain)
             }
         }
         .padding(14)

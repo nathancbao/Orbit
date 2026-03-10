@@ -15,6 +15,8 @@ class FriendsViewModel: ObservableObject {
     @Published var userSearchResults: [FriendProfile] = []
     @Published var isSearching = false
     @Published var sentRequestUserIds: Set<Int> = []
+    @Published var sendingUserIds: Set<Int> = []
+    @Published var searchError: String?
     private var searchTask: Task<Void, Never>?
 
     var filteredFriends: [Friendship] {
@@ -115,9 +117,15 @@ class FriendsViewModel: ObservableObject {
     }
 
     func sendRequestFromSearch(toUserId: Int) async {
-        let success = await sendRequest(toUserId: toUserId)
-        if success {
+        sendingUserIds.insert(toUserId)
+        searchError = nil
+        do {
+            let request = try await FriendService.shared.sendRequest(toUserId: toUserId)
+            outgoingRequests.append(request)
             sentRequestUserIds.insert(toUserId)
+        } catch {
+            searchError = error.localizedDescription
         }
+        sendingUserIds.remove(toUserId)
     }
 }
