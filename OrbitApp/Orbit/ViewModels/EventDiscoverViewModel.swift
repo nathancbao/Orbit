@@ -36,8 +36,7 @@ class MissionsViewModel: ObservableObject {
         UserDefaults.standard.integer(forKey: "orbit_user_id")
     }
 
-    override init() {
-        super.init()
+    init() {
         refreshCancellable = NotificationCenter.default
             .publisher(for: .missionsNeedRefresh)
             .sink { [weak self] _ in
