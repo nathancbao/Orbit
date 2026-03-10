@@ -44,7 +44,7 @@ def list_friends():
 def create_request():
     body = request.get_json(silent=True) or {}
     to_user_id = body.get('to_user_id')
-    if to_user_id is None:
+    if to_user_id is None or int(to_user_id) == 0:
         return error("to_user_id is required", 400)
 
     data, err = send_friend_request(g.user_id, to_user_id)
