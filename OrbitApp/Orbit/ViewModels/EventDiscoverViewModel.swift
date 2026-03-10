@@ -30,9 +30,22 @@ class MissionsViewModel: ObservableObject {
 
     private var userYear: String = ""
     private var toastTask: Task<Void, Never>?
+    private var refreshCancellable: AnyCancellable?
 
     private var currentUserId: Int {
         UserDefaults.standard.integer(forKey: "orbit_user_id")
+    }
+
+    override init() {
+        super.init()
+        refreshCancellable = NotificationCenter.default
+            .publisher(for: .missionsNeedRefresh)
+            .sink { [weak self] _ in
+                guard let self else { return }
+                Task { @MainActor in
+                    await self.reload()
+                }
+            }
     }
 
     // MARK: - Computed: Combined + Filtered

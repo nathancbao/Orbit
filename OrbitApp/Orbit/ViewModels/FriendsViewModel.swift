@@ -94,6 +94,8 @@ class FriendsViewModel: ObservableObject {
         do {
             _ = try await PodService.shared.acceptInvite(inviteId: invite.id)
             podInvites.removeAll { $0.id == invite.id }
+            // Tell the missions feed to refresh so the joined mission appears in "My Missions"
+            NotificationCenter.default.post(name: .missionsNeedRefresh, object: nil)
         } catch {
             errorMessage = error.localizedDescription
         }

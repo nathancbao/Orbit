@@ -15,8 +15,7 @@ struct MissionsView: View {
     @State private var searchText = ""
 
     private let allTags = [
-        "Hiking", "Gaming", "Music", "Food", "Sports",
-        "Art", "Coffee", "Tech", "Fitness", "Travel"
+        "Hiking", "Gaming", "Food", "Sports", "Study", "Other"
     ]
 
     var body: some View {
@@ -354,6 +353,22 @@ struct MissionListCard: View {
                                     .font(.caption)
                             }
                             .foregroundColor(.white.opacity(0.6))
+                        }
+
+                        if !mission.tags.isEmpty {
+                            ScrollView(.horizontal, showsIndicators: false) {
+                                HStack(spacing: 6) {
+                                    ForEach(mission.tags.prefix(4), id: \.self) { tag in
+                                        Text(tag)
+                                            .font(.caption2)
+                                            .padding(.horizontal, 8)
+                                            .padding(.vertical, 3)
+                                            .background(Color.white.opacity(0.12))
+                                            .clipShape(Capsule())
+                                            .foregroundColor(.white.opacity(0.7))
+                                    }
+                                }
+                            }
                         }
 
                         HStack(spacing: 8) {
@@ -772,6 +787,54 @@ struct MissionCreateView: View {
         }
     }
 
+    // MARK: - Tag Picker (shared)
+
+    private let availableTags = ["Hiking", "Gaming", "Food", "Sports", "Study", "Other"]
+
+    private var tagPickerSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            OrbitSectionHeader(title: "Tags")
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 8) {
+                    ForEach(availableTags, id: \.self) { tag in
+                        let isSelected = tags.contains(tag)
+                        Button {
+                            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                            if isSelected {
+                                tags.removeAll { $0 == tag }
+                            } else {
+                                tags.append(tag)
+                            }
+                        } label: {
+                            Text(tag.lowercased())
+                                .font(.caption)
+                                .fontWeight(isSelected ? .semibold : .regular)
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 7)
+                                .background(
+                                    isSelected
+                                    ? AnyShapeStyle(OrbitTheme.gradient.opacity(0.2))
+                                    : AnyShapeStyle(Color(.systemGray6))
+                                )
+                                .overlay(
+                                    Capsule()
+                                        .stroke(
+                                            isSelected
+                                            ? AnyShapeStyle(OrbitTheme.gradient)
+                                            : AnyShapeStyle(Color.clear),
+                                            lineWidth: 1.5
+                                        )
+                                )
+                                .clipShape(Capsule())
+                                .foregroundColor(isSelected ? .primary : .secondary)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+            }
+        }
+    }
+
     // MARK: - Set Mode Form
 
     private var setModeForm: some View {
@@ -789,6 +852,8 @@ struct MissionCreateView: View {
                     .textFieldStyle(.roundedBorder)
                     .lineLimit(2...4)
             }
+
+            tagPickerSection
 
             // Date + Time grouped in a single card
             VStack(alignment: .leading, spacing: 10) {
@@ -904,6 +969,9 @@ struct MissionCreateView: View {
                         .foregroundColor(isOverWordLimit ? .red : .secondary)
                 }
             }
+
+            // Tags
+            tagPickerSection
 
             // Location
             VStack(alignment: .leading, spacing: 8) {

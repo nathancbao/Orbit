@@ -357,6 +357,23 @@ struct MissionDetailView: View {
                         .foregroundColor(.secondary)
                     }
 
+                    // Tags
+                    if !mission.tags.isEmpty {
+                        ScrollView(.horizontal, showsIndicators: false) {
+                            HStack(spacing: 8) {
+                                ForEach(mission.tags, id: \.self) { tag in
+                                    Text(tag)
+                                        .font(.caption)
+                                        .padding(.horizontal, 10)
+                                        .padding(.vertical, 5)
+                                        .background(OrbitTheme.blue.opacity(0.12))
+                                        .clipShape(Capsule())
+                                        .foregroundColor(OrbitTheme.blue)
+                                }
+                            }
+                        }
+                    }
+
                     // Description
                     if !mission.description.isEmpty {
                         Text(mission.description)

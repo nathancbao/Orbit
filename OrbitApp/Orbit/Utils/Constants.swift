@@ -1,5 +1,11 @@
 import Foundation
 
+// MARK: - App Notifications
+
+extension Notification.Name {
+    static let missionsNeedRefresh = Notification.Name("missionsNeedRefresh")
+}
+
 enum Constants {
 
     // ============================================================
