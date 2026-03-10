@@ -205,7 +205,7 @@ def apple_app_site_association():
             "apps": [],
             "details": [
                 {
-                    "appID": "XXXXXXXXXX.com.orbit.app",
+                    "appID": "25YX97TQQ4.com.orbitecs191.orbit",
                     "paths": ["/friend/*"]
                 }
             ]

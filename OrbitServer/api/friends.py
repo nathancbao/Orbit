@@ -7,9 +7,22 @@ from OrbitServer.services.friend_service import (
     get_incoming_requests, get_outgoing_requests,
     accept_friend_request, decline_friend_request,
     remove_friend, get_friendship_status,
+    search_friends,
 )
 
 friends_bp = Blueprint('friends', __name__, url_prefix='/api/friends')
+
+
+# ── GET /friends/search ───────────────────────────────────────────────────────
+
+@friends_bp.route('/search', methods=['GET'])
+@require_auth
+def search():
+    q = request.args.get('q', '').strip()
+    data, err = search_friends(q, g.user_id)
+    if err:
+        return error(err, 400)
+    return success(data)
 
 
 # ── GET /friends ──────────────────────────────────────────────────────────────

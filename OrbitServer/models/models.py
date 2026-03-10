@@ -91,6 +91,30 @@ def update_user(user_id, data):
     return _entity_to_dict(entity)
 
 
+def search_users(query_str, exclude_user_id=None, limit=20):
+    """Search users by partial match on email or name (case-insensitive).
+
+    Datastore doesn't support LIKE queries, so we fetch all User entities
+    and filter in Python.  This is fine for a college-scale user base.
+    """
+    q = query_str.lower()
+    ds_query = client.query(kind='User')
+    results = []
+    for entity in ds_query.fetch():
+        d = _entity_to_dict(entity)
+        if d is None:
+            continue
+        if exclude_user_id is not None and str(d['id']) == str(exclude_user_id):
+            continue
+        name = (d.get('name') or '').lower()
+        email = (d.get('email') or '').lower()
+        if q in name or q in email:
+            results.append(d)
+            if len(results) >= limit:
+                break
+    return results
+
+
 def adjust_trust_score(user_id, delta):
     """Add delta to a user's trust_score, clamped to [0.0, 5.0].
     Uses a transaction to avoid lost updates from concurrent adjustments."""

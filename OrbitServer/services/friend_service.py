@@ -1,5 +1,5 @@
 from OrbitServer.models.models import (
-    get_user,
+    get_user, search_users,
     create_friend_request, get_friend_request, update_friend_request_status,
     list_incoming_friend_requests, list_outgoing_friend_requests,
     find_pending_request,
@@ -20,6 +20,17 @@ def _friend_profile(user):
         'photo': user.get('photo'),
         'bio': user.get('bio', ''),
     }
+
+
+# ── GET /friends/search ───────────────────────────────────────────────────────
+
+def search_friends(query_str, current_user_id):
+    """Search for users by email or name, excluding the authenticated user."""
+    if not query_str or len(query_str) < 3:
+        return None, "Query must be at least 3 characters"
+
+    users = search_users(query_str, exclude_user_id=current_user_id, limit=20)
+    return [_friend_profile(u) for u in users], None
 
 
 # ── GET /friends ──────────────────────────────────────────────────────────────
