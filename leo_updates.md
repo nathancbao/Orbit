@@ -95,3 +95,33 @@ Before the survey, the AI was a skeleton — it could score missions but had alm
 | `OrbitServer/models/models.py` | SurveyResponse entity, enriched get_user_pods with has_pending_survey + mission_tags |
 | `tests/test_survey_service.py` | 19 tests — validation, interest capping, trust adjustments, history enrichment |
 | `tests/test_survey_ml_integration.py` | 16 tests — enjoyment multiplier, behavioral profiles, display rescaling, LightFM bonuses |
+
+---
+
+## Flex Mission Recommendations (NEW)
+
+Previously, the AI recommendation engine only scored **set missions** (the `Mission` Datastore kind). Flex missions (stored as `Signal` entities) were completely absent from `/missions/suggested`, so neither the Discovery galaxy nor the Explore page ever showed flex recommendations.
+
+### What Changed
+
+The recommendation engine now includes flex missions in the candidate pool alongside set missions. Both types are scored with the same 5-signal hybrid formula (TF-IDF, semantic embeddings, LightFM, behavioral decay, trust weight).
+
+### How It Works
+
+1. `get_suggested_missions()` fetches both `Mission` (status=open) and `Signal` entities
+2. Each signal gets tagged with `mode: "flex"` so the iOS client decodes it as a flex mission
+3. Signals the user created or already RSVP'd to are excluded from candidates
+4. All candidates (set + flex) are scored identically and ranked together
+5. The `/missions/suggested` endpoint annotates pod status separately for flex vs set (flex missions use RSVPs, not pods)
+
+### Files Changed
+
+| File | Change |
+|------|--------|
+| `OrbitServer/services/ai_suggestion_service.py` | Imports `list_all_signals` + `list_rsvped_signals`; merges signals into candidate pool with `mode: "flex"`; safe UUID ID handling in embedding lookup |
+| `OrbitServer/services/embedding_service.py` | `preload_embeddings()` handles UUID string IDs (signals) without crashing |
+| `OrbitServer/api/missions.py` | `/missions/suggested` splits pod annotation — flex missions get `not_joined` directly |
+
+### Frontend Impact
+
+No frontend changes needed. The `Mission` Swift model already defaults `mode` to `.set` when absent, and correctly parses `"flex"` when present. Flex suggestions will render with their activity category display title, availability grid, and RSVP flow as usual.

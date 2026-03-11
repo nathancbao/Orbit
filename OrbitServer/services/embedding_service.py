@@ -127,7 +127,10 @@ def preload_embeddings(missions: list) -> dict:
     """
     result = {}
     for mission in missions:
-        mid = int(mission['id'])
+        try:
+            mid = int(mission['id'])
+        except (TypeError, ValueError):
+            mid = mission['id']
         # Check L1 cache first
         with _cache_lock:
             if mid in _embedding_cache:

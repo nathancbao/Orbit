@@ -127,7 +127,13 @@ def suggested():
         logger.exception("Failed to get suggested missions")
         return success([])
 
-    _annotate_pod_status_batch(missions, g.user_id)
+    # Annotate pod status — only for set missions; flex missions use RSVPs instead
+    set_missions = [m for m in missions if m.get('mode') != 'flex']
+    flex_missions = [m for m in missions if m.get('mode') == 'flex']
+    _annotate_pod_status_batch(set_missions, g.user_id)
+    for m in flex_missions:
+        m['user_pod_status'] = 'not_joined'
+        m['user_pod_id'] = None
 
     return success([_strip_embedding(m) for m in missions])
 

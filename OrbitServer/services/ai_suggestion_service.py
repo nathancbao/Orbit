@@ -24,7 +24,10 @@ import numpy as np
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity as sk_cosine
 
-from OrbitServer.models.models import list_missions, get_user, get_user_history
+from OrbitServer.models.models import (
+    list_missions, list_all_signals, list_rsvped_signals,
+    get_user, get_user_history,
+)
 from OrbitServer.services.embedding_service import (
     get_or_create_mission_embedding, get_user_embedding, cosine_similarity,
     preload_embeddings,
@@ -258,8 +261,22 @@ def get_suggested_missions(user_id, limit=5) -> list:
     skipped_ids = {h['mission_id'] for h in history if h.get('action') == 'skipped'}
     behavioral_profile = _build_behavioral_profile(history)
 
-    # 3. Candidate missions (open, not yet acted on)
+    # 3. Candidate missions (open, not yet acted on) — includes both set + flex
     all_missions = list_missions(filters={'status': 'open'})
+    for m in all_missions:
+        m.setdefault('mode', 'set')
+
+    # Include flex missions (signals) in the candidate pool
+    all_signals, _ = list_all_signals(limit=50)
+    for s in all_signals:
+        s['mode'] = 'flex'
+    # Exclude signals the user created or already RSVP'd to
+    rsvped_ids = {s['id'] for s in list_rsvped_signals(user_id)}
+    created_ids = {s['id'] for s in all_signals if s.get('creator_id') == int(user_id)}
+    exclude_signal_ids = rsvped_ids | created_ids
+    all_signals = [s for s in all_signals if s['id'] not in exclude_signal_ids]
+    all_missions = all_missions + all_signals
+
     candidates = [
         m for m in all_missions
         if m['id'] not in joined_ids and m['id'] not in skipped_ids
@@ -293,7 +310,11 @@ def get_suggested_missions(user_id, limit=5) -> list:
 
         semantic_s = 0.0
         if user_vec is not None:
-            mission_vec = mission_embeddings.get(int(mid))
+            try:
+                embed_key = int(mid)
+            except (TypeError, ValueError):
+                embed_key = mid
+            mission_vec = mission_embeddings.get(embed_key)
             if mission_vec is not None:
                 semantic_s = max(0.0, min(1.0, cosine_similarity(user_vec, mission_vec)))
 
