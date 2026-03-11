@@ -120,6 +120,11 @@ struct PlanetNode: Identifiable {
         if case .template = type { return true }
         return false
     }
+
+    var matchScore: Double? {
+        if case .mission(let m) = type { return m.matchScore }
+        return nil
+    }
 }
 
 // MARK: - Image Star Field View
@@ -342,6 +347,9 @@ struct RecommendationsSheet: View {
                                         }
                                     }
                                     Spacer()
+                                    if let score = mission.matchScore {
+                                        MatchScoreBadge(score: score)
+                                    }
                                     Image(systemName: "chevron.right")
                                         .font(.caption)
                                         .foregroundColor(DiscoveryTheme.textMuted)
@@ -632,6 +640,10 @@ struct PlanetNodeView: View {
                     Text(planet.subtitle)
                         .font(.caption2)
                         .foregroundColor(DiscoveryTheme.textMuted)
+
+                    if let score = planet.matchScore {
+                        MatchScoreBadge(score: score)
+                    }
 
                     if planet.isTemplate {
                         Text("tap to create")

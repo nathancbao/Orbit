@@ -199,6 +199,8 @@ struct Signal: Codable, Identifiable {
     let links: [String]?
     let timeRangeStart: Int?
     let timeRangeEnd: Int?
+    let matchScore: Double?
+    let suggestionReason: String?
 
     enum CodingKeys: String, CodingKey {
         case id, title, description, availability, status, links
@@ -212,6 +214,8 @@ struct Signal: Codable, Identifiable {
         case scheduledTime     = "scheduled_time"
         case timeRangeStart    = "time_range_start"
         case timeRangeEnd      = "time_range_end"
+        case matchScore        = "match_score"
+        case suggestionReason  = "suggestion_reason"
     }
 
     var displayTitle: String {

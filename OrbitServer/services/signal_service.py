@@ -3,8 +3,18 @@ from OrbitServer.models.models import (
     list_signals_for_user, list_all_signals,
     transactional_signal_rsvp, list_rsvped_signals,
     create_signal_pod, get_pod, transactional_pod_update,
+    get_user,
 )
+from OrbitServer.services.ai_suggestion_service import score_mission_for_user
 
+
+
+def _score_signals(signals, user_id):
+    """Score signals using the same AI scoring as missions."""
+    user = get_user(user_id) or {}
+    user_interests = set(user.get('interests') or [])
+    for signal in signals:
+        signal['match_score'] = score_mission_for_user(signal, user_interests)
 
 
 def create_new_signal(data, creator_id):
@@ -23,6 +33,7 @@ def get_all_signals(user_id=None, limit=20, cursor=None, category=None, tag=None
     )
     if user_id is not None:
         _resolve_pod_ids(signals, user_id)
+        _score_signals(signals, user_id)
     return signals, next_cursor, None
 
 
@@ -30,6 +41,7 @@ def get_user_signals(user_id):
     """Return all signals posted by a user, newest first. Returns (list, None)."""
     signals = list_signals_for_user(user_id)
     _resolve_pod_ids(signals, user_id)
+    _score_signals(signals, user_id)
     return signals, None
 
 
@@ -37,6 +49,7 @@ def get_rsvped_signals(user_id):
     """Return all signals the user has RSVP'd to. pod_id always included."""
     signals = list_rsvped_signals(user_id)
     _resolve_pod_ids(signals, user_id)
+    _score_signals(signals, user_id)
     return signals, None
 
 

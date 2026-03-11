@@ -513,7 +513,7 @@ struct MatchScoreBadge: View {
     let score: Double
 
     private var color: Color {
-        score >= 0.75 ? .green : score >= 0.45 ? .orange : Color(.systemGray2)
+        score >= 0.85 ? .green : score >= 0.70 ? .orange : Color(.systemGray2)
     }
 
     var body: some View {

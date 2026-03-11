@@ -307,6 +307,20 @@ struct SignalRsvpCard: View {
                     }
                     .foregroundColor(.white.opacity(0.6))
 
+                    if let score = signal.matchScore {
+                        Text("\(Int(score * 100))% match")
+                            .font(.caption2)
+                            .fontWeight(.semibold)
+                            .padding(.horizontal, 7)
+                            .padding(.vertical, 3)
+                            .background(
+                                (score >= 0.85 ? Color.green : score >= 0.70 ? Color.orange : Color.white.opacity(0.3))
+                                    .opacity(0.25)
+                            )
+                            .foregroundColor(score >= 0.85 ? .green : score >= 0.70 ? .orange : .white.opacity(0.7))
+                            .clipShape(Capsule())
+                    }
+
                     HStack(spacing: 4) {
                         Image(systemName: "calendar")
                             .font(.caption2)

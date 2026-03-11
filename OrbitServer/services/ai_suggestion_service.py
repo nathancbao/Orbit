@@ -46,6 +46,7 @@ W_TRUST      = 0.10
 # feel intuitive while preserving rank order.
 DISPLAY_FLOOR = 0.55   # minimum displayed score
 DISPLAY_CEIL  = 0.97   # maximum displayed score
+DISPLAY_GAMMA = 0.4    # power curve exponent (<1 stretches low values)
 
 # ── Behavioral decay parameters ────────────────────────────────────────────────
 DECAY_LAMBDA = 0.05   # exp(-0.05 * days), half-life ~ 14 days
@@ -183,13 +184,17 @@ def _compute_behavioral_score(mission_tags: set, behavioral_profile: list) -> fl
 # ── Trust weight ───────────────────────────────────────────────────────────────
 
 def _rescale_for_display(raw: float) -> float:
-    """Map a raw score in [0, 1] to [DISPLAY_FLOOR, DISPLAY_CEIL].
+    """Map a raw score in [0, 1] to [DISPLAY_FLOOR, DISPLAY_CEIL] using a
+    power curve to amplify differences in the low-to-mid range.
 
-    Preserves rank order — higher raw scores still produce higher display
-    scores.  Missions with raw 0.0 still get the floor so the UI never
-    shows an awkwardly low percentage.
+    With gamma=0.4:
+      raw=0.05 -> 66%    raw=0.15 -> 73%    raw=0.30 -> 79%
+      raw=0.50 -> 87%    raw=0.80 -> 93%    raw=1.00 -> 97%
     """
-    return DISPLAY_FLOOR + raw * (DISPLAY_CEIL - DISPLAY_FLOOR)
+    if raw <= 0:
+        return DISPLAY_FLOOR
+    curved = raw ** DISPLAY_GAMMA
+    return DISPLAY_FLOOR + curved * (DISPLAY_CEIL - DISPLAY_FLOOR)
 
 
 def _normalize_trust(trust_score) -> float:

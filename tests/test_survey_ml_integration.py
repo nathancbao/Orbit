@@ -83,7 +83,7 @@ class TestEnjoymentInBehavioralDecay:
 
 
 class TestDisplayRescaling:
-    """Verify the display rescaling from the earlier match score change."""
+    """Verify the display rescaling with power curve."""
 
     def test_rescale_floor(self):
         from OrbitServer.services.ai_suggestion_service import _rescale_for_display, DISPLAY_FLOOR
@@ -99,13 +99,18 @@ class TestDisplayRescaling:
         b = _rescale_for_display(0.7)
         assert b > a
 
-    def test_rescale_midpoint(self):
-        from OrbitServer.services.ai_suggestion_service import (
-            _rescale_for_display, DISPLAY_FLOOR, DISPLAY_CEIL,
-        )
-        mid = _rescale_for_display(0.5)
-        expected = DISPLAY_FLOOR + 0.5 * (DISPLAY_CEIL - DISPLAY_FLOOR)
-        assert abs(mid - expected) < 1e-9
+    def test_rescale_spreads_low_values(self):
+        """Power curve should create meaningful gaps between small raw scores."""
+        from OrbitServer.services.ai_suggestion_service import _rescale_for_display
+        a = _rescale_for_display(0.05)
+        b = _rescale_for_display(0.15)
+        # With gamma=0.4, gap should be ~7% (vs ~4% with linear)
+        gap = b - a
+        assert gap > 0.05, f"Gap {gap} too small — low values not spread enough"
+
+    def test_rescale_negative_returns_floor(self):
+        from OrbitServer.services.ai_suggestion_service import _rescale_for_display, DISPLAY_FLOOR
+        assert abs(_rescale_for_display(-0.1) - DISPLAY_FLOOR) < 1e-9
 
 
 class TestLightFMEnjoymentBonus:
