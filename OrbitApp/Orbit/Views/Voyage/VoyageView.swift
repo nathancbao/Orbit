@@ -49,6 +49,10 @@ struct VoyageView: View {
     // Zoom into a cluster
     @State private var zoomedTile: VoyageTile? = nil
 
+    // Pinch-to-zoom
+    @State private var zoomScale: CGFloat = 1.0
+    @State private var lastZoomScale: CGFloat = 1.0
+
     /// Compact solar system diameter shown in the tile grid.
     private let compactDiameter: CGFloat = 160
 
@@ -61,12 +65,24 @@ struct VoyageView: View {
                 // Parallax star field
                 starFieldLayer(size: geo.size)
 
-                // Tile content layer — moves with pan
+                // Tile content layer — moves with pan, scales with pinch
                 tileContentLayer(size: geo.size)
+                    .scaleEffect(zoomScale)
 
                 // Home direction indicator
                 if viewModel.distanceFromHome > 2 && zoomedTile == nil {
                     VoyageHomeIndicator(angle: viewModel.homeAngle)
+                }
+
+                // Top hint
+                if zoomedTile == nil {
+                    VStack {
+                        Text("Tap on solar systems to explore more activities!")
+                            .font(.system(size: 16, weight: .semibold))
+                            .foregroundColor(.white.opacity(0.8))
+                            .padding(.top, 60)
+                        Spacer()
+                    }
                 }
 
                 // End Voyage button
@@ -74,11 +90,9 @@ struct VoyageView: View {
                     endVoyageButton
                 }
 
-                // Loading indicator for initial load
+                // Loading — rocket launch animation
                 if viewModel.isLoading {
-                    ProgressView()
-                        .tint(.white)
-                        .scaleEffect(1.5)
+                    VoyageRocketLoading()
                 }
 
                 // Zoomed cluster overlay
@@ -97,6 +111,7 @@ struct VoyageView: View {
                 }
             }
             .gesture(panGesture)
+            .simultaneousGesture(pinchGesture)
         }
         .ignoresSafeArea()
         .statusBarHidden()
@@ -367,10 +382,13 @@ struct VoyageView: View {
         DragGesture()
             .onChanged { value in
                 guard zoomedTile == nil else { return }
-                let delta = CGSize(
+                let raw = CGSize(
                     width: value.translation.width - lastDragValue.width,
                     height: value.translation.height - lastDragValue.height
                 )
+                // Divide by zoom so panning distance matches finger movement at any scale
+                let delta = CGSize(width: raw.width / zoomScale,
+                                   height: raw.height / zoomScale)
                 lastDragValue = value.translation
                 viewModel.dragVelocity = CGSize(
                     width: value.velocity.width,
@@ -383,6 +401,17 @@ struct VoyageView: View {
                 withAnimation(.easeOut(duration: 0.5)) {
                     viewModel.dragVelocity = .zero
                 }
+            }
+    }
+
+    private var pinchGesture: some Gesture {
+        MagnificationGesture()
+            .onChanged { value in
+                guard zoomedTile == nil else { return }
+                zoomScale = max(0.4, min(lastZoomScale * value, 3.0))
+            }
+            .onEnded { _ in
+                lastZoomScale = zoomScale
             }
     }
 
@@ -445,6 +474,190 @@ struct VoyageView: View {
                 parallaxFactor: CGFloat.random(in: 0.02...0.15)
             )
         }
+    }
+}
+
+// MARK: - Rocket Loading Animation
+
+private struct VoyageRocketLoading: View {
+    @State private var rocketOffset: CGFloat = 0
+    @State private var flameScale: CGFloat = 1.0
+    @State private var exhaustParticles: [ExhaustDot] = []
+
+    private struct ExhaustDot: Identifiable {
+        let id: Int
+        let xJitter: CGFloat
+        let size: CGFloat
+        let delay: Double
+        let isWhite: Bool
+    }
+
+    var body: some View {
+        VStack(spacing: 0) {
+            Spacer()
+
+            ZStack {
+                // Exhaust particles trailing below
+                ForEach(exhaustParticles) { dot in
+                    let color = dot.isWhite ? Color.white : Color(hex: "F97316")
+                    Circle()
+                        .fill(
+                            RadialGradient(
+                                colors: [color.opacity(0.7), color.opacity(0)],
+                                center: .center, startRadius: 0, endRadius: dot.size
+                            )
+                        )
+                        .frame(width: dot.size * 2, height: dot.size * 2)
+                        .offset(x: dot.xJitter, y: 100 + CGFloat(dot.id) * 18)
+                        .opacity(flameScale > 1.05 ? 0.8 : 0.35)
+                        .animation(
+                            .easeInOut(duration: 0.35 + dot.delay).repeatForever(autoreverses: true),
+                            value: flameScale
+                        )
+                }
+
+                // Outer orange flame glow
+                Ellipse()
+                    .fill(
+                        RadialGradient(
+                            colors: [
+                                Color(hex: "F97316").opacity(0.6),
+                                Color(hex: "EF4444").opacity(0.3),
+                                Color(hex: "EF4444").opacity(0)
+                            ],
+                            center: .center, startRadius: 4, endRadius: 50
+                        )
+                    )
+                    .frame(width: 60, height: 100)
+                    .scaleEffect(y: flameScale)
+                    .offset(y: 70)
+
+                // Inner white-hot flame core
+                Ellipse()
+                    .fill(
+                        RadialGradient(
+                            colors: [
+                                .white.opacity(0.95),
+                                Color(hex: "FBBF24").opacity(0.7),
+                                Color(hex: "F97316").opacity(0)
+                            ],
+                            center: .center, startRadius: 2, endRadius: 28
+                        )
+                    )
+                    .frame(width: 36, height: 70)
+                    .scaleEffect(y: flameScale)
+                    .offset(y: 60)
+
+                // Rocket body
+                VStack(spacing: 0) {
+                    // Nose cone
+                    RocketNose()
+                        .fill(
+                            LinearGradient(colors: [.white, Color(hex: "B0B0B0")],
+                                           startPoint: .top, endPoint: .bottom)
+                        )
+                        .frame(width: 44, height: 36)
+
+                    // Body
+                    RoundedRectangle(cornerRadius: 4)
+                        .fill(
+                            LinearGradient(colors: [Color(hex: "D4D4D4"), Color(hex: "4B4B4B")],
+                                           startPoint: .leading, endPoint: .trailing)
+                        )
+                        .frame(width: 48, height: 80)
+                        .overlay(
+                            VStack(spacing: 10) {
+                                // Window
+                                Circle()
+                                    .fill(
+                                        RadialGradient(
+                                            colors: [.white.opacity(0.9), Color(hex: "888888")],
+                                            center: UnitPoint(x: 0.35, y: 0.35),
+                                            startRadius: 0, endRadius: 10
+                                        )
+                                    )
+                                    .frame(width: 16, height: 16)
+                                    .overlay(Circle().strokeBorder(.white.opacity(0.4), lineWidth: 1))
+
+                                // Stripe
+                                RoundedRectangle(cornerRadius: 1)
+                                    .fill(Color.white.opacity(0.25))
+                                    .frame(width: 36, height: 3)
+                            }
+                            .offset(y: -6)
+                        )
+
+                    // Fins
+                    HStack(spacing: 30) {
+                        RocketFin()
+                            .fill(
+                                LinearGradient(colors: [Color(hex: "9CA3AF"), Color(hex: "374151")],
+                                               startPoint: .top, endPoint: .bottom)
+                            )
+                            .frame(width: 18, height: 32)
+                        RocketFin()
+                            .fill(
+                                LinearGradient(colors: [Color(hex: "9CA3AF"), Color(hex: "374151")],
+                                               startPoint: .top, endPoint: .bottom)
+                            )
+                            .frame(width: 18, height: 32)
+                            .scaleEffect(x: -1)
+                    }
+                    .offset(y: -4)
+                }
+            }
+            .offset(y: rocketOffset)
+
+            Spacer()
+
+            Text("Launching...")
+                .font(.system(size: 14, weight: .medium))
+                .foregroundColor(.white.opacity(0.5))
+                .padding(.bottom, 100)
+        }
+        .onAppear {
+            exhaustParticles = (0..<14).map { i in
+                ExhaustDot(
+                    id: i,
+                    xJitter: CGFloat.random(in: -20...20),
+                    size: CGFloat.random(in: 5...14),
+                    delay: Double.random(in: 0...0.4),
+                    isWhite: i % 3 == 0
+                )
+            }
+
+            withAnimation(.easeInOut(duration: 1.2).repeatForever(autoreverses: true)) {
+                rocketOffset = -24
+            }
+            withAnimation(.easeInOut(duration: 0.25).repeatForever(autoreverses: true)) {
+                flameScale = 1.35
+            }
+        }
+    }
+}
+
+// Small rocket shape helpers
+private struct RocketNose: Shape {
+    func path(in rect: CGRect) -> Path {
+        var p = Path()
+        p.move(to: CGPoint(x: rect.midX, y: rect.minY))
+        p.addQuadCurve(to: CGPoint(x: rect.maxX, y: rect.maxY),
+                       control: CGPoint(x: rect.maxX, y: rect.midY))
+        p.addLine(to: CGPoint(x: rect.minX, y: rect.maxY))
+        p.addQuadCurve(to: CGPoint(x: rect.midX, y: rect.minY),
+                       control: CGPoint(x: rect.minX, y: rect.midY))
+        return p
+    }
+}
+
+private struct RocketFin: Shape {
+    func path(in rect: CGRect) -> Path {
+        var p = Path()
+        p.move(to: CGPoint(x: rect.maxX, y: rect.minY))
+        p.addLine(to: CGPoint(x: rect.maxX, y: rect.maxY))
+        p.addLine(to: CGPoint(x: rect.minX, y: rect.maxY))
+        p.closeSubpath()
+        return p
     }
 }
 
