@@ -152,7 +152,7 @@ struct VoyageView: View {
                 }
 
                 // ── Shooting stars (3 staggered slots) ──
-                let shootingIntervals: [Double] = [9.0, 14.0, 21.0]
+                let shootingIntervals: [Double] = [45.0, 65.0, 90.0]
                 for (si, interval) in shootingIntervals.enumerated() {
                     let idx = Int(time / interval)
                     let t = time - Double(idx) * interval
@@ -188,7 +188,7 @@ struct VoyageView: View {
                 }
 
                 // ── Drifting ships (2 staggered slots, less common) ──
-                let shipIntervals: [Double] = [28.0, 43.0]
+                let shipIntervals: [Double] = [55.0, 80.0]
                 for (si, interval) in shipIntervals.enumerated() {
                     let idx = Int(time / interval)
                     let t = time - Double(idx) * interval
