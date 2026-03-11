@@ -85,6 +85,30 @@ struct VoyageItem: Codable, Identifiable {
         case creatorId = "creator_id"
     }
 
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        // id may arrive as Int or String from backend
+        if let intId = try? c.decode(Int.self, forKey: .id) {
+            id = String(intId)
+        } else {
+            id = (try? c.decode(String.self, forKey: .id)) ?? UUID().uuidString
+        }
+        title = (try? c.decode(String.self, forKey: .title)) ?? ""
+        description = (try? c.decode(String.self, forKey: .description)) ?? ""
+        tags = (try? c.decode([String].self, forKey: .tags)) ?? []
+        itemType = (try? c.decode(String.self, forKey: .itemType)) ?? "mission"
+        status = (try? c.decode(String.self, forKey: .status)) ?? "open"
+        date = try? c.decode(String.self, forKey: .date)
+        location = try? c.decode(String.self, forKey: .location)
+        startTime = try? c.decode(String.self, forKey: .startTime)
+        endTime = try? c.decode(String.self, forKey: .endTime)
+        maxPodSize = try? c.decode(Int.self, forKey: .maxPodSize)
+        activityCategory = try? c.decode(String.self, forKey: .activityCategory)
+        minGroupSize = try? c.decode(Int.self, forKey: .minGroupSize)
+        maxGroupSize = try? c.decode(Int.self, forKey: .maxGroupSize)
+        creatorId = try? c.decode(Int.self, forKey: .creatorId)
+    }
+
     var isMission: Bool { itemType == "mission" }
     var isSignal: Bool { itemType == "signal" }
 

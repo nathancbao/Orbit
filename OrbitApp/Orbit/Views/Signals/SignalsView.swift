@@ -12,7 +12,7 @@ struct SignalsView: View {
     @State private var showProfile = false
 
     enum SignalSegment: String, CaseIterable {
-        case discover = "Discover"
+        case discover = "Explore"
         case mine = "My Signals"
     }
 

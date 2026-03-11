@@ -72,7 +72,7 @@ def get_clusters():
     sig_results = list(sig_query.fetch(limit=200))
     signals = [_entity_to_dict(e) for e in sig_results]
 
-    # Tag each item with its type for the frontend
+    # Tag each item with its type and normalise required fields
     pool = []
     for m in missions:
         m['item_type'] = 'mission'
@@ -82,6 +82,13 @@ def get_clusters():
         s['item_type'] = 'signal'
         _strip_heavy_fields(s)
         pool.append(s)
+
+    for item in pool:
+        item.setdefault('id', '')
+        item.setdefault('title', '')
+        item.setdefault('description', '')
+        item.setdefault('tags', [])
+        item.setdefault('status', 'open')
 
     # Build tiles
     tiles = []

@@ -10,7 +10,7 @@ import Combine
 import SwiftUI
 
 enum MissionSegment: String, CaseIterable {
-    case discover = "Discover"
+    case discover = "Explore"
     case mine = "My Missions"
 }
 

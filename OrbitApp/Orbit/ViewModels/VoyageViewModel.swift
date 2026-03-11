@@ -129,6 +129,7 @@ class VoyageViewModel: ObservableObject {
                 loadingTileKeys.remove(key)
             }
         } catch {
+            print("[Voyage] fetchTilesAround failed: \(error)")
             // Remove loading state on failure so retry is possible
             for dx in -2...2 {
                 for dy in -2...2 {
