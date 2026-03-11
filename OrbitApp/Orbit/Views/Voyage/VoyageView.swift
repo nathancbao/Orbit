@@ -4,6 +4,7 @@
 //
 //  Fullscreen infinite 2D exploration — panning through tile-based clusters
 //  of missions and signals against a dense parallax star field.
+//  Tap a solar system to zoom in and browse its events.
 //
 
 import SwiftUI
@@ -45,6 +46,12 @@ struct VoyageView: View {
     // Detail sheet
     @State private var selectedItem: VoyageItem? = nil
 
+    // Zoom into a cluster
+    @State private var zoomedTile: VoyageTile? = nil
+
+    /// Compact solar system diameter shown in the tile grid.
+    private let compactDiameter: CGFloat = 160
+
     var body: some View {
         GeometryReader { geo in
             ZStack {
@@ -58,18 +65,25 @@ struct VoyageView: View {
                 tileContentLayer(size: geo.size)
 
                 // Home direction indicator
-                if viewModel.distanceFromHome > 2 {
+                if viewModel.distanceFromHome > 2 && zoomedTile == nil {
                     VoyageHomeIndicator(angle: viewModel.homeAngle)
                 }
 
                 // End Voyage button
-                endVoyageButton
+                if zoomedTile == nil {
+                    endVoyageButton
+                }
 
                 // Loading indicator for initial load
                 if viewModel.isLoading {
                     ProgressView()
                         .tint(.white)
                         .scaleEffect(1.5)
+                }
+
+                // Zoomed cluster overlay
+                if let tile = zoomedTile {
+                    zoomedOverlay(tile: tile, screenSize: geo.size)
                 }
             }
             .scaleEffect(isExiting ? exitScale : entryScale)
@@ -120,7 +134,7 @@ struct VoyageView: View {
                     let opacity = star.baseOpacity + twinkle * (1.0 - star.baseOpacity)
 
                     if warpFactor > 0.1 {
-                        // Warp-speed streaks: elongate in direction of movement
+                        // Warp-speed streaks
                         let streakLength = star.size + warpFactor * 12
                         let angle = atan2(-velocity.height, -velocity.width)
 
@@ -137,7 +151,6 @@ struct VoyageView: View {
                             lineWidth: star.size * 0.6
                         )
                     } else {
-                        // Normal dot
                         let rect = CGRect(
                             x: sx - star.size / 2,
                             y: sy - star.size / 2,
@@ -169,31 +182,32 @@ struct VoyageView: View {
                     let ty = cy + dy
                     let key = "\(tx),\(ty)"
 
-                    // Tile origin in world space, offset by voyage position
-                    let originX = CGFloat(tx) * tileSize + viewModel.voyagePosition.x + size.width / 2
-                    let originY = CGFloat(ty) * tileSize + viewModel.voyagePosition.y + size.height / 2
+                    // Tile centre in screen space
+                    let centerX = CGFloat(tx) * tileSize + viewModel.voyagePosition.x + size.width / 2 + tileSize / 2
+                    let centerY = CGFloat(ty) * tileSize + viewModel.voyagePosition.y + size.height / 2 + tileSize / 2
 
-                    // Only render if tile is roughly on screen
-                    if originX > -tileSize && originX < size.width + tileSize &&
-                       originY > -tileSize && originY < size.height + tileSize {
+                    // Only render if roughly on screen
+                    if centerX > -tileSize && centerX < size.width + tileSize &&
+                       centerY > -tileSize && centerY < size.height + tileSize {
 
                         if let tile = viewModel.loadedTiles[key] {
                             VoyageClusterView(
                                 tile: tile,
-                                tileSize: tileSize,
-                                onItemTap: { item in
-                                    selectedItem = item
+                                systemDiameter: compactDiameter,
+                                interactive: false,
+                                onSystemTap: {
+                                    withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) {
+                                        zoomedTile = tile
+                                    }
                                 }
                             )
-                            .frame(width: tileSize, height: tileSize)
-                            .position(x: originX + tileSize / 2, y: originY + tileSize / 2)
+                            .position(x: centerX, y: centerY)
                             .transition(.scale.combined(with: .opacity))
                         } else if viewModel.loadingTileKeys.contains(key) {
-                            // Subtle loading shimmer
                             RoundedRectangle(cornerRadius: 8)
                                 .fill(Color.white.opacity(0.03))
-                                .frame(width: tileSize * 0.6, height: tileSize * 0.6)
-                                .position(x: originX + tileSize / 2, y: originY + tileSize / 2)
+                                .frame(width: compactDiameter * 0.5, height: compactDiameter * 0.5)
+                                .position(x: centerX, y: centerY)
                         }
                     }
                 }
@@ -202,11 +216,61 @@ struct VoyageView: View {
         .animation(.easeOut(duration: 0.3), value: viewModel.loadedTiles.count)
     }
 
+    // MARK: - Zoomed Cluster Overlay
+
+    private func zoomedOverlay(tile: VoyageTile, screenSize: CGSize) -> some View {
+        let expandedDiameter = min(screenSize.width, screenSize.height) - 40
+
+        return ZStack {
+            // Dim background — tap to close
+            Color.black.opacity(0.75)
+                .ignoresSafeArea()
+                .onTapGesture {
+                    withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
+                        zoomedTile = nil
+                    }
+                }
+
+            VStack(spacing: 20) {
+                // Close button
+                HStack {
+                    Spacer()
+                    Button {
+                        withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
+                            zoomedTile = nil
+                        }
+                    } label: {
+                        Image(systemName: "xmark.circle.fill")
+                            .font(.title2)
+                            .foregroundStyle(.white.opacity(0.7))
+                    }
+                }
+                .padding(.horizontal, 24)
+
+                Spacer()
+
+                // Expanded solar system
+                VoyageClusterView(
+                    tile: tile,
+                    systemDiameter: expandedDiameter,
+                    interactive: true,
+                    onItemTap: { item in
+                        selectedItem = item
+                    }
+                )
+
+                Spacer()
+            }
+        }
+        .transition(.opacity.combined(with: .scale(scale: 0.6)))
+    }
+
     // MARK: - Pan Gesture
 
     private var panGesture: some Gesture {
         DragGesture()
             .onChanged { value in
+                guard zoomedTile == nil else { return }
                 let delta = CGSize(
                     width: value.translation.width - lastDragValue.width,
                     height: value.translation.height - lastDragValue.height

@@ -4,23 +4,28 @@
 //
 //  Renders a single tile's cluster as a mini solar system — a glowing sun
 //  at the centre with orbit rings that rotate, each carrying a planet bubble.
+//  Accepts a `systemDiameter` so the same view works at compact and zoomed sizes.
 //
 
 import SwiftUI
 
 struct VoyageClusterView: View {
     let tile: VoyageTile
-    let tileSize: CGFloat
-    var onItemTap: (VoyageItem) -> Void
+    let systemDiameter: CGFloat
+    let interactive: Bool
+    var onSystemTap: (() -> Void)? = nil
+    var onItemTap: ((VoyageItem) -> Void)? = nil
 
     @State private var appeared = false
 
-    /// Deterministic seed for this tile (layout, rotation speeds, sun hue).
+    // MARK: - Deterministic seed
+
     private var seed: UInt64 {
         UInt64(abs(tile.x &* 73856093 ^ tile.y &* 19349663))
     }
 
-    /// Sun colour derived from tile coordinates.
+    // MARK: - Sun
+
     private var sunColor: Color {
         let hues: [Color] = [
             Color(hex: "FBBF24"), // warm gold
@@ -28,130 +33,125 @@ struct VoyageClusterView: View {
             Color(hex: "FB923C"), // light orange
             Color(hex: "FCD34D"), // yellow
         ]
-        return hues[Int(seed) % sunHueCount]
+        return hues[Int(seed) % hues.count]
     }
-    private let sunHueCount = 4
 
-    /// Sun radius scales with item count so bigger systems feel heavier.
     private var sunRadius: CGFloat {
-        CGFloat(22 + min(tile.items.count, 6) * 3)
+        let base: CGFloat = 10 + CGFloat(min(tile.items.count, 6)) * 1.5
+        return base * scaleFactor
     }
 
-    /// Max orbit radius — keep planets inside the tile.
-    private var maxOrbitRadius: CGFloat {
-        tileSize * 0.42
-    }
+    // MARK: - Geometry helpers
+
+    private var scaleFactor: CGFloat { systemDiameter / 300 }
+    private var center: CGFloat { systemDiameter / 2 }
+    private var maxOrbitRadius: CGFloat { systemDiameter * 0.48 }
+
+    // MARK: - Body
 
     var body: some View {
         TimelineView(.animation(minimumInterval: 1.0 / 30)) { timeline in
             let time = timeline.date.timeIntervalSinceReferenceDate
-            let center = tileSize / 2
 
-            Canvas { context, size in
-                // Draw orbit ring strokes
-                for index in 0..<tile.items.count {
+            ZStack {
+                // Canvas — orbit rings + sun (non-interactive)
+                Canvas { context, _ in
+                    drawOrbitRings(context: context)
+                    drawSun(context: context)
+                }
+                .allowsHitTesting(false)
+
+                // Planet bubbles
+                ForEach(Array(tile.items.enumerated()), id: \.element.id) { index, item in
                     let radius = orbitRadius(for: index)
-                    let rect = CGRect(
-                        x: center - radius,
-                        y: center - radius,
-                        width: radius * 2,
-                        height: radius * 2
-                    )
-                    context.stroke(
-                        Path(ellipseIn: rect),
-                        with: .color(.white.opacity(0.08)),
-                        lineWidth: 0.5
+                    let angle = orbitStartAngle(for: index) + time * orbitSpeed(for: index)
+                    let px = center + radius * CGFloat(cos(angle))
+                    let py = center + radius * CGFloat(sin(angle))
+
+                    VoyageBubble(item: item, scale: scaleFactor, showLabel: interactive) {
+                        if interactive { onItemTap?(item) }
+                    }
+                    .position(x: px, y: py)
+                    .allowsHitTesting(interactive)
+                    .scaleEffect(appeared ? 1 : 0.3)
+                    .opacity(appeared ? 1 : 0)
+                    .animation(
+                        .spring(response: 0.5, dampingFraction: 0.7)
+                            .delay(Double(index) * 0.08),
+                        value: appeared
                     )
                 }
-
-                // Draw sun glow
-                let glowRect = CGRect(
-                    x: center - sunRadius * 2,
-                    y: center - sunRadius * 2,
-                    width: sunRadius * 4,
-                    height: sunRadius * 4
-                )
-                context.fill(
-                    Path(ellipseIn: glowRect),
-                    with: .radialGradient(
-                        Gradient(colors: [sunColor.opacity(0.35), sunColor.opacity(0)]),
-                        center: CGPoint(x: center, y: center),
-                        startRadius: sunRadius * 0.5,
-                        endRadius: sunRadius * 2
-                    )
-                )
-
-                // Draw sun core
-                let sunRect = CGRect(
-                    x: center - sunRadius,
-                    y: center - sunRadius,
-                    width: sunRadius * 2,
-                    height: sunRadius * 2
-                )
-                context.fill(
-                    Path(ellipseIn: sunRect),
-                    with: .radialGradient(
-                        Gradient(colors: [.white.opacity(0.95), sunColor]),
-                        center: CGPoint(x: center, y: center),
-                        startRadius: 0,
-                        endRadius: sunRadius
-                    )
-                )
-            }
-            .allowsHitTesting(false)
-
-            // Planet bubbles positioned on their orbits
-            ForEach(Array(tile.items.enumerated()), id: \.element.id) { index, item in
-                let radius = orbitRadius(for: index)
-                let speed = orbitSpeed(for: index)
-                let startAngle = orbitStartAngle(for: index)
-                let angle = startAngle + time * speed
-
-                let px = center + radius * CGFloat(cos(angle))
-                let py = center + radius * CGFloat(sin(angle))
-
-                VoyageBubble(item: item) {
-                    onItemTap(item)
-                }
-                .position(x: px, y: py)
-                .scaleEffect(appeared ? 1 : 0.3)
-                .opacity(appeared ? 1 : 0)
-                .animation(
-                    .spring(response: 0.5, dampingFraction: 0.7)
-                        .delay(Double(index) * 0.08),
-                    value: appeared
-                )
             }
         }
-        .frame(width: tileSize, height: tileSize)
+        .frame(width: systemDiameter, height: systemDiameter)
+        .contentShape(Circle())
+        .onTapGesture {
+            if !interactive { onSystemTap?() }
+        }
         .onAppear { appeared = true }
     }
 
-    // MARK: - Orbit Helpers
+    // MARK: - Canvas drawing
 
-    /// Radius for the nth orbit ring, evenly spaced from sun edge to max.
+    private func drawOrbitRings(context: GraphicsContext) {
+        for index in 0..<tile.items.count {
+            let r = orbitRadius(for: index)
+            let rect = CGRect(x: center - r, y: center - r, width: r * 2, height: r * 2)
+            context.stroke(
+                Path(ellipseIn: rect),
+                with: .color(.white.opacity(interactive ? 0.22 : 0.15)),
+                lineWidth: interactive ? 1.0 : 0.7
+            )
+        }
+    }
+
+    private func drawSun(context: GraphicsContext) {
+        let c = CGPoint(x: center, y: center)
+
+        // Outer glow
+        let glowR = sunRadius * 2.5
+        context.fill(
+            Path(ellipseIn: CGRect(x: c.x - glowR, y: c.y - glowR,
+                                   width: glowR * 2, height: glowR * 2)),
+            with: .radialGradient(
+                Gradient(colors: [sunColor.opacity(0.35), sunColor.opacity(0)]),
+                center: c, startRadius: sunRadius * 0.4, endRadius: glowR
+            )
+        )
+
+        // Core
+        context.fill(
+            Path(ellipseIn: CGRect(x: c.x - sunRadius, y: c.y - sunRadius,
+                                   width: sunRadius * 2, height: sunRadius * 2)),
+            with: .radialGradient(
+                Gradient(colors: [.white.opacity(0.95), sunColor]),
+                center: c, startRadius: 0, endRadius: sunRadius
+            )
+        )
+    }
+
+    // MARK: - Orbit helpers
+
     private func orbitRadius(for index: Int) -> CGFloat {
         let count = max(tile.items.count, 1)
-        let innerEdge = sunRadius + 30
+        let innerEdge = sunRadius + systemDiameter * 0.06
         let step = (maxOrbitRadius - innerEdge) / CGFloat(count)
         return innerEdge + step * CGFloat(index) + step * 0.5
     }
 
-    /// Angular speed (radians/sec) — inner orbits faster, outer slower.
+    /// Slow orbit — inner rings faster, alternating directions.
     private func orbitSpeed(for index: Int) -> Double {
-        let base = 0.18 + Double(seed % 10) * 0.008 // slight per-tile variation
+        let base = 0.035 + Double(seed % 10) * 0.002
         let count = max(tile.items.count, 1)
-        // Inner = faster, outer = slower, alternating directions
-        let factor = 1.0 - Double(index) * 0.12 / Double(count)
+        let factor = 1.0 - Double(index) * 0.1 / Double(count)
         let direction: Double = index.isMultiple(of: 2) ? 1 : -1
         return base * factor * direction
     }
 
-    /// Deterministic start angle so planets aren't all aligned on load.
     private func orbitStartAngle(for index: Int) -> Double {
         var s = seed &+ UInt64(index) &* 2654435761
         s = s ^ (s >> 13)
-        return Double(s % 6283) / 1000.0 // 0 ... ~2pi
+        return Double(s % 6283) / 1000.0
     }
 }
 
@@ -159,25 +159,26 @@ struct VoyageClusterView: View {
 
 struct VoyageBubble: View {
     let item: VoyageItem
+    let scale: CGFloat
+    let showLabel: Bool
     let onTap: () -> Void
 
     @State private var isFloating = false
 
     private var bubbleColor: Color {
+        let hash = abs(item.id.hashValue)
         if item.isMission {
-            let hash = abs(item.id.hashValue)
             let colors: [Color] = [
-                Color(hex: "3B82F6"),  // blue
-                Color(hex: "0D9488"),  // teal
-                Color(hex: "059669"),  // green
+                Color(hex: "3B82F6"),
+                Color(hex: "0D9488"),
+                Color(hex: "059669"),
             ]
             return colors[hash % colors.count]
         } else {
-            let hash = abs(item.id.hashValue)
             let colors: [Color] = [
-                Color(hex: "D97706"),  // amber
-                Color(hex: "DB2777"),  // pink
-                Color(hex: "8B5CF6"),  // lavender
+                Color(hex: "D97706"),
+                Color(hex: "DB2777"),
+                Color(hex: "8B5CF6"),
             ]
             return colors[hash % colors.count]
         }
@@ -185,7 +186,7 @@ struct VoyageBubble: View {
 
     private var bubbleSize: CGFloat {
         let hash = abs(item.id.hashValue)
-        return CGFloat(44 + (hash % 16))
+        return CGFloat(44 + (hash % 16)) * scale
     }
 
     var body: some View {
@@ -203,7 +204,7 @@ struct VoyageBubble: View {
                     )
                     .frame(width: bubbleSize * 1.6, height: bubbleSize * 1.6)
 
-                // Main bubble
+                // Core
                 Circle()
                     .fill(
                         RadialGradient(
@@ -219,15 +220,15 @@ struct VoyageBubble: View {
                             .strokeBorder(bubbleColor.opacity(0.6), lineWidth: 1.5)
                     )
 
-                // Icon
+                // Icon + label
                 VStack(spacing: 2) {
                     Image(systemName: item.isMission ? "calendar" : "antenna.radiowaves.left.and.right")
                         .font(.system(size: bubbleSize * 0.24))
                         .foregroundColor(.white)
 
-                    if bubbleSize > 50 {
+                    if showLabel && bubbleSize > 36 {
                         Text(item.displayTitle)
-                            .font(.system(size: 7, weight: .medium))
+                            .font(.system(size: max(7, bubbleSize * 0.15), weight: .medium))
                             .foregroundColor(.white.opacity(0.9))
                             .lineLimit(2)
                             .multilineTextAlignment(.center)
@@ -239,11 +240,10 @@ struct VoyageBubble: View {
         .buttonStyle(.plain)
         .offset(y: isFloating ? -2 : 2)
         .animation(
-            .easeInOut(duration: Double.random(in: 2.5...4.0)).repeatForever(autoreverses: true),
+            .easeInOut(duration: Double.random(in: 2.5...4.0))
+                .repeatForever(autoreverses: true),
             value: isFloating
         )
-        .onAppear {
-            isFloating = true
-        }
+        .onAppear { isFloating = true }
     }
 }

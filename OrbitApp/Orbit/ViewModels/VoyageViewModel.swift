@@ -30,7 +30,7 @@ class VoyageViewModel: ObservableObject {
 
     // MARK: - Constants
 
-    let tileSize: CGFloat = 600
+    let tileSize: CGFloat = 420
 
     /// Max tiles held in memory at once.
     private let maxTilesInMemory = 25
