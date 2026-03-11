@@ -1,177 +1,84 @@
-# AI Integration Updates — Leo
+# Orbit AI/ML Integration — Current State
 
 ---
 
-## Current State (as of Feb 2026)
+## The Recommendation Engine (5 Signals)
 
-All recommendation logic runs locally — no API keys, no external calls. Pod formation uses interest-based compatibility matching.
+Every mission gets scored for each user via a hybrid multi-signal formula:
 
-### Scoring Formula
-
-```
-score = 0.30 * tfidf_cosine      — keyword/tag content similarity
-      + 0.20 * semantic_cosine   — meaning-level similarity via fastembed
-      + 0.25 * lightfm_score     — collaborative filtering (learned from all users)
-      + 0.15 * behavioral_decay  — weighted join/skip history with temporal decay
-      + 0.10 * trust_weight      — user reliability signal
-```
-
-No API keys required. No external calls. All models run locally.
-
-### What Each Signal Does
-
-| Signal | Weight | How it works |
-|--------|--------|-------------|
-| **TF-IDF cosine** | 30% | scikit-learn `TfidfVectorizer` (unigrams + bigrams). Matches user interests against event title, description, and tags (tags double-weighted). Fast batch computation over all candidates. |
-| **Semantic cosine** | 20% | `fastembed` with `BAAI/bge-small-en-v1.5` (~24MB, ONNX Runtime). Converts user interests and event text to 384-dim vectors and scores cosine similarity. Catches meaning-level matches that TF-IDF misses (e.g. "hiking" ↔ "trail walking"). Event embeddings are generated once and cached in Datastore + in-process. |
-| **LightFM score** | 25% | Collaborative filtering model trained on all `UserEventHistory` records. Learns latent user and event embeddings from who joined what across the entire user base. Incorporates user interests and event tags as side features to handle cold start. Gets better as more users interact. Unknown users/events degrade to 0.0. |
-| **Behavioral decay** | 15% | Jaccard similarity between candidate event tags and tags from events the user has previously joined/browsed. Older interactions down-weighted by `exp(-0.05 * age_days)` (half-life ≈ 14 days). Skipped events excluded from candidates entirely. |
-| **Trust weight** | 10% | User's `trust_score` (0–5, reflects confirmed attendance) normalized to [0, 1]. Flat uplift across all candidates. |
-
-### Two Separate Scorers
-
-| Function | Used by | Method |
+| Signal | Weight | Data Source |
 |---|---|---|
-| `get_suggested_events()` | `GET /api/events/suggested` | Full 5-signal pipeline (TF-IDF + semantic + LightFM + behavioral + trust) |
-| `score_event_for_user()` | Main `GET /api/events` list | Jaccard + tiny noise only — fast, scales to N events |
+| **TF-IDF cosine** | 30% | User interests vs mission title/description/tags |
+| **LightFM collaborative filtering** | 25% | Learned from all users' join/skip/browse patterns + side features (interests, college year, tags) |
+| **Semantic embeddings** | 20% | BAAI/bge-small-en-v1.5 meaning-level similarity (local, no API) |
+| **Behavioral decay** | 15% | Weighted history of joins/browses with exponential time decay (~14-day half-life) |
+| **Trust weight** | 10% | User reliability score [0-5] |
+
+Scores are rescaled to 55-97% for display.
 
 ---
 
-## What the AI Actually Does
+## How the Post-Activity Survey Feeds All 5 Signals
 
-> **What "AI" means here:** the system combines a pre-trained ML model (fastembed/`BAAI/bge-small-en-v1.5`) with a set of hand-tuned heuristics to produce recommendation scores. 
+The post-activity survey creates a closed feedback loop — every signal improves with real data:
 
-There are two places this runs — event recommendations and pod formation. No generative AI, no chat, no external model calls anywhere.
+### 1. Enjoyment Rating (1-5 stars)
 
-**Event recommendations:** Every open event gets a score for each user based on five signals. TF-IDF matches keywords — if you're into "hiking" and the event says "hiking," that's a direct hit. The semantic model (`BAAI/bge-small-en-v1.5`, runs locally) catches meaning-level matches even when the words differ — it knows "trail walking" and "hiking" are the same idea. LightFM looks across all users: if people with similar interests to yours tend to join certain events, those events get a boost for you too, even if the tags don't line up. Behavioral decay weights your own join/browse history, fading older interactions so recent activity counts more. Trust weight gives a small flat uplift to users who have a track record of actually showing up. Events are sorted by final score so the most relevant ones surface first.
+- **Behavioral decay (15%)**: Multiplies the action weight (`{1: 0.3x, 2: 0.6x, 3: 1.0x, 4: 1.3x, 5: 1.6x}`). A 5-star hike makes future hike-tagged missions rank much higher; a 1-star experience dampens them.
+- **LightFM (25%)**: Adds bonus to interaction weights (`{1: -0.3, 2: -0.1, 3: 0.0, 4: 0.2, 5: 0.5}`). The model learns which *types* of missions users actually enjoy, not just which they join.
 
-**Pod formation:** When a user joins an event, instead of dropping them into whatever pod has an open slot, the system finds the pod whose current members share the most interests with them. It scores every open pod using average Jaccard similarity between the joining user's interests and each member's interests, then routes the user to the best match. The goal is that by the time a pod fills up, the four members already have something in common before they've even said hello.
+### 2. "Add to Your Interests" (Tag Selection)
 
-### Plain English Summary
+- **TF-IDF (30%)**: New interests immediately improve keyword matching on next recommendation call.
+- **Semantic (20%)**: User embedding is regenerated from interests each time, so meaning-level matching improves too.
 
-**TF-IDF** — do the words match? Weights terms by how rare/important they are across all missions.
+### 3. Member Upvote/Downvote
 
-**Jaccard (behavioral decay)** — does this look like stuff you've done before? Tag overlap between past interactions and the candidate mission, faded by age.
-
-**Trust score** — static flat boost based on how reliably the user shows up.
-
-**LightFM** — did people like you enjoy this? Matrix factorization on interaction history across all users. Ignores words entirely, learns from behavior patterns.
-
-**FastEmbed** — does this mean the same thing as your interests? Dense vector embeddings catch semantic relationships (e.g. "hiking" ↔ "trail walking") even when exact words don't match.
-
-The key distinction between LightFM and FastEmbed: LightFM learns from *who* interacted with *what*, FastEmbed understands *what things mean*. They complement each other — LightFM can surface things semantically unrelated but popular with similar users, FastEmbed can surface things with no interaction history but semantically aligned.
+- **Trust weight (10%)**: Upvotes add +0.1, downvotes subtract -0.15 from the target user's trust score. Higher-trust users' missions rank better in recommendations.
 
 ---
 
-### Worked Example
+## Other AI-Powered Features
 
-**User profile:**
-- Interests: `["machine learning", "python", "data science"]`
-- History: joined `"Intro to PyTorch"` (3 days ago), joined `"NLP Workshop"` (10 days ago), skipped `"Web Dev Bootcamp"` (5 days ago)
-- Trust score: 4.2 / 5
-
-**Candidate events:**
-1. `"Advanced ML with Python"` — tags: `["machine learning", "python", "advanced"]`
-2. `"React Frontend Workshop"` — tags: `["javascript", "react", "frontend"]`
-
-**Scoring event 1 — "Advanced ML with Python":**
-```
-TF-IDF cosine:    0.82   (strong keyword overlap with interests)
-Semantic cosine:  0.91   (embedding model knows "ML" and "data science" are closely related)
-LightFM score:    0.76   (users with similar interests have joined ML events)
-Behavioral decay: 0.78   (tag overlap with PyTorch/NLP joins, recent → low decay)
-Trust weight:     0.84   (4.2/5 normalized)
-
-score = 0.30 × 0.82 + 0.20 × 0.91 + 0.25 × 0.76 + 0.15 × 0.78 + 0.10 × 0.84
-      = 0.246 + 0.182 + 0.190 + 0.117 + 0.084
-      = 0.819
-```
-
-**Scoring event 2 — "React Frontend Workshop":**
-```
-TF-IDF cosine:    0.05   (no keyword overlap with ML/Python interests)
-Semantic cosine:  0.11   (embedding model confirms frontend/ML are unrelated)
-LightFM score:    0.08   (users similar to you rarely join frontend events)
-Behavioral decay: 0.00   (no tag overlap; "Web Dev Bootcamp" was skipped → excluded)
-Trust weight:     0.84
-
-score = 0.30 × 0.05 + 0.20 × 0.11 + 0.25 × 0.08 + 0.15 × 0.00 + 0.10 × 0.84
-      = 0.015 + 0.022 + 0.020 + 0.000 + 0.084
-      = 0.141
-```
-
-**Result:** Event 1 surfaces near the top of suggestions; Event 2 is ranked near the bottom. The skipped web dev event is filtered out entirely before scoring begins.
+- **Pod assignment**: When you join a mission, you're placed in the pod with the highest Jaccard interest overlap with existing members (not random).
+- **LightFM cold-start handling**: Side features (interests, college year, mission tags) let the model score new users/missions even without interaction history.
+- **Embedding persistence**: Mission embeddings are generated once, stored in Datastore, and cached in-process to avoid redundant computation.
 
 ---
 
-## LightFM Collaborative Filtering
+## What's Still Not AI-Powered
 
-The LightFM model is the only signal that learns from your actual user base. All other signals operate on a single user in isolation — LightFM looks across everyone.
-
-### How It Works
-
-1. On first scoring request, the model trains on all `UserEventHistory` records in Datastore.
-2. It learns latent embeddings for every user and event from interaction patterns — who joined what, who browsed what.
-3. Side features (user interests, college year, event tags) are incorporated so new users/events have a starting point before enough interactions exist.
-4. Scores are output as raw floats and normalized to (0, 1) via sigmoid.
-5. Unknown users or events (not in training data) fall back to 0.0 gracefully.
-
-### Training Data
-
-| Input | Source | How used |
-|---|---|---|
-| Interactions | `UserEventHistory` — all records | joined=1.0, browsed=0.3, attended bonus=+0.5, skipped=excluded |
-| User features | `Profile.interests`, `college_year` | Side features to bootstrap cold-start users |
-| Item features | `Event.tags` | Side features to bootstrap cold-start events |
-
-### Retraining
-
-The model is lazy-trained in memory on first call. Call `retrain()` from a scheduled cron endpoint to refresh it with new interaction data. As the user base grows this should run nightly.
-
-### Scaling Considerations
-
-- **Retraining cost** grows with data. At 100 users it's instant. At 100,000+ users with millions of interactions, move retraining to a dedicated Cloud Scheduler / Cloud Run job rather than running it on the app server.
-- **Cold start** — new events have no interaction history so LightFM scores them 0.0. The TF-IDF and semantic signals cover this gap until enough interactions accumulate.
-- **Memory** — the LightFM model grows as the user/event matrix grows. Combined with the fastembed model in memory, monitor instance RAM as the user base scales.
-- **Model staleness** — with nightly retraining, interactions from the current day aren't reflected until the next retrain. The behavioral decay signal covers recent history in the interim.
-
-### Key Functions
-
-| Function | Location | Purpose |
-|---|---|---|
-| `get_lightfm_scores(user_id, event_ids)` | `lightfm_service.py` | Batch scoring for a user against a list of events |
-| `retrain()` | `lightfm_service.py` | Force a full retrain from current Datastore data |
-| `list_all_event_history()` | `models.py` | Fetch all interaction records for training |
-| `list_all_profiles()` | `models.py` | Fetch all profiles for user side features |
+- Chat/DMs — pure user-to-user messaging
+- Pod voting (time/place) — simple plurality
+- Friend suggestions — no ML yet
+- No LLM/generative AI calls anywhere — all classical ML + local embeddings
 
 ---
 
-## Smart Pod Formation
+## The Key Narrative
 
-When a user joins an event, the system routes them into the open pod whose existing members have the most interest overlap with them, rather than assigning FIFO.
+Before the survey, the AI was a skeleton — it could score missions but had almost no feedback signal to learn from. Now there's a complete loop: **user joins mission -> does activity -> rates it -> AI learns -> better recommendations next time**. Every survey submission enriches all 5 scoring signals simultaneously.
 
-### How It Works
+---
 
-1. On `POST /events/{id}/join`, the joining user's profile is fetched to get their `interests` list.
-2. All open pods for the event are scored by **average Jaccard similarity** between the user's interests and each existing member's interests.
-3. The user is placed in the highest-scoring pod. If the user has no interests set, falls back to FIFO. If no open pods exist, a new pod is created as before.
-4. The existing Datastore transaction (race-condition safety) is unchanged.
+## Survey Flow Details
 
-### Compatibility Score
+### Backend
+- `POST /pods/<id>/survey` — submit survey (enjoyment rating, added interests, member votes)
+- `GET /pods/<id>/survey/status` — check if user already submitted
+- Survey window: 7 days after pod completion, then expires silently
 
-```
-compatibility(user, pod) = mean over members of:
-    |user_interests ∩ member_interests| / |user_interests ∪ member_interests|
-```
+### Frontend
+- Completed pods show green gradient highlight with "Activity done! Fill out survey!" badge
+- Tapping opens SurveyView with 3 sections: star rating, tag chips, member thumbs up/down
+- Skip button available — no penalty for not filling it out
 
-Pure Python — no model, no API calls. Runs at join time only (one profile fetch per existing pod member).
-
-### Key Functions
-
-| Function | Location | Purpose |
-|---|---|---|
-| `_compute_pod_compatibility()` | `pod_service.py` | Average Jaccard between user and pod members |
-| `_find_best_pod_for_user()` | `pod_service.py` | Scans open pods, returns best-scoring one |
+### ML Side Effects on Submit
+1. Store `SurveyResponse` entity
+2. Merge selected tags into user's interests (capped at 10, case-insensitive dedup)
+3. Adjust trust scores from member votes (+0.1 upvote, -0.15 downvote)
+4. Enrich `UserHistory` with `attended=True` + `enjoyment_rating`
+5. Add user to pod's `survey_completed_by` list
 
 ---
 
@@ -179,22 +86,12 @@ Pure Python — no model, no API calls. Runs at join time only (one profile fetc
 
 | File | Purpose |
 |------|---------|
-| `OrbitServer/services/ai_suggestion_service.py` | Main scorer. `get_suggested_events()` and `score_event_for_user()`. |
-| `OrbitServer/services/lightfm_service.py` | LightFM model. `get_lightfm_scores()`, `retrain()`, lazy training pipeline. |
-| `OrbitServer/services/embedding_service.py` | fastembed model loading, embedding generation, Datastore caching, `cosine_similarity` helper. |
-| `OrbitServer/services/pod_service.py` | Pod assignment. `_find_best_pod_for_user()` and `_compute_pod_compatibility()` for smart formation. |
-| `OrbitServer/models/models.py` | `list_all_event_history()`, `list_all_profiles()` for training. `store_event_embedding()` persists vectors. |
-| `tests/test_ai_suggestion_service.py` | 34 tests covering all scorer components including LightFM and semantic signals. |
-| `tests/test_lightfm_service.py` | 11 tests covering scoring, sigmoid normalization, graceful degradation, and retrain. |
-| `tests/test_pod_service.py` | 26 tests covering pod assignment including 11 tests for smart formation. |
-| `tests/test_embedding_service.py` | 18 tests covering model loading, generation, caching, and math helpers. |
-
-### Dependencies
-
-- `scikit-learn==1.4.2`
-- `numpy==1.26.4`
-- `fastembed==0.3.6` — local semantic embeddings (ONNX Runtime, no API)
-- `lightfm==1.17` — collaborative filtering model
-
-### Previously Removed
-- `anthropic==0.28.0` — Voyage API removed to eliminate API costs; replaced by local fastembed model
+| `OrbitServer/services/ai_suggestion_service.py` | Main scorer with display rescaling and enjoyment multiplier |
+| `OrbitServer/services/lightfm_service.py` | LightFM model with enjoyment weight bonus |
+| `OrbitServer/services/embedding_service.py` | fastembed model loading, embedding generation, caching |
+| `OrbitServer/services/survey_service.py` | Survey orchestration — stores response, merges interests, adjusts trust, enriches history |
+| `OrbitServer/services/pod_service.py` | Pod assignment + completed_at tracking |
+| `OrbitServer/api/pods.py` | Survey API endpoints |
+| `OrbitServer/models/models.py` | SurveyResponse entity, enriched get_user_pods with has_pending_survey + mission_tags |
+| `tests/test_survey_service.py` | 19 tests — validation, interest capping, trust adjustments, history enrichment |
+| `tests/test_survey_ml_integration.py` | 16 tests — enjoyment multiplier, behavioral profiles, display rescaling, LightFM bonuses |

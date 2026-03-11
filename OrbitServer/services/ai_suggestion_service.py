@@ -57,6 +57,7 @@ ACTION_SCORES = {
     'skipped': -0.4,
 }
 ATTENDED_BONUS = 0.2  # added to 'joined' score when attended=True
+ENJOYMENT_MULTIPLIER = {1: 0.3, 2: 0.6, 3: 1.0, 4: 1.3, 5: 1.6}
 
 
 # ── TF-IDF helpers ─────────────────────────────────────────────────────────────
@@ -106,10 +107,12 @@ def _compute_tfidf_scores(user_interests: list, missions: list) -> dict:
 
 # ── Behavioral decay signal ────────────────────────────────────────────────────
 
-def _action_score(action: str, attended) -> float:
+def _action_score(action: str, attended, enjoyment_rating=None) -> float:
     base = ACTION_SCORES.get(action, 0.0)
     if action == 'joined' and attended is True:
         base += ATTENDED_BONUS
+    if action == 'joined' and enjoyment_rating is not None:
+        base *= ENJOYMENT_MULTIPLIER.get(int(enjoyment_rating), 1.0)
     return base
 
 
@@ -142,7 +145,7 @@ def _build_behavioral_profile(history: list) -> list:
         tags_snapshot = h.get('tags_snapshot') or []
         if not tags_snapshot:
             continue
-        base = _action_score(action, h.get('attended'))
+        base = _action_score(action, h.get('attended'), h.get('enjoyment_rating'))
         if base <= 0:
             continue
         w = _decay_weight(h.get('created_at'))

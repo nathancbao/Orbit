@@ -321,6 +321,7 @@ def confirm_attendance(pod_id, user_id):
         entity['confirmed_attendees'] = confirmed
         if len(confirmed) >= len(m_ids) * 0.5:
             entity['status'] = 'completed'
+            entity['completed_at'] = datetime.datetime.utcnow()
 
     _, pod = transactional_pod_update(pod_id, _confirm)
 

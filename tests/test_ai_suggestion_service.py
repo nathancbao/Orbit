@@ -281,7 +281,9 @@ class TestGetSuggestedMissions:
 
         result = get_suggested_missions(user_id=1)
         assert len(result) == 1
-        assert abs(result[0]['match_score'] - W_LIGHTFM) < 1e-3
+        from OrbitServer.services.ai_suggestion_service import _rescale_for_display
+        expected = _rescale_for_display(W_LIGHTFM)
+        assert abs(result[0]['match_score'] - expected) < 1e-3
 
     @patch('OrbitServer.services.ai_suggestion_service.preload_embeddings')
     @patch('OrbitServer.services.ai_suggestion_service.get_user_embedding')
@@ -310,4 +312,7 @@ class TestGetSuggestedMissions:
         score_no_sem = result_no_sem[0]['match_score']
         score_with_sem = result_with_sem[0]['match_score']
         assert score_with_sem > score_no_sem
-        assert abs(score_with_sem - score_no_sem - W_SEMANTIC) < 1e-3
+        # After display rescaling, the delta is W_SEMANTIC * (CEIL - FLOOR)
+        from OrbitServer.services.ai_suggestion_service import DISPLAY_FLOOR, DISPLAY_CEIL
+        expected_delta = W_SEMANTIC * (DISPLAY_CEIL - DISPLAY_FLOOR)
+        assert abs(score_with_sem - score_no_sem - expected_delta) < 1e-3

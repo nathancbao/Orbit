@@ -197,14 +197,23 @@ struct PodRowCard: View {
     let title: String
     var onDismiss: (() -> Void)? = nil
     @State private var showPod = false
+    @State private var showSurvey = false
 
     var body: some View {
-        Button(action: { showPod = true }) {
+        Button(action: {
+            if pod.hasPendingSurvey {
+                showSurvey = true
+            } else {
+                showPod = true
+            }
+        }) {
             HStack(spacing: 14) {
                 Rectangle()
                     .fill(
                         LinearGradient(
-                            colors: [OrbitTheme.pink, OrbitTheme.blue],
+                            colors: pod.hasPendingSurvey
+                                ? [.green.opacity(0.8), .green.opacity(0.3)]
+                                : [OrbitTheme.pink, OrbitTheme.blue],
                             startPoint: .top, endPoint: .bottom
                         )
                     )
@@ -234,7 +243,7 @@ struct PodRowCard: View {
                         .foregroundColor(.secondary)
                     }
 
-                    PodStatusBadge(status: pod.status)
+                    PodStatusBadge(status: pod.status, hasPendingSurvey: pod.hasPendingSurvey)
                 }
 
                 Spacer()
@@ -243,7 +252,11 @@ struct PodRowCard: View {
                     .foregroundStyle(OrbitTheme.gradient)
             }
             .padding(16)
-            .background(Color.white)
+            .background(
+                pod.hasPendingSurvey
+                    ? LinearGradient(colors: [.green.opacity(0.08), .white], startPoint: .top, endPoint: .bottom)
+                    : LinearGradient(colors: [.white, .white], startPoint: .top, endPoint: .bottom)
+            )
             .cornerRadius(16)
             .shadow(color: .black.opacity(0.06), radius: 8, x: 0, y: 2)
         }
@@ -252,6 +265,11 @@ struct PodRowCard: View {
             onDismiss?()
         }) {
             PodView(podId: pod.id, title: title)
+        }
+        .sheet(isPresented: $showSurvey, onDismiss: {
+            onDismiss?()
+        }) {
+            SurveyView(pod: pod)
         }
     }
 }
@@ -351,8 +369,10 @@ struct SignalStatusBadgeDark: View {
 
 struct PodStatusBadge: View {
     let status: String
+    var hasPendingSurvey: Bool = false
 
     var label: String {
+        if hasPendingSurvey { return "Activity done! Fill out survey!" }
         switch status {
         case "open": return "forming"
         case "full": return "full"
@@ -363,6 +383,7 @@ struct PodStatusBadge: View {
     }
 
     var color: Color {
+        if hasPendingSurvey { return .green }
         switch status {
         case "open": return .orange
         case "full": return OrbitTheme.blue

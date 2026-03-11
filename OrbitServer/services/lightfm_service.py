@@ -36,6 +36,7 @@ INTERACTION_WEIGHTS = {
     'skipped': 0.0,   # excluded from positive signal
 }
 ATTENDED_BONUS = 0.5   # added to joined weight when attended=True
+ENJOYMENT_WEIGHT_BONUS = {1: -0.3, 2: -0.1, 3: 0.0, 4: 0.2, 5: 0.5}
 MIN_INTERACTIONS = 10  # minimum records before training is worthwhile
 
 _model = None
@@ -110,6 +111,9 @@ def _train():
         w = INTERACTION_WEIGHTS.get(action, 0.0)
         if action == 'joined' and h.get('attended') is True:
             w += ATTENDED_BONUS
+        enjoyment = h.get('enjoyment_rating')
+        if enjoyment is not None:
+            w += ENJOYMENT_WEIGHT_BONUS.get(int(enjoyment), 0.0)
         if w > 0:
             triples.append((int(uid), int(mid), w))
 

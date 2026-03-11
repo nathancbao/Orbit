@@ -10,6 +10,7 @@ from OrbitServer.services.schedule_service import submit_availability, confirm_s
 from OrbitServer.services.pod_invite_service import (
     send_pod_invite, accept_pod_invite, decline_pod_invite, get_incoming_invites,
 )
+from OrbitServer.services.survey_service import submit_survey
 from OrbitServer.utils.validators import validate_schedule_slots
 from OrbitServer.utils.helpers import safe_int
 
@@ -116,6 +117,38 @@ def confirm_schedule_slot(pod_id):
     if err:
         return error(err, 400)
     return success(pod)
+
+
+# ── Post-Activity Survey ────────────────────────────────────────────────────
+
+@pods_bp.route('/<pod_id>/survey', methods=['POST'])
+@require_auth
+def submit_pod_survey(pod_id):
+    data = request.get_json(silent=True) or {}
+    enjoyment_rating = data.get('enjoyment_rating')
+    added_interests = data.get('added_interests', [])
+    member_votes = data.get('member_votes', {})
+
+    if enjoyment_rating is None:
+        return error("enjoyment_rating is required", 400)
+
+    result, err = submit_survey(g.user_id, pod_id, enjoyment_rating, added_interests, member_votes)
+    if err:
+        status_code = 409 if "already submitted" in err.lower() else 400
+        if "not found" in err.lower():
+            status_code = 404
+        elif "not a member" in err.lower():
+            status_code = 403
+        return error(err, status_code)
+    return success(result)
+
+
+@pods_bp.route('/<pod_id>/survey/status', methods=['GET'])
+@require_auth
+def survey_status(pod_id):
+    from OrbitServer.models.models import get_user_survey_for_pod
+    existing = get_user_survey_for_pod(g.user_id, pod_id)
+    return success({'submitted': existing is not None})
 
 
 # ── Pod Invites ──────────────────────────────────────────────────────────────
