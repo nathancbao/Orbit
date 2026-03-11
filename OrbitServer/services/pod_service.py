@@ -58,6 +58,76 @@ def _find_best_pod_for_user(mission_id: int, user_interests: set, max_pod_size: 
     return best_pod
 
 
+def _parse_time_of_day(time_str):
+    """Parse an 'HH:mm' string into (hour, minute). Returns None on failure."""
+    if not time_str:
+        return None
+    try:
+        parts = time_str.split(':')
+        return int(parts[0]), int(parts[1]) if len(parts) > 1 else 0
+    except (ValueError, IndexError):
+        return None
+
+
+def _format_display_time(hour, minute):
+    """Format hour/minute into '3:00 PM' style string."""
+    am_pm = 'AM' if hour < 12 else 'PM'
+    display_hour = hour if hour <= 12 else hour - 12
+    if display_hour == 0:
+        display_hour = 12
+    return f'{display_hour}:{minute:02d} {am_pm}'
+
+
+def _set_mission_time_info(mission):
+    """Extract scheduling info from a set mission.
+
+    Returns dict with:
+      - scheduled_time: display string like "Mon, Mar 9 · 3:00 PM"
+      - scheduled_end_time: ISO string of end datetime (or None)
+      - expires_at: end datetime + 2 hours (or None)
+    Returns None if the mission lacks a date.
+    """
+    date_str = mission.get('date', '')
+    if not date_str:
+        return None
+    try:
+        dt = datetime.datetime.strptime(date_str, '%Y-%m-%d')
+    except (ValueError, TypeError):
+        return None
+
+    result = {}
+
+    # Build display string for start time
+    parsed_start = _parse_time_of_day(mission.get('start_time', ''))
+    if parsed_start:
+        h, m = parsed_start
+        time_part = f' · {_format_display_time(h, m)}'
+    else:
+        time_part = ''
+    result['scheduled_time'] = dt.strftime('%a, %b %-d') + time_part
+
+    # Compute end datetime and expires_at
+    parsed_end = _parse_time_of_day(mission.get('end_time', ''))
+    if parsed_end:
+        eh, em = parsed_end
+        end_dt = dt.replace(hour=eh, minute=em)
+        result['scheduled_end_time'] = end_dt.isoformat()
+        result['expires_at'] = end_dt + datetime.timedelta(hours=2)
+    elif parsed_start:
+        # No explicit end time — default to start + 2 hours
+        sh, sm = parsed_start
+        default_end = dt.replace(hour=sh, minute=sm) + datetime.timedelta(hours=2)
+        result['scheduled_end_time'] = default_end.isoformat()
+        result['expires_at'] = default_end + datetime.timedelta(hours=2)
+    else:
+        # Date only, no times — expire at end of day + 2 hours
+        end_of_day = dt.replace(hour=23, minute=59)
+        result['scheduled_end_time'] = end_of_day.isoformat()
+        result['expires_at'] = end_of_day + datetime.timedelta(hours=2)
+
+    return result
+
+
 def join_mission(mission_id, user_id):
     """
     Assign a user to the next open pod for a mission.
@@ -106,6 +176,33 @@ def join_mission(mission_id, user_id):
             pod = create_pod(mission_id, max_size=max_pod_size, first_member_id=user_id)
     else:
         pod = create_pod(mission_id, max_size=max_pod_size, first_member_id=user_id)
+
+    # For set missions, auto-set the pod's scheduled_time, end time, and expiry
+    if mission.get('mode') != 'flex' and not pod.get('scheduled_time'):
+        info = _set_mission_time_info(mission)
+        if info:
+            location = mission.get('location') or None
+            sched = info['scheduled_time']
+            end_time = info.get('scheduled_end_time')
+            exp = info.get('expires_at')
+
+            def _set_time(entity):
+                entity['scheduled_time'] = sched
+                entity['scheduled_place'] = location
+                entity['status'] = 'meeting_confirmed'
+                if end_time:
+                    entity['scheduled_end_time'] = end_time
+                if exp:
+                    entity['expires_at'] = exp
+
+            transactional_pod_update(pod['id'], _set_time)
+            pod['scheduled_time'] = sched
+            pod['scheduled_place'] = location
+            pod['status'] = 'meeting_confirmed'
+            if end_time:
+                pod['scheduled_end_time'] = end_time
+            if exp:
+                pod['expires_at'] = exp
 
     record_action(user_id, mission_id, 'joined', pod_id=pod['id'],
                    tags_snapshot=mission.get('tags') or [])
@@ -172,6 +269,7 @@ def get_pod_with_members(pod_id, requesting_user_id):
     """
     Returns pod dict enriched with member profile stubs.
     Only accessible to pod members.
+    Auto-deletes expired pods (past expires_at).
     Returns (pod, error_message, status_code).
     """
     uid = _safe_int(requesting_user_id)
@@ -181,6 +279,20 @@ def get_pod_with_members(pod_id, requesting_user_id):
     pod = get_pod(pod_id)
     if not pod:
         return None, "Pod not found", 404
+
+    # Check if pod has expired (2 hours after activity end time)
+    expires_at = pod.get('expires_at')
+    if expires_at:
+        if isinstance(expires_at, str):
+            try:
+                expires_at = datetime.datetime.fromisoformat(
+                    expires_at.replace('Z', '+00:00')
+                ).replace(tzinfo=None)
+            except (ValueError, TypeError):
+                expires_at = None
+        if isinstance(expires_at, datetime.datetime) and datetime.datetime.utcnow() > expires_at:
+            delete_pod(pod_id)
+            return None, "This pod has expired and been removed", 410
 
     member_ids = pod.get('member_ids') or []
     if uid not in member_ids:

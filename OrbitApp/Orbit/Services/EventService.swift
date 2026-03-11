@@ -234,6 +234,13 @@ class SignalService {
         )
     }
 
+    func getSignal(id: String) async throws -> Signal {
+        return try await APIService.shared.request(
+            endpoint: Constants.API.Endpoints.signal(id),
+            authenticated: true
+        )
+    }
+
     func rsvpSignal(id: String) async throws -> Signal {
         return try await APIService.shared.request(
             endpoint: Constants.API.Endpoints.rsvpSignal(id),

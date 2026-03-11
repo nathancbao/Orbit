@@ -8,7 +8,9 @@ struct Pod: Codable, Identifiable {
     var name: String?           // User-defined pod name
     var status: String          // open | full | meeting_confirmed | completed | cancelled
     var scheduledTime: String?
+    var scheduledEndTime: String?
     var scheduledPlace: String?
+    var expiresAt: String?
     var confirmedAttendees: [Int]
     var members: [PodMember]?   // Enriched — only present in GET /pods/<id>
     var missionTitle: String?   // Enriched — present in GET /users/me/pods
@@ -36,7 +38,9 @@ struct Pod: Codable, Identifiable {
         case maxSize = "max_size"
         case status
         case scheduledTime = "scheduled_time"
+        case scheduledEndTime = "scheduled_end_time"
         case scheduledPlace = "scheduled_place"
+        case expiresAt = "expires_at"
         case confirmedAttendees = "confirmed_attendees"
         case members
         case missionTitle = "mission_title"
@@ -60,7 +64,9 @@ struct Pod: Codable, Identifiable {
         name = try? container.decodeIfPresent(String.self, forKey: .name)
         status = (try? container.decode(String.self, forKey: .status)) ?? "open"
         scheduledTime = try? container.decodeIfPresent(String.self, forKey: .scheduledTime)
+        scheduledEndTime = try? container.decodeIfPresent(String.self, forKey: .scheduledEndTime)
         scheduledPlace = try? container.decodeIfPresent(String.self, forKey: .scheduledPlace)
+        expiresAt = try? container.decodeIfPresent(String.self, forKey: .expiresAt)
         confirmedAttendees = (try? container.decode([Int].self, forKey: .confirmedAttendees)) ?? []
         members = try? container.decodeIfPresent([PodMember].self, forKey: .members)
         missionTitle = try? container.decodeIfPresent(String.self, forKey: .missionTitle)
@@ -104,6 +110,38 @@ struct Pod: Codable, Identifiable {
     /// Whether this pod is still in pre-scheduling state (not yet confirmed/cancelled).
     var isFlexForming: Bool {
         status == "open" || status == "full"
+    }
+
+    /// Parsed end time for the activity.
+    var parsedEndTime: Date? {
+        guard let raw = scheduledEndTime, !raw.isEmpty else { return nil }
+        let iso = ISO8601DateFormatter()
+        iso.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        if let d = iso.date(from: raw) { return d }
+        iso.formatOptions = [.withInternetDateTime]
+        if let d = iso.date(from: raw) { return d }
+        let f = DateFormatter()
+        f.dateFormat = "yyyy-MM-dd'T'HH:mm:ss"
+        return f.date(from: raw)
+    }
+
+    /// Parsed expiration time (2 hours after activity end).
+    var parsedExpiresAt: Date? {
+        guard let raw = expiresAt else { return nil }
+        let iso = ISO8601DateFormatter()
+        iso.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        if let d = iso.date(from: raw) { return d }
+        iso.formatOptions = [.withInternetDateTime]
+        if let d = iso.date(from: raw) { return d }
+        let f = DateFormatter()
+        f.dateFormat = "yyyy-MM-dd'T'HH:mm:ss"
+        return f.date(from: raw)
+    }
+
+    /// Whether the activity end time has passed.
+    var isActivityCompleted: Bool {
+        guard let endTime = parsedEndTime else { return false }
+        return Date() > endTime
     }
 }
 

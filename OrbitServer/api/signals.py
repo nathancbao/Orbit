@@ -6,7 +6,7 @@ from OrbitServer.utils.rate_limit import limiter
 from OrbitServer.utils.validators import validate_signal_data
 from OrbitServer.services.signal_service import (
     create_new_signal, get_user_signals, get_all_signals,
-    remove_signal, rsvp_signal,
+    fetch_signal, remove_signal, rsvp_signal,
 )
 
 signals_bp = Blueprint('signals', __name__, url_prefix='/api/signals')
@@ -71,6 +71,15 @@ def create():
 
 # ── DELETE /signals/<id> ─────────────────────────────────────────────────────
 # Delete a signal. Only the creator can delete.
+
+@signals_bp.route('/<signal_id>', methods=['GET'])
+@require_auth
+def get_signal_by_id(signal_id):
+    signal, err = fetch_signal(signal_id, g.user_id)
+    if err:
+        return error(err, 404)
+    return success(signal)
+
 
 @signals_bp.route('/<signal_id>', methods=['DELETE'])
 @require_auth

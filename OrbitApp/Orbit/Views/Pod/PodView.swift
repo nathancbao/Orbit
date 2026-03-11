@@ -222,6 +222,9 @@ struct PodView: View {
                 confirmedDetailsBanner
             }
 
+            // Activity completed banner (set missions after end time)
+            activityCompletedBanner
+
             // Action bar
             actionBar
 
@@ -348,6 +351,53 @@ struct PodView: View {
             .padding(.horizontal, 16)
             .padding(.vertical, 10)
             .background(OrbitTheme.gradient.opacity(0.08))
+
+            Divider()
+        }
+    }
+
+    // MARK: - Activity Completed Banner
+
+    @ViewBuilder
+    private var activityCompletedBanner: some View {
+        if let pod = viewModel.pod, pod.isActivityCompleted {
+            HStack(spacing: 12) {
+                Image(systemName: "checkmark.circle.fill")
+                    .font(.system(size: 22))
+                    .foregroundColor(Color(hex: "059669"))
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Activity completed!")
+                        .font(.subheadline)
+                        .fontWeight(.semibold)
+                        .foregroundColor(.primary)
+
+                    if let expiresAt = pod.parsedExpiresAt {
+                        let remaining = expiresAt.timeIntervalSince(Date())
+                        if remaining > 0 {
+                            let minutes = Int(remaining / 60)
+                            let hours = minutes / 60
+                            let mins = minutes % 60
+                            Text("Pod will remain for \(hours > 0 ? "\(hours)h " : "")\(mins)m")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        } else {
+                            Text("Pod is being removed...")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                    } else {
+                        Text("Pod will remain for two more hours.")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                }
+
+                Spacer()
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 10)
+            .background(Color(hex: "059669").opacity(0.08))
 
             Divider()
         }

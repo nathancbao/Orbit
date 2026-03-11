@@ -53,6 +53,16 @@ def get_rsvped_signals(user_id):
     return signals, None
 
 
+def fetch_signal(signal_id, user_id):
+    """Return a single signal by ID with pod info resolved. Returns (signal, error)."""
+    signal = get_signal(signal_id)
+    if not signal:
+        return None, "Signal not found"
+    _resolve_pod_ids([signal], user_id)
+    _score_signals([signal], user_id)
+    return signal, None
+
+
 def remove_signal(signal_id, user_id):
     """
     Delete a signal if the requesting user owns it.

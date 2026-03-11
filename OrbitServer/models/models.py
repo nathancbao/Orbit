@@ -286,7 +286,8 @@ def update_pod(pod_id, data):
         return None
     allowed = [
         'member_ids', 'status', 'scheduled_time', 'scheduled_place',
-        'confirmed_attendees', 'kick_votes', 'expires_at', 'name', 'schedule_data',
+        'scheduled_end_time', 'confirmed_attendees', 'kick_votes',
+        'expires_at', 'name', 'schedule_data',
         'survey_completed_by', 'completed_at',
     ]
     for field in allowed:

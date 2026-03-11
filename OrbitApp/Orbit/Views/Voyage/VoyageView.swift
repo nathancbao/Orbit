@@ -44,7 +44,9 @@ struct VoyageView: View {
     @State private var screenSize: CGSize = .zero
 
     // Detail sheet
-    @State private var selectedItem: VoyageItem? = nil
+    @State private var selectedMission: Mission? = nil
+    @State private var selectedSignal: Signal? = nil
+    @State private var isLoadingDetail = false
 
     // Zoom into a cluster
     @State private var zoomedTile: VoyageTile? = nil
@@ -136,8 +138,11 @@ struct VoyageView: View {
         .task {
             await viewModel.startVoyage()
         }
-        .sheet(item: $selectedItem) { item in
-            VoyageItemDetailSheet(item: item)
+        .sheet(item: $selectedMission) { mission in
+            MissionDetailView(mission: mission, onJoined: {})
+        }
+        .sheet(item: $selectedSignal) { signal in
+            SignalDetailView(signal: signal)
         }
     }
 
@@ -360,22 +365,7 @@ struct VoyageView: View {
                     }
                 }
 
-            VStack(spacing: 20) {
-                // Close button
-                HStack {
-                    Spacer()
-                    Button {
-                        withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
-                            zoomedTile = nil
-                        }
-                    } label: {
-                        Image(systemName: "xmark.circle.fill")
-                            .font(.title2)
-                            .foregroundStyle(.white.opacity(0.7))
-                    }
-                }
-                .padding(.horizontal, 24)
-
+            VStack(spacing: 24) {
                 Spacer()
 
                 // Expanded solar system
@@ -384,14 +374,85 @@ struct VoyageView: View {
                     systemDiameter: expandedDiameter,
                     interactive: true,
                     onItemTap: { item in
-                        selectedItem = item
+                        fetchAndPresentDetail(item: item)
                     }
                 )
+                .overlay {
+                    if isLoadingDetail {
+                        ProgressView()
+                            .tint(.white)
+                            .scaleEffect(1.2)
+                    }
+                }
 
                 Spacer()
+
+                // Close button
+                Button {
+                    withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
+                        zoomedTile = nil
+                    }
+                } label: {
+                    HStack(spacing: 8) {
+                        Image(systemName: "xmark")
+                            .font(.system(size: 16, weight: .bold))
+                        Text("Close")
+                            .font(.system(size: 16, weight: .semibold, design: .rounded))
+                    }
+                    .foregroundColor(.white)
+                    .padding(.horizontal, 28)
+                    .padding(.vertical, 14)
+                    .background(
+                        Capsule()
+                            .fill(
+                                LinearGradient(
+                                    colors: [OrbitTheme.purple.opacity(0.6), OrbitTheme.blue.opacity(0.6)],
+                                    startPoint: .leading,
+                                    endPoint: .trailing
+                                )
+                            )
+                            .overlay(
+                                Capsule()
+                                    .strokeBorder(
+                                        LinearGradient(
+                                            colors: [OrbitTheme.pink.opacity(0.5), OrbitTheme.purple.opacity(0.4), OrbitTheme.blue.opacity(0.5)],
+                                            startPoint: .leading,
+                                            endPoint: .trailing
+                                        ),
+                                        lineWidth: 1.5
+                                    )
+                            )
+                    )
+                }
+                .padding(.bottom, 60)
             }
         }
         .transition(.opacity.combined(with: .scale(scale: 0.6)))
+    }
+
+    // MARK: - Fetch Detail
+
+    private func fetchAndPresentDetail(item: VoyageItem) {
+        guard !isLoadingDetail else { return }
+        isLoadingDetail = true
+        Task {
+            defer { isLoadingDetail = false }
+            if item.isMission {
+                do {
+                    let mission = try await MissionService.shared.getMission(id: item.id)
+                    selectedMission = mission
+                } catch {
+                    print("[Voyage] Failed to fetch mission \(item.id): \(error)")
+                }
+            } else {
+                do {
+                    let signal = try await SignalService.shared.getSignal(id: item.id)
+                    selectedSignal = signal
+                } catch {
+                    print("[Voyage] Failed to fetch signal \(item.id): \(error)")
+                }
+            }
+        }
     }
 
     // MARK: - Pan Gesture
@@ -679,96 +740,3 @@ private struct RocketFin: Shape {
     }
 }
 
-// MARK: - Item Detail Sheet
-
-struct VoyageItemDetailSheet: View {
-    let item: VoyageItem
-    @Environment(\.dismiss) private var dismiss
-
-    var body: some View {
-        NavigationStack {
-            VStack(spacing: 20) {
-                // Type badge
-                HStack {
-                    Image(systemName: item.isMission ? "calendar.circle.fill" : "antenna.radiowaves.left.and.right")
-                        .foregroundStyle(item.isMission
-                            ? Color(hex: "3B82F6")
-                            : Color(hex: "DB2777"))
-                    Text(item.isMission ? "Mission" : "Flex Mission")
-                        .font(.subheadline)
-                        .fontWeight(.medium)
-                        .foregroundColor(.secondary)
-                    Spacer()
-                }
-
-                // Title
-                Text(item.displayTitle)
-                    .font(.title2)
-                    .fontWeight(.bold)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-
-                // Description
-                if !item.description.isEmpty {
-                    Text(item.description)
-                        .font(.body)
-                        .foregroundColor(.secondary)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                }
-
-                // Tags
-                if !item.tags.isEmpty {
-                    ScrollView(.horizontal, showsIndicators: false) {
-                        HStack(spacing: 8) {
-                            ForEach(item.tags, id: \.self) { tag in
-                                Text(tag)
-                                    .font(.caption)
-                                    .fontWeight(.medium)
-                                    .padding(.horizontal, 12)
-                                    .padding(.vertical, 6)
-                                    .background(Color(hex: "8B5CF6").opacity(0.12))
-                                    .foregroundColor(Color(hex: "8B5CF6"))
-                                    .clipShape(Capsule())
-                            }
-                        }
-                    }
-                }
-
-                // Details
-                VStack(spacing: 12) {
-                    if let date = item.date, !date.isEmpty {
-                        detailRow(icon: "calendar", text: date)
-                    }
-                    if let location = item.location, !location.isEmpty {
-                        detailRow(icon: "mappin.circle", text: location)
-                    }
-                    if let min = item.minGroupSize, let max = item.maxGroupSize {
-                        detailRow(icon: "person.2", text: "\(min)–\(max) people")
-                    } else if let size = item.maxPodSize {
-                        detailRow(icon: "person.2", text: "Up to \(size) people")
-                    }
-                }
-
-                Spacer()
-            }
-            .padding(24)
-            .navigationTitle("Activity")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Done") { dismiss() }
-                }
-            }
-        }
-    }
-
-    private func detailRow(icon: String, text: String) -> some View {
-        HStack(spacing: 10) {
-            Image(systemName: icon)
-                .foregroundColor(.secondary)
-                .frame(width: 20)
-            Text(text)
-                .font(.subheadline)
-            Spacer()
-        }
-    }
-}
