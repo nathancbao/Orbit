@@ -82,6 +82,19 @@ def rsvp_signal(signal_id, user_id):
     """RSVP to a signal and create/join its pod. Returns (signal_dict, error_string)."""
     signal, err = transactional_signal_rsvp(signal_id, user_id)
     if err:
+        # For "already RSVP'd", still return the signal with pod_id so the
+        # frontend can open the pod instead of showing "waiting for a pod".
+        if signal is None and "already" in (err or "").lower():
+            existing = get_signal(signal_id)
+            if existing:
+                pod_id = _user_pod_id(existing, user_id)
+                if pod_id:
+                    pod = get_pod(pod_id)
+                    if not pod:
+                        max_size = int(existing.get('max_group_size', 6))
+                        create_signal_pod(pod_id, signal_id, max_size, user_id)
+                    existing['pod_id'] = pod_id
+                return existing, None
         return signal, err
 
     # Determine which pod this user belongs to
@@ -142,13 +155,9 @@ def _resolve_pod_ids(signals, user_id):
         # Clean internal pod_ids from response; expose only pod_id
         s.pop('pod_ids', None)
         if user_pod:
+            s['pod_id'] = user_pod
             pod = get_pod(user_pod)
-            if pod:
-                s['pod_id'] = user_pod
-                if pod.get('scheduled_time'):
-                    s['scheduled_time'] = pod['scheduled_time']
-            else:
-                # Pod was deleted — don't expose stale pod_id
-                s.pop('pod_id', None)
+            if pod and pod.get('scheduled_time'):
+                s['scheduled_time'] = pod['scheduled_time']
         else:
             s.pop('pod_id', None)

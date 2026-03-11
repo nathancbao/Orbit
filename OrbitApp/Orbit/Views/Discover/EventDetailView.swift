@@ -111,14 +111,14 @@ struct MissionDetailView: View {
                 }
             }
         }
-        .sheet(item: $joinedPod) { pod in
+        .fullScreenCover(item: $joinedPod) { pod in
             PodView(podId: pod.id, title: mission.isFlexMode ? mission.displayTitle : mission.title, missionMode: mission.mode)
                 .onDisappear {
                     onJoined()
                     dismiss()
                 }
         }
-        .sheet(isPresented: $showPod) {
+        .fullScreenCover(isPresented: $showPod) {
             if let podId = joinedPodId {
                 PodView(podId: podId, title: mission.displayTitle, missionMode: mission.mode)
             }
@@ -166,7 +166,7 @@ struct MissionDetailView: View {
                     .fontWeight(.bold)
                     .padding(.top, 8)
 
-                if mission.status == "completed" {
+                if mission.isCompleted {
                     HStack(spacing: 10) {
                         Image(systemName: "checkmark.circle.fill")
                             .font(.system(size: 20))
@@ -175,9 +175,15 @@ struct MissionDetailView: View {
                             Text("Mission completed!")
                                 .font(.subheadline)
                                 .fontWeight(.semibold)
-                            Text("This mission will be removed shortly.")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
+                            if let countdown = mission.deletionCountdownString {
+                                Text("Mission will be deleted in \(countdown)")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                            } else {
+                                Text("This mission will be removed shortly.")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                            }
                         }
                         Spacer()
                     }
@@ -253,7 +259,7 @@ struct MissionDetailView: View {
 
     @ViewBuilder
     private var setActionButton: some View {
-        if mission.status == "completed" {
+        if mission.isCompleted {
             if let podId = mission.userPodId {
                 Button(action: { openPod(podId: podId) }) {
                     Label("open your pod", systemImage: "person.3.fill")
@@ -303,8 +309,8 @@ struct MissionDetailView: View {
 
     @ViewBuilder
     private var flexActionButton: some View {
-        if showSignedUp, let podId = joinedPodId {
-            Button(action: { showPod = true }) {
+        if showSignedUp {
+            Button(action: { openFlexPod() }) {
                 Label("open your pod", systemImage: "person.3.fill")
                     .font(.system(size: 16, weight: .semibold))
                     .tracking(0.5)
@@ -316,14 +322,6 @@ struct MissionDetailView: View {
             }
             .padding(.horizontal, 24)
             .padding(.bottom, 16)
-        } else if showSignedUp {
-            Text("You're signed up — waiting for a pod")
-                .font(.subheadline)
-                .foregroundColor(.secondary)
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 16)
-                .padding(.horizontal, 24)
-                .padding(.bottom, 16)
         } else {
             Button {
                 UIImpactFeedbackGenerator(style: .medium).impactOccurred()
@@ -577,6 +575,25 @@ struct MissionDetailView: View {
             }
         } catch {
             // Best effort — user can still see the mission
+        }
+    }
+
+    /// Open the flex pod — resolves pod_id first if needed.
+    private func openFlexPod() {
+        if let podId = joinedPodId {
+            showPod = true
+            return
+        }
+        // pod_id missing — fetch it, then open
+        Task {
+            await resolvePodId()
+            await MainActor.run {
+                if joinedPodId != nil {
+                    showPod = true
+                } else {
+                    errorMessage = "Could not find your pod. Try again."
+                }
+            }
         }
     }
 

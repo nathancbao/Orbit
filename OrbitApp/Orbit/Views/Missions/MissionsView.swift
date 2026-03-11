@@ -432,6 +432,7 @@ struct MissionListCard: View {
             .background(mission.isFlexMode ? Color(red: 0.1, green: 0.1, blue: 0.14) : Color.white)
             .cornerRadius(16)
             .shadow(color: .black.opacity(mission.isFlexMode ? 0.15 : 0.06), radius: 8, x: 0, y: 2)
+            .opacity(mission.isCompleted ? 0.6 : 1.0)
         }
         .buttonStyle(.plain)
     }
@@ -535,9 +536,16 @@ struct MissionSpotsLabel: View {
 
     var body: some View {
         Group {
-            if mission.status == "completed" {
-                Label("Mission completed", systemImage: "checkmark.circle.fill")
-                    .foregroundColor(.secondary)
+            if mission.isCompleted {
+                VStack(alignment: .leading, spacing: 2) {
+                    Label("Mission completed", systemImage: "checkmark.circle.fill")
+                        .foregroundColor(.secondary)
+                    if let countdown = mission.deletionCountdownString {
+                        Text("Removed in \(countdown)")
+                            .font(.caption2)
+                            .foregroundColor(.secondary.opacity(0.7))
+                    }
+                }
             } else {
                 switch mission.userPodStatus {
                 case "in_pod":

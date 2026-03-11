@@ -106,9 +106,11 @@ def check_mission_expiration(mission):
 
 
 def get_missions_for_user(user_id, filters=None):
-    """Return all open missions, scored by relevance for the user. Returns (list, error)."""
+    """Return all open and completed missions, scored by relevance for the user. Returns (list, error)."""
     try:
-        missions = list_missions(filters={'status': 'open', **(filters or {})})
+        open_missions = list_missions(filters={'status': 'open', **(filters or {})})
+        completed_missions = list_missions(filters={'status': 'completed', **(filters or {})})
+        missions = open_missions + completed_missions
     except Exception as e:
         logger.exception("Failed to list missions")
         return [], str(e)

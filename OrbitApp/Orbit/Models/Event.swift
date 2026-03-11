@@ -60,6 +60,7 @@ struct Mission: Codable, Identifiable {
     var podId: String?              // user's pod from RSVP (flex mode)
     var scheduledTime: String?      // confirmed meeting time (flex mode, set by leader)
     var createdAt: String?
+    var utcOffset: Int?             // seconds east of UTC, used for deletion countdown
 
     // ── CodingKeys ──────────────────────────────────────────────────────
 
@@ -86,6 +87,7 @@ struct Mission: Codable, Identifiable {
         case podId              = "pod_id"
         case scheduledTime      = "scheduled_time"
         case createdAt          = "created_at"
+        case utcOffset          = "utc_offset"
     }
 
     // ── Custom Decoder (backward-compatible: defaults mode to .set) ─────
@@ -126,6 +128,7 @@ struct Mission: Codable, Identifiable {
         podId             = try? c.decode(String.self, forKey: .podId)
         scheduledTime     = try? c.decode(String.self, forKey: .scheduledTime)
         createdAt         = try? c.decode(String.self, forKey: .createdAt)
+        utcOffset         = try? c.decode(Int.self, forKey: .utcOffset)
     }
 
     // ── Local initializer (for creating missions in code) ───────────────
@@ -159,7 +162,8 @@ struct Mission: Codable, Identifiable {
         signalStatus: SignalStatus? = nil,
         podId: String? = nil,
         scheduledTime: String? = nil,
-        createdAt: String? = nil
+        createdAt: String? = nil,
+        utcOffset: Int? = nil
     ) {
         self.id = id
         self.title = title
@@ -190,11 +194,74 @@ struct Mission: Codable, Identifiable {
         self.podId = podId
         self.scheduledTime = scheduledTime
         self.createdAt = createdAt
+        self.utcOffset = utcOffset
     }
 
     // ── Computed Properties ─────────────────────────────────────────────
 
     var isFlexMode: Bool { mode == .flex }
+
+    /// Whether this mission has ended (past its end time in the user's local timezone).
+    var isCompleted: Bool { status == "completed" }
+
+    /// The date at which this mission will be auto-deleted (end time + 2 hours).
+    /// Times are stored in the creator's local timezone. utc_offset converts to UTC.
+    var deletionDate: Date? {
+        guard mode == .set, !date.isEmpty else { return nil }
+
+        // Parse date+time as naive values (no timezone) using a GMT calendar
+        // so that "2026-03-11 15:00" is treated as absolute hour 15, not shifted.
+        let f = DateFormatter()
+        f.dateFormat = "yyyy-MM-dd"
+        f.timeZone = TimeZone(secondsFromGMT: 0)
+        guard let day = f.date(from: date) else { return nil }
+
+        var cal = Calendar(identifier: .gregorian)
+        cal.timeZone = TimeZone(secondsFromGMT: 0)!
+        var endDt: Date?
+
+        if let et = endTime {
+            let parts = et.split(separator: ":").compactMap { Int($0) }
+            if parts.count >= 2 {
+                endDt = cal.date(bySettingHour: parts[0], minute: parts[1], second: 0, of: day)
+            }
+        }
+        if endDt == nil, let st = startTime {
+            let parts = st.split(separator: ":").compactMap { Int($0) }
+            if parts.count >= 2, let base = cal.date(bySettingHour: parts[0], minute: parts[1], second: 0, of: day) {
+                endDt = base.addingTimeInterval(2 * 3600)
+            }
+        }
+        if endDt == nil {
+            endDt = cal.date(bySettingHour: 23, minute: 59, second: 0, of: day)
+        }
+
+        guard let naiveEnd = endDt else { return nil }
+
+        // naiveEnd is now the local end time stored as-if-GMT.
+        // Subtract utcOffset to convert creator-local → real UTC, then add 2h grace.
+        let offsetSecs = utcOffset ?? TimeZone.current.secondsFromGMT()
+        let utcEnd = naiveEnd.addingTimeInterval(TimeInterval(-offsetSecs))
+        return utcEnd.addingTimeInterval(2 * 3600)
+    }
+
+    /// Time remaining until deletion, or nil if not applicable.
+    var timeUntilDeletion: TimeInterval? {
+        guard let delDate = deletionDate else { return nil }
+        let remaining = delDate.timeIntervalSinceNow
+        return remaining > 0 ? remaining : nil
+    }
+
+    /// Human-readable countdown string like "1h 23m".
+    var deletionCountdownString: String? {
+        guard let remaining = timeUntilDeletion else { return nil }
+        let hours = Int(remaining) / 3600
+        let minutes = (Int(remaining) % 3600) / 60
+        if hours > 0 {
+            return "\(hours)h \(minutes)m"
+        }
+        return "\(minutes)m"
+    }
 
     /// Parsed event date+time for sorting. Set missions use date+startTime; flex returns `.distantFuture`.
     var sortDate: Date {
