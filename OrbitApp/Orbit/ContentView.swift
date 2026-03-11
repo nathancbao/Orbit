@@ -63,6 +63,11 @@ struct ContentView: View {
             currentProfile = nil
             appState = .auth
         }
+        .task {
+            if appState == .launch && AuthService.shared.isLoggedIn() {
+                await loadExistingProfile()
+            }
+        }
     }
 
     private func loadExistingProfile() async {
