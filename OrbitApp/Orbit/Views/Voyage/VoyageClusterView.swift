@@ -99,7 +99,7 @@ struct VoyageClusterView: View {
             let rect = CGRect(x: center - r, y: center - r, width: r * 2, height: r * 2)
             context.stroke(
                 Path(ellipseIn: rect),
-                with: .color(.white.opacity(interactive ? 0.35 : 0.25)),
+                with: .color(.white.opacity(interactive ? 0.45 : 0.35)),
                 lineWidth: interactive ? 1.2 : 0.8
             )
         }

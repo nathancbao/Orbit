@@ -90,7 +90,7 @@ struct VoyageView: View {
             .opacity(isExiting ? exitOpacity : entryOpacity)
             .onAppear {
                 screenSize = geo.size
-                generateStars(count: 300, size: geo.size)
+                generateStars(count: 200, size: geo.size)
                 withAnimation(.easeOut(duration: 0.6)) {
                     entryScale = 1.0
                     entryOpacity = 1.0
@@ -117,51 +117,135 @@ struct VoyageView: View {
                 let velocity = viewModel.dragVelocity
                 let speed = hypot(velocity.width, velocity.height)
                 let warpFactor = min(speed / 800, 1.0) // 0...1
+                let w = canvasSize.width
+                let h = canvasSize.height
 
+                // ── Background stars ──
                 for star in stars {
-                    // Parallax offset
                     let px = viewModel.voyagePosition.x * star.parallaxFactor
                     let py = viewModel.voyagePosition.y * star.parallaxFactor
 
-                    // Wrap star position
-                    var sx = (star.x * canvasSize.width + px).truncatingRemainder(dividingBy: canvasSize.width)
-                    var sy = (star.y * canvasSize.height + py).truncatingRemainder(dividingBy: canvasSize.height)
-                    if sx < 0 { sx += canvasSize.width }
-                    if sy < 0 { sy += canvasSize.height }
+                    var sx = (star.x * w + px).truncatingRemainder(dividingBy: w)
+                    var sy = (star.y * h + py).truncatingRemainder(dividingBy: h)
+                    if sx < 0 { sx += w }
+                    if sy < 0 { sy += h }
 
-                    // Twinkle
                     let twinkle = (sin(time * star.twinkleSpeed + star.phaseOffset) + 1) / 2
                     let opacity = star.baseOpacity + twinkle * (1.0 - star.baseOpacity)
 
                     if warpFactor > 0.1 {
-                        // Warp-speed streaks
                         let streakLength = star.size + warpFactor * 12
                         let angle = atan2(-velocity.height, -velocity.width)
-
                         let dx = cos(angle) * streakLength / 2
                         let dy = sin(angle) * streakLength / 2
 
                         var path = Path()
                         path.move(to: CGPoint(x: sx - dx, y: sy - dy))
                         path.addLine(to: CGPoint(x: sx + dx, y: sy + dy))
-
-                        context.stroke(
-                            path,
-                            with: .color(.white.opacity(opacity * 0.8)),
-                            lineWidth: star.size * 0.6
-                        )
+                        context.stroke(path, with: .color(.white.opacity(opacity * 0.8)),
+                                       lineWidth: star.size * 0.6)
                     } else {
-                        let rect = CGRect(
-                            x: sx - star.size / 2,
-                            y: sy - star.size / 2,
-                            width: star.size,
-                            height: star.size
-                        )
-                        context.fill(
-                            Path(ellipseIn: rect),
-                            with: .color(.white.opacity(opacity))
-                        )
+                        let rect = CGRect(x: sx - star.size / 2, y: sy - star.size / 2,
+                                          width: star.size, height: star.size)
+                        context.fill(Path(ellipseIn: rect), with: .color(.white.opacity(opacity)))
                     }
+                }
+
+                // ── Shooting stars (3 staggered slots) ──
+                let shootingIntervals: [Double] = [9.0, 14.0, 21.0]
+                for (si, interval) in shootingIntervals.enumerated() {
+                    let idx = Int(time / interval)
+                    let t = time - Double(idx) * interval
+                    let duration = 1.2
+                    guard t < duration else { continue }
+
+                    // Deterministic start, angle, length from slot + index
+                    var seed = UInt64(idx &* 2654435761 &+ si &* 73856093)
+                    seed = seed ^ (seed >> 17)
+                    let startX = CGFloat(seed % 1000) / 1000.0 * w
+                    seed = seed &* 6364136223846793005 &+ 1
+                    let startY = CGFloat(seed % 1000) / 1000.0 * h
+                    seed = seed &* 6364136223846793005 &+ 1
+                    let angle = Double(seed % 628) / 100.0 // ~0...6.28
+
+                    let progress = t / duration
+                    let tailLen: CGFloat = 60 + CGFloat(seed % 40)
+                    let headX = startX + CGFloat(cos(angle)) * tailLen * 4 * CGFloat(progress)
+                    let headY = startY + CGFloat(sin(angle)) * tailLen * 4 * CGFloat(progress)
+                    let tailX = headX - CGFloat(cos(angle)) * tailLen
+                    let tailY = headY - CGFloat(sin(angle)) * tailLen
+
+                    let fade = 1.0 - progress  // bright at start, fades out
+
+                    var streak = Path()
+                    streak.move(to: CGPoint(x: tailX, y: tailY))
+                    streak.addLine(to: CGPoint(x: headX, y: headY))
+                    context.stroke(streak, with: .color(.white.opacity(fade * 0.8)), lineWidth: 1.5)
+
+                    // Bright head dot
+                    let headRect = CGRect(x: headX - 2, y: headY - 2, width: 4, height: 4)
+                    context.fill(Path(ellipseIn: headRect), with: .color(.white.opacity(fade)))
+                }
+
+                // ── Drifting ships (2 staggered slots, less common) ──
+                let shipIntervals: [Double] = [28.0, 43.0]
+                for (si, interval) in shipIntervals.enumerated() {
+                    let idx = Int(time / interval)
+                    let t = time - Double(idx) * interval
+                    let duration = 14.0
+                    guard t < duration else { continue }
+
+                    var seed = UInt64(idx &* 19349663 &+ si &* 83492791)
+                    seed = seed ^ (seed >> 15)
+                    let edge = Int(seed % 4)  // which screen edge to start from
+                    seed = seed &* 6364136223846793005 &+ 1
+                    let edgePos = CGFloat(seed % 1000) / 1000.0
+                    seed = seed &* 6364136223846793005 &+ 1
+                    let angle = Double(seed % 314) / 100.0 - 0.5 // slight angle variation
+
+                    let progress = CGFloat(t / duration)
+                    var sx: CGFloat, sy: CGFloat, dir: CGFloat
+
+                    switch edge {
+                    case 0: // from left
+                        sx = -20 + (w + 40) * progress
+                        sy = edgePos * h + CGFloat(sin(angle)) * 60
+                        dir = 0
+                    case 1: // from top
+                        sx = edgePos * w + CGFloat(sin(angle)) * 60
+                        sy = -20 + (h + 40) * progress
+                        dir = .pi / 2
+                    case 2: // from right
+                        sx = w + 20 - (w + 40) * progress
+                        sy = edgePos * h + CGFloat(sin(angle)) * 60
+                        dir = .pi
+                    default: // from bottom
+                        sx = edgePos * w + CGFloat(sin(angle)) * 60
+                        sy = h + 20 - (h + 40) * progress
+                        dir = -.pi / 2
+                    }
+
+                    let fade = min(1.0, min(Double(progress) * 4, Double(1.0 - progress) * 4))
+
+                    // Ship body — small diamond
+                    let shipSize: CGFloat = 6
+                    var ship = Path()
+                    let cosD = CGFloat(cos(Double(dir)))
+                    let sinD = CGFloat(sin(Double(dir)))
+                    ship.move(to: CGPoint(x: sx + cosD * shipSize, y: sy + sinD * shipSize))       // nose
+                    ship.addLine(to: CGPoint(x: sx - sinD * shipSize * 0.5, y: sy + cosD * shipSize * 0.5))
+                    ship.addLine(to: CGPoint(x: sx - cosD * shipSize * 0.6, y: sy - sinD * shipSize * 0.6))
+                    ship.addLine(to: CGPoint(x: sx + sinD * shipSize * 0.5, y: sy - cosD * shipSize * 0.5))
+                    ship.closeSubpath()
+
+                    context.fill(ship, with: .color(.white.opacity(fade * 0.5)))
+
+                    // Tiny engine glow behind ship
+                    let glowX = sx - cosD * shipSize * 0.8
+                    let glowY = sy - sinD * shipSize * 0.8
+                    let glowRect = CGRect(x: glowX - 2, y: glowY - 2, width: 4, height: 4)
+                    context.fill(Path(ellipseIn: glowRect),
+                                 with: .color(Color(hex: "60A5FA").opacity(fade * 0.6)))
                 }
             }
         }
@@ -177,7 +261,7 @@ struct VoyageView: View {
         let jx = CGFloat(s % 1000) / 1000.0 - 0.5 // -0.5...0.5
         s = s &* 6364136223846793005 &+ 1
         let jy = CGFloat(s % 1000) / 1000.0 - 0.5
-        let maxJitter = tileSize * 0.25
+        let maxJitter = tileSize * 0.38
         return CGPoint(x: jx * maxJitter, y: jy * maxJitter)
     }
 
