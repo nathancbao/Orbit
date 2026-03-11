@@ -1,5 +1,29 @@
 import SwiftUI
 
+// MARK: - Signal Status Badge
+
+struct SignalStatusBadge: View {
+    let status: SignalStatus
+
+    var body: some View {
+        Text(status.label)
+            .font(.caption2)
+            .fontWeight(.semibold)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 3)
+            .background(statusColor.opacity(0.15))
+            .foregroundColor(statusColor)
+            .clipShape(Capsule())
+    }
+
+    private var statusColor: Color {
+        switch status {
+        case .pending: return .orange
+        case .active:  return .green
+        }
+    }
+}
+
 // MARK: - Wrapped Hour (Identifiable wrapper for ForEach)
 
 struct WrappedHour: Identifiable {

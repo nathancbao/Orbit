@@ -1,5 +1,12 @@
 import SwiftUI
 
+// MARK: - Hour Slot Key
+
+struct HourSlotKey: Hashable {
+    let dayOffset: Int
+    let hour: Int
+}
+
 // MARK: - Missions View
 // Unified discover feed for both Set (fixed-date) and Flex (group-picks-time) missions.
 
