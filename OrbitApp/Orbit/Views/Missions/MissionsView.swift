@@ -12,6 +12,10 @@ struct MissionsView: View {
     @State private var showProfile = false
     @State private var createdFlexPodId: String? = nil
     @State private var showCreatedFlexPod = false
+    @State private var openPodId: String? = nil
+    @State private var openPodTitle: String = ""
+    @State private var openPodMode: MissionMode = .set
+    @State private var showOpenPod = false
     @State private var searchText = ""
 
     private let allTags = [
@@ -165,7 +169,25 @@ struct MissionsView: View {
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
                     Task { await viewModel.reload() }
                 }
+            }, onOpenPod: { podId in
+                let title = mission.isFlexMode ? mission.displayTitle : mission.title
+                let mode = mission.mode
+                selectedMission = nil
+                openPodId = podId
+                openPodTitle = title
+                openPodMode = mode
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
+                    showOpenPod = true
+                }
             })
+        }
+        .sheet(isPresented: $showOpenPod) {
+            if let podId = openPodId {
+                PodView(podId: podId, title: openPodTitle, missionMode: openPodMode)
+                    .onDisappear {
+                        Task { await viewModel.reload() }
+                    }
+            }
         }
         .sheet(isPresented: $showCreate) {
             MissionCreateView(

@@ -47,6 +47,10 @@ struct VoyageView: View {
     @State private var selectedMission: Mission? = nil
     @State private var selectedSignal: Signal? = nil
     @State private var isLoadingDetail = false
+    @State private var voyageOpenPodId: String? = nil
+    @State private var voyageOpenPodTitle: String = ""
+    @State private var voyageOpenPodMode: MissionMode = .set
+    @State private var showVoyagePod = false
 
     // Zoom into a cluster
     @State private var zoomedTile: VoyageTile? = nil
@@ -139,7 +143,22 @@ struct VoyageView: View {
             await viewModel.startVoyage()
         }
         .sheet(item: $selectedMission) { mission in
-            MissionDetailView(mission: mission, onJoined: {})
+            MissionDetailView(mission: mission, onJoined: {}, onOpenPod: { podId in
+                let title = mission.isFlexMode ? mission.displayTitle : mission.title
+                let mode = mission.mode
+                selectedMission = nil
+                voyageOpenPodId = podId
+                voyageOpenPodTitle = title
+                voyageOpenPodMode = mode
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
+                    showVoyagePod = true
+                }
+            })
+        }
+        .sheet(isPresented: $showVoyagePod) {
+            if let podId = voyageOpenPodId {
+                PodView(podId: podId, title: voyageOpenPodTitle, missionMode: voyageOpenPodMode)
+            }
         }
         .sheet(item: $selectedSignal) { signal in
             SignalDetailView(signal: signal)

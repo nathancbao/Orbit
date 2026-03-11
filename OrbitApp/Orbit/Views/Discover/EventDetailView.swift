@@ -58,14 +58,13 @@ struct FlowLayout: Layout {
 struct MissionDetailView: View {
     let mission: Mission
     let onJoined: () -> Void
+    var onOpenPod: ((String) -> Void)?
 
     @State private var isJoining = false
-    @State private var joinedPod: Pod?
     @State private var errorMessage: String?
     @State private var showSignedUp = false
     @State private var localToast = false
     @State private var joinedPodId: String?
-    @State private var showPod = false
 
     // Member profiles
     @State private var podMembers: [PodMember] = []
@@ -109,18 +108,6 @@ struct MissionDetailView: View {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button("Done") { dismiss() }
                 }
-            }
-        }
-        .fullScreenCover(item: $joinedPod) { pod in
-            PodView(podId: pod.id, title: mission.isFlexMode ? mission.displayTitle : mission.title, missionMode: mission.mode)
-                .onDisappear {
-                    onJoined()
-                    dismiss()
-                }
-        }
-        .fullScreenCover(isPresented: $showPod) {
-            if let podId = joinedPodId {
-                PodView(podId: podId, title: mission.displayTitle, missionMode: mission.mode)
             }
         }
         .sheet(item: $selectedMemberForPreview) { member in
@@ -518,7 +505,8 @@ struct MissionDetailView: View {
                 let pod = try await MissionService.shared.joinMission(id: mission.id)
                 await MainActor.run {
                     isJoining = false
-                    joinedPod = pod
+                    dismiss()
+                    onOpenPod?(pod.id)
                 }
             } catch {
                 await MainActor.run {
@@ -581,15 +569,17 @@ struct MissionDetailView: View {
     /// Open the flex pod — resolves pod_id first if needed.
     private func openFlexPod() {
         if let podId = joinedPodId {
-            showPod = true
+            dismiss()
+            onOpenPod?(podId)
             return
         }
         // pod_id missing — fetch it, then open
         Task {
             await resolvePodId()
             await MainActor.run {
-                if joinedPodId != nil {
-                    showPod = true
+                if let podId = joinedPodId {
+                    dismiss()
+                    onOpenPod?(podId)
                 } else {
                     errorMessage = "Could not find your pod. Try again."
                 }
@@ -598,8 +588,8 @@ struct MissionDetailView: View {
     }
 
     private func openPod(podId: String) {
-        joinedPodId = podId
-        showPod = true
+        dismiss()
+        onOpenPod?(podId)
     }
 
     // MARK: - Member Fetching

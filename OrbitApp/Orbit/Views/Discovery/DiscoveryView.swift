@@ -766,6 +766,10 @@ struct DiscoveryView: View {
     @State private var selectedPlanetId: UUID? = nil
     @State private var planetPositions: [UUID: CGPoint] = [:]
     @State private var selectedMission: Mission? = nil
+    @State private var discOpenPodId: String? = nil
+    @State private var discOpenPodTitle: String = ""
+    @State private var discOpenPodMode: MissionMode = .set
+    @State private var showDiscPod = false
     @State private var showCreateMission = false
     @State private var createPrefillTitle = ""
     @State private var createPrefillTags: [String] = []
@@ -954,7 +958,22 @@ struct DiscoveryView: View {
                 }
             }
             .sheet(item: $selectedMission) { mission in
-                MissionDetailView(mission: mission, onJoined: {})
+                MissionDetailView(mission: mission, onJoined: {}, onOpenPod: { podId in
+                    let title = mission.isFlexMode ? mission.displayTitle : mission.title
+                    let mode = mission.mode
+                    selectedMission = nil
+                    discOpenPodId = podId
+                    discOpenPodTitle = title
+                    discOpenPodMode = mode
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
+                        showDiscPod = true
+                    }
+                })
+            }
+            .sheet(isPresented: $showDiscPod) {
+                if let podId = discOpenPodId {
+                    PodView(podId: podId, title: discOpenPodTitle, missionMode: discOpenPodMode)
+                }
             }
             .sheet(isPresented: $showCreateMission) {
                 MissionCreateView(
