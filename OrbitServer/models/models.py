@@ -557,6 +557,11 @@ def get_signal(signal_id):
 def delete_signal(signal_id):
     key = client.key('Signal', str(signal_id))
     client.delete(key)
+    # Cascade: delete all pods linked to this signal
+    query = client.query(kind='Pod')
+    query.add_filter(filter=PropertyFilter('signal_id', '=', str(signal_id)))
+    for pod in query.fetch(limit=1000):
+        delete_pod(str(pod.key.id_or_name))
 
 
 def list_signals_for_user(user_id, limit=100):

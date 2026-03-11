@@ -118,6 +118,12 @@ def validate_mission_data(data, is_update=False):
     if not is_update:
         if 'title' not in data or not data['title']:
             errors.append("title is required")
+        if not data.get('date'):
+            errors.append("date is required")
+        if not data.get('start_time'):
+            errors.append("start_time is required")
+        if not data.get('end_time'):
+            errors.append("end_time is required")
 
     if 'title' in data and isinstance(data['title'], str):
         if len(data['title']) > 200:

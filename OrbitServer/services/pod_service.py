@@ -101,17 +101,23 @@ def _set_mission_time_info(mission):
 
     result = {}
 
-    # Build display string for start time (stays in local time for display)
+    # Parse start and end times
     parsed_start = _parse_time_of_day(mission.get('start_time', ''))
-    if parsed_start:
-        h, m = parsed_start
-        time_part = f' · {_format_display_time(h, m)}'
+    parsed_end = _parse_time_of_day(mission.get('end_time', ''))
+
+    # Build display string (stays in local time for display)
+    if parsed_start and parsed_end:
+        sh, sm = parsed_start
+        eh, em = parsed_end
+        time_part = f' · {_format_display_time(sh, sm)} – {_format_display_time(eh, em)}'
+    elif parsed_start:
+        sh, sm = parsed_start
+        time_part = f' · {_format_display_time(sh, sm)}'
     else:
         time_part = ''
     result['scheduled_time'] = dt.strftime('%a, %b %-d') + time_part
 
     # Compute end datetime in UTC and expires_at
-    parsed_end = _parse_time_of_day(mission.get('end_time', ''))
     if parsed_end:
         eh, em = parsed_end
         end_dt_utc = dt.replace(hour=eh, minute=em) - offset_delta
