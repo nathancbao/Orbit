@@ -64,11 +64,14 @@ class TestCreateSignal:
         assert resp.status_code == 201
         assert body["success"] is True
 
-    def test_rejects_missing_category(self, client):
+    @patch('OrbitServer.api.signals.create_new_signal')
+    def test_allows_missing_category(self, mock_create, client):
+        """activity_category is optional — defaults to Custom on the backend."""
+        mock_create.return_value = ({"id": "uuid-1", "status": "pending"}, None)
         bad = {**VALID_SIGNAL}
         del bad["activity_category"]
         resp = client.post('/api/signals', headers=auth_header(), json=bad)
-        assert resp.status_code == 400
+        assert resp.status_code == 201
 
     def test_rejects_invalid_category(self, client):
         bad = {**VALID_SIGNAL, "activity_category": "NotACategory"}
@@ -92,9 +95,18 @@ class TestCreateSignal:
         resp = client.post('/api/signals', headers=auth_header(), json=bad)
         assert resp.status_code == 400
 
-    def test_custom_category_requires_name(self, client):
-        bad = {**VALID_SIGNAL, "activity_category": "Custom", "custom_activity_name": None}
-        resp = client.post('/api/signals', headers=auth_header(), json=bad)
+    @patch('OrbitServer.api.signals.create_new_signal')
+    def test_custom_category_allows_no_name(self, mock_create, client):
+        """Custom category no longer requires custom_activity_name."""
+        mock_create.return_value = ({"id": "uuid-1", "status": "pending"}, None)
+        data = {**VALID_SIGNAL, "activity_category": "Custom", "custom_activity_name": None}
+        resp = client.post('/api/signals', headers=auth_header(), json=data)
+        assert resp.status_code == 201
+
+    def test_custom_category_rejects_long_name(self, client):
+        """custom_activity_name over 100 chars is still rejected."""
+        data = {**VALID_SIGNAL, "activity_category": "Custom", "custom_activity_name": "x" * 101}
+        resp = client.post('/api/signals', headers=auth_header(), json=data)
         assert resp.status_code == 400
 
 

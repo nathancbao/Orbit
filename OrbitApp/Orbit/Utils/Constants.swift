@@ -48,6 +48,8 @@ enum Constants {
             static func podLeave(_ id: String) -> String { "/pods/\(id)/leave" }
             static func podScheduleAvailability(_ id: String) -> String { "/pods/\(id)/schedule/availability" }
             static func podScheduleConfirm(_ id: String) -> String { "/pods/\(id)/schedule/confirm" }
+            static func podSurvey(_ id: String) -> String { "/pods/\(id)/survey" }
+            static func podSurveyStatus(_ id: String) -> String { "/pods/\(id)/survey/status" }
 
             // Signals (spontaneous activity requests)
             static let signals = "/signals"

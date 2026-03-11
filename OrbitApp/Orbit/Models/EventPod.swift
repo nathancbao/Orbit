@@ -13,6 +13,9 @@ struct Pod: Codable, Identifiable {
     var members: [PodMember]?   // Enriched — only present in GET /pods/<id>
     var missionTitle: String?   // Enriched — present in GET /users/me/pods
     var scheduleData: PodScheduleData?  // Availability grid entries from backend
+    var surveyCompletedBy: [Int]
+    var hasPendingSurvey: Bool
+    var missionTags: [String]
 
     // ── Local-only schedule fields (not from API — TODO: migrate to backend) ──
     var confirmedTime: Date?
@@ -38,6 +41,9 @@ struct Pod: Codable, Identifiable {
         case members
         case missionTitle = "mission_title"
         case scheduleData = "schedule_data"
+        case surveyCompletedBy = "survey_completed_by"
+        case hasPendingSurvey = "has_pending_survey"
+        case missionTags = "mission_tags"
     }
 
     init(from decoder: Decoder) throws {
@@ -65,6 +71,10 @@ struct Pod: Codable, Identifiable {
             print("[Schedule] Pod \(id) FAILED to decode schedule_data: \(error)")
             scheduleData = nil
         }
+
+        surveyCompletedBy = (try? container.decode([Int].self, forKey: .surveyCompletedBy)) ?? []
+        hasPendingSurvey = (try? container.decode(Bool.self, forKey: .hasPendingSurvey)) ?? false
+        missionTags = (try? container.decode([String].self, forKey: .missionTags)) ?? []
 
         // Local-only fields — not decoded from API
         confirmedTime = nil

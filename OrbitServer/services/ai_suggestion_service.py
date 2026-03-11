@@ -40,6 +40,13 @@ W_LIGHTFM    = 0.25
 W_BEHAVIORAL = 0.15
 W_TRUST      = 0.10
 
+# ── Display rescaling ──────────────────────────────────────────────────────────
+# Raw scores cluster low (0.05–0.50) because most signal components are zero
+# for newer users.  Rescale to a human-friendly range so the UI percentages
+# feel intuitive while preserving rank order.
+DISPLAY_FLOOR = 0.55   # minimum displayed score
+DISPLAY_CEIL  = 0.97   # maximum displayed score
+
 # ── Behavioral decay parameters ────────────────────────────────────────────────
 DECAY_LAMBDA = 0.05   # exp(-0.05 * days), half-life ~ 14 days
 EPSILON = 1e-8
@@ -50,6 +57,7 @@ ACTION_SCORES = {
     'skipped': -0.4,
 }
 ATTENDED_BONUS = 0.2  # added to 'joined' score when attended=True
+ENJOYMENT_MULTIPLIER = {1: 0.3, 2: 0.6, 3: 1.0, 4: 1.3, 5: 1.6}
 
 
 # ── TF-IDF helpers ─────────────────────────────────────────────────────────────
@@ -99,10 +107,12 @@ def _compute_tfidf_scores(user_interests: list, missions: list) -> dict:
 
 # ── Behavioral decay signal ────────────────────────────────────────────────────
 
-def _action_score(action: str, attended) -> float:
+def _action_score(action: str, attended, enjoyment_rating=None) -> float:
     base = ACTION_SCORES.get(action, 0.0)
     if action == 'joined' and attended is True:
         base += ATTENDED_BONUS
+    if action == 'joined' and enjoyment_rating is not None:
+        base *= ENJOYMENT_MULTIPLIER.get(int(enjoyment_rating), 1.0)
     return base
 
 
@@ -135,7 +145,7 @@ def _build_behavioral_profile(history: list) -> list:
         tags_snapshot = h.get('tags_snapshot') or []
         if not tags_snapshot:
             continue
-        base = _action_score(action, h.get('attended'))
+        base = _action_score(action, h.get('attended'), h.get('enjoyment_rating'))
         if base <= 0:
             continue
         w = _decay_weight(h.get('created_at'))
@@ -172,6 +182,16 @@ def _compute_behavioral_score(mission_tags: set, behavioral_profile: list) -> fl
 
 # ── Trust weight ───────────────────────────────────────────────────────────────
 
+def _rescale_for_display(raw: float) -> float:
+    """Map a raw score in [0, 1] to [DISPLAY_FLOOR, DISPLAY_CEIL].
+
+    Preserves rank order — higher raw scores still produce higher display
+    scores.  Missions with raw 0.0 still get the floor so the UI never
+    shows an awkwardly low percentage.
+    """
+    return DISPLAY_FLOOR + raw * (DISPLAY_CEIL - DISPLAY_FLOOR)
+
+
 def _normalize_trust(trust_score) -> float:
     """Normalize trust_score [0, 5] to [0, 1]. Default 0.0."""
     try:
@@ -204,8 +224,8 @@ def score_mission_for_user(mission: dict, user_interests: set, history_tags: set
     history_tags parameter kept for backward compatibility.
     """
     mission_tags = set(mission.get('tags') or [])
-    score = _jaccard(user_interests, mission_tags)
-    return min(1.0, score + random.uniform(0, 0.05))
+    raw = _jaccard(user_interests, mission_tags) + random.uniform(0, 0.05)
+    return _rescale_for_display(min(1.0, raw))
 
 
 def get_suggested_missions(user_id, limit=5) -> list:
@@ -280,10 +300,11 @@ def get_suggested_missions(user_id, limit=5) -> list:
             W_TRUST      * trust_weight
         )
         final = min(1.0, max(0.0, final))
+        display = _rescale_for_display(final)
 
         scored.append({
             **mission,
-            'match_score': round(final, 4),
+            'match_score': round(display, 4),
             'suggestion_reason': _build_reason(mission, user_interests_set, behav_s),
         })
 

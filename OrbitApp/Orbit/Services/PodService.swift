@@ -81,6 +81,20 @@ class PodService {
             authenticated: true
         )
     }
+
+    func submitSurvey(podId: String, enjoymentRating: Int, addedInterests: [String], memberVotes: [String: String]) async throws -> SurveyResponse {
+        let body: [String: Any] = [
+            "enjoyment_rating": enjoymentRating,
+            "added_interests": addedInterests,
+            "member_votes": memberVotes,
+        ]
+        return try await APIService.shared.request(
+            endpoint: Constants.API.Endpoints.podSurvey(podId),
+            method: "POST",
+            body: body,
+            authenticated: true
+        )
+    }
 }
 
 struct KickResponse: Codable {
@@ -92,4 +106,14 @@ struct KickResponse: Codable {
 struct ConfirmResponse: Codable {
     var pod: Pod
     var message: String
+}
+
+struct SurveyResponse: Codable {
+    var surveyId: String
+    var message: String
+
+    enum CodingKeys: String, CodingKey {
+        case surveyId = "survey_id"
+        case message
+    }
 }

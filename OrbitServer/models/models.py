@@ -287,6 +287,7 @@ def update_pod(pod_id, data):
     allowed = [
         'member_ids', 'status', 'scheduled_time', 'scheduled_place',
         'confirmed_attendees', 'kick_votes', 'expires_at', 'name', 'schedule_data',
+        'survey_completed_by', 'completed_at',
     ]
     for field in allowed:
         if field in data:
@@ -494,7 +495,7 @@ def update_history(hist_id, data):
     entity = client.get(key)
     if not entity:
         return None
-    for field in ['attended', 'points_earned']:
+    for field in ['attended', 'points_earned', 'enjoyment_rating']:
         if field in data:
             entity[field] = data[field]
     client.put(entity)
@@ -683,24 +684,42 @@ def create_signal_pod(pod_id, signal_id, max_size=6, first_member_id=None):
 # ── Pod user membership query ────────────────────────────────────────────────
 
 def get_user_pods(user_id, limit=100):
-    """Return all Pod entities the user is a member of, enriched with mission_title.
-
-    Datastore automatically builds single-property indexes for array fields,
-    so filtering member_ids by equality works without a composite index.
-    """
+    """Return all Pod entities the user is a member of, enriched with mission_title,
+    mission_tags, and has_pending_survey."""
     query = client.query(kind='Pod')
     query.add_filter(filter=PropertyFilter('member_ids', '=', int(user_id)))
     results = list(query.fetch(limit=limit))
     pods = [_entity_to_dict(e) for e in results]
 
-    # Enrich each pod with its mission title
+    now = datetime.datetime.utcnow()
+    survey_window = datetime.timedelta(days=7)
+
     for pod in pods:
         mission_id = pod.get('mission_id')
         if mission_id is not None:
             mission = get_mission(int(mission_id))
             pod['mission_title'] = mission.get('title', 'Untitled') if mission else 'Untitled'
+            pod['mission_tags'] = mission.get('tags', []) if mission else []
         else:
             pod['mission_title'] = 'Untitled'
+            pod['mission_tags'] = []
+
+        # Survey eligibility: completed pod, user hasn't submitted, within 7-day window
+        survey_completed_by = pod.get('survey_completed_by') or []
+        completed_at_raw = pod.get('completed_at')
+        if completed_at_raw and isinstance(completed_at_raw, str):
+            try:
+                completed_at = datetime.datetime.fromisoformat(completed_at_raw.replace('Z', '+00:00')).replace(tzinfo=None)
+            except ValueError:
+                completed_at = None
+        else:
+            completed_at = completed_at_raw if isinstance(completed_at_raw, datetime.datetime) else None
+
+        pod['has_pending_survey'] = (
+            pod.get('status') == 'completed'
+            and int(user_id) not in survey_completed_by
+            and (completed_at is None or (now - completed_at) < survey_window)
+        )
 
     return pods
 
@@ -900,6 +919,36 @@ def list_dm_conversations(user_id):
         if existing is None or d['created_at'] > existing['created_at']:
             conversations[pid] = d
     return list(conversations.values())
+
+
+# ── SurveyResponse ────────────────────────────────────────────────────────────
+# Fields: id (UUID), user_id, pod_id, mission_id, enjoyment_rating,
+#         added_interests, member_votes, created_at
+
+def create_survey_response(user_id, pod_id, mission_id, enjoyment_rating, added_interests, member_votes):
+    survey_id = str(uuid.uuid4())
+    key = client.key('SurveyResponse', survey_id)
+    entity = datastore.Entity(key=key)
+    entity.update({
+        'user_id': int(user_id),
+        'pod_id': str(pod_id),
+        'mission_id': int(mission_id) if mission_id is not None else None,
+        'enjoyment_rating': int(enjoyment_rating),
+        'added_interests': list(added_interests) if added_interests else [],
+        'member_votes': dict(member_votes) if member_votes else {},
+        'created_at': datetime.datetime.utcnow(),
+    })
+    client.put(entity)
+    return _entity_to_dict(entity)
+
+
+def get_user_survey_for_pod(user_id, pod_id):
+    """Check if a user already submitted a survey for this pod."""
+    query = client.query(kind='SurveyResponse')
+    query.add_filter(filter=PropertyFilter('user_id', '=', int(user_id)))
+    query.add_filter(filter=PropertyFilter('pod_id', '=', str(pod_id)))
+    results = list(query.fetch(limit=1))
+    return _entity_to_dict(results[0]) if results else None
 
 
 # ── PodInvite ────────────────────────────────────────────────────────────────
