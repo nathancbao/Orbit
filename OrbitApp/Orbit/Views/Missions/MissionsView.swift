@@ -535,29 +535,34 @@ struct MissionSpotsLabel: View {
 
     var body: some View {
         Group {
-            switch mission.userPodStatus {
-            case "in_pod":
-                Label("you're in!", systemImage: "checkmark.circle.fill")
-                    .foregroundColor(.green)
-            case "pod_full":
-                Label("pods full", systemImage: "person.fill.xmark")
+            if mission.status == "completed" {
+                Label("Mission completed", systemImage: "checkmark.circle.fill")
                     .foregroundColor(.secondary)
-            default:
-                if let pods = mission.pods, !pods.isEmpty {
-                    let open = pods.filter { $0.status == "open" }
-                    if let first = open.first {
-                        Label(
-                            "\(first.spotsLeft) spot\(first.spotsLeft == 1 ? "" : "s") left",
-                            systemImage: "person.badge.plus"
-                        )
-                        .foregroundStyle(OrbitTheme.gradient)
+            } else {
+                switch mission.userPodStatus {
+                case "in_pod":
+                    Label("you're in!", systemImage: "checkmark.circle.fill")
+                        .foregroundColor(.green)
+                case "pod_full":
+                    Label("pods full", systemImage: "person.fill.xmark")
+                        .foregroundColor(.secondary)
+                default:
+                    if let pods = mission.pods, !pods.isEmpty {
+                        let open = pods.filter { $0.status == "open" }
+                        if let first = open.first {
+                            Label(
+                                "\(first.spotsLeft) spot\(first.spotsLeft == 1 ? "" : "s") left",
+                                systemImage: "person.badge.plus"
+                            )
+                            .foregroundStyle(OrbitTheme.gradient)
+                        } else {
+                            Label("join waitlist", systemImage: "person.badge.clock")
+                                .foregroundColor(.secondary)
+                        }
                     } else {
-                        Label("join waitlist", systemImage: "person.badge.clock")
-                            .foregroundColor(.secondary)
+                        Label("be the first to join", systemImage: "star")
+                            .foregroundStyle(OrbitTheme.gradient)
                     }
-                } else {
-                    Label("be the first to join", systemImage: "star")
-                        .foregroundStyle(OrbitTheme.gradient)
                 }
             }
         }

@@ -239,8 +239,11 @@ def leave_mission(mission_id, user_id):
 def leave_pod(pod_id, user_id):
     """
     Remove a user from a pod. Deletes the pod entirely if no members remain.
+    For signal pods, also removes the user from the signal's rsvps list.
     Returns (True, None) on success or (False, (error_msg, status_code)) on failure.
     """
+    from OrbitServer.models.models import remove_signal_rsvp
+
     uid = _safe_int(user_id)
     if uid is None:
         return False, ("Invalid user ID", 400)
@@ -265,6 +268,15 @@ def leave_pod(pod_id, user_id):
 
     if remaining == 0:
         delete_pod(pod_id)
+
+    # For signal pods, also remove user from the signal's rsvps so it
+    # no longer appears on their Pods tab.
+    signal_id = pod.get('signal_id')
+    if signal_id:
+        try:
+            remove_signal_rsvp(signal_id, user_id)
+        except Exception:
+            logger.exception("Failed to remove RSVP for signal %s", signal_id)
 
     return True, None
 

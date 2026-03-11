@@ -596,6 +596,20 @@ def list_rsvped_signals(user_id, limit=100):
     return [_entity_to_dict(e) for e in results]
 
 
+def remove_signal_rsvp(signal_id, user_id):
+    """Remove a user from a signal's rsvps list."""
+    key = client.key('Signal', str(signal_id))
+    entity = client.get(key)
+    if not entity:
+        return
+    rsvps = list(entity.get('rsvps') or [])
+    uid = int(user_id)
+    if uid in rsvps:
+        rsvps.remove(uid)
+        entity['rsvps'] = rsvps
+        client.put(entity)
+
+
 def update_signal_status(signal_id, status):
     """Update signal status. Valid values: 'pending' | 'active'."""
     key = client.key('Signal', str(signal_id))

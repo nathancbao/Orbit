@@ -249,7 +249,7 @@ struct PodRowCard: View {
                         .foregroundColor(.secondary)
                     }
 
-                    PodStatusBadge(status: pod.status, hasPendingSurvey: pod.hasPendingSurvey)
+                    PodStatusBadge(status: pod.status, hasPendingSurvey: pod.hasPendingSurvey, isActivityCompleted: pod.isActivityCompleted)
                 }
 
                 Spacer()
@@ -391,9 +391,11 @@ struct SignalStatusBadgeDark: View {
 struct PodStatusBadge: View {
     let status: String
     var hasPendingSurvey: Bool = false
+    var isActivityCompleted: Bool = false
 
     var label: String {
         if hasPendingSurvey { return "Activity done! Fill out survey!" }
+        if isActivityCompleted { return "activity completed ✓" }
         switch status {
         case "open": return "forming"
         case "full": return "full"
@@ -405,6 +407,7 @@ struct PodStatusBadge: View {
 
     var color: Color {
         if hasPendingSurvey { return .green }
+        if isActivityCompleted { return .secondary }
         switch status {
         case "open": return .orange
         case "full": return OrbitTheme.blue
