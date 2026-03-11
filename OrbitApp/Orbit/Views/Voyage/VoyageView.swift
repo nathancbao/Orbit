@@ -142,20 +142,23 @@ struct VoyageView: View {
         .task {
             await viewModel.startVoyage()
         }
-        .sheet(item: $selectedMission) { mission in
-            MissionDetailView(mission: mission, onJoined: {}, onOpenPod: { podId in
-                let title = mission.isFlexMode ? mission.displayTitle : mission.title
-                let mode = mission.mode
+        .sheet(item: $selectedMission, onDismiss: {
+            if voyageOpenPodId != nil {
+                showVoyagePod = true
+            }
+        }) { mission in
+            MissionDetailView(mission: mission, onJoined: {
                 selectedMission = nil
+            }, onOpenPod: { podId in
                 voyageOpenPodId = podId
-                voyageOpenPodTitle = title
-                voyageOpenPodMode = mode
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
-                    showVoyagePod = true
-                }
+                voyageOpenPodTitle = mission.isFlexMode ? mission.displayTitle : mission.title
+                voyageOpenPodMode = mission.mode
+                selectedMission = nil
             })
         }
-        .sheet(isPresented: $showVoyagePod) {
+        .sheet(isPresented: $showVoyagePod, onDismiss: {
+            voyageOpenPodId = nil
+        }) {
             if let podId = voyageOpenPodId {
                 PodView(podId: podId, title: voyageOpenPodTitle, missionMode: voyageOpenPodMode)
             }

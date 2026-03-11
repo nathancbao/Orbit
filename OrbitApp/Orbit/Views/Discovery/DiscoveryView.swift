@@ -957,20 +957,23 @@ struct DiscoveryView: View {
                     }
                 }
             }
-            .sheet(item: $selectedMission) { mission in
-                MissionDetailView(mission: mission, onJoined: {}, onOpenPod: { podId in
-                    let title = mission.isFlexMode ? mission.displayTitle : mission.title
-                    let mode = mission.mode
+            .sheet(item: $selectedMission, onDismiss: {
+                if discOpenPodId != nil {
+                    showDiscPod = true
+                }
+            }) { mission in
+                MissionDetailView(mission: mission, onJoined: {
                     selectedMission = nil
+                }, onOpenPod: { podId in
                     discOpenPodId = podId
-                    discOpenPodTitle = title
-                    discOpenPodMode = mode
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
-                        showDiscPod = true
-                    }
+                    discOpenPodTitle = mission.isFlexMode ? mission.displayTitle : mission.title
+                    discOpenPodMode = mission.mode
+                    selectedMission = nil
                 })
             }
-            .sheet(isPresented: $showDiscPod) {
+            .sheet(isPresented: $showDiscPod, onDismiss: {
+                discOpenPodId = nil
+            }) {
                 if let podId = discOpenPodId {
                     PodView(podId: podId, title: discOpenPodTitle, missionMode: discOpenPodMode)
                 }

@@ -163,30 +163,28 @@ struct MissionsView: View {
                 }
             }
         }
-        .sheet(item: $selectedMission) { mission in
+        .sheet(item: $selectedMission, onDismiss: {
+            Task { await viewModel.reload() }
+            // If a pod was queued to open, show it now that the sheet is fully gone
+            if openPodId != nil {
+                showOpenPod = true
+            }
+        }) { mission in
             MissionDetailView(mission: mission, onJoined: {
                 selectedMission = nil
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                    Task { await viewModel.reload() }
-                }
             }, onOpenPod: { podId in
-                let title = mission.isFlexMode ? mission.displayTitle : mission.title
-                let mode = mission.mode
-                selectedMission = nil
                 openPodId = podId
-                openPodTitle = title
-                openPodMode = mode
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
-                    showOpenPod = true
-                }
+                openPodTitle = mission.isFlexMode ? mission.displayTitle : mission.title
+                openPodMode = mission.mode
+                selectedMission = nil
             })
         }
-        .sheet(isPresented: $showOpenPod) {
+        .sheet(isPresented: $showOpenPod, onDismiss: {
+            openPodId = nil
+            Task { await viewModel.reload() }
+        }) {
             if let podId = openPodId {
                 PodView(podId: podId, title: openPodTitle, missionMode: openPodMode)
-                    .onDisappear {
-                        Task { await viewModel.reload() }
-                    }
             }
         }
         .sheet(isPresented: $showCreate) {
