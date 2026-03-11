@@ -1,6 +1,7 @@
 from OrbitServer.models.models import (
     get_user, search_users as ds_search_users,
     create_friend_request, get_friend_request, update_friend_request_status,
+    delete_friend_request as ds_delete_friend_request,
     list_incoming_friend_requests, list_outgoing_friend_requests,
     find_pending_request,
     create_friendship, get_friendship, list_friendships,
@@ -112,6 +113,21 @@ def decline_friend_request(request_id, user_id):
         return None, "Request is no longer pending", 409
 
     update_friend_request_status(request_id, 'declined')
+    return {}, None, None
+
+
+# ── POST /friends/requests/<id>/cancel ────────────────────────────────────────
+
+def cancel_friend_request(request_id, user_id):
+    req = get_friend_request(request_id)
+    if not req:
+        return None, "Friend request not found", 404
+    if int(req['from_user_id']) != int(user_id):
+        return None, "Not your friend request", 403
+    if req['status'] != 'pending':
+        return None, "Request is no longer pending", 409
+
+    ds_delete_friend_request(request_id)
     return {}, None, None
 
 

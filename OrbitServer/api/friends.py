@@ -5,7 +5,7 @@ from OrbitServer.utils.auth import require_auth
 from OrbitServer.services.friend_service import (
     get_friends, send_friend_request,
     get_incoming_requests, get_outgoing_requests,
-    accept_friend_request, decline_friend_request,
+    accept_friend_request, decline_friend_request, cancel_friend_request,
     remove_friend, get_friendship_status, search_users,
 )
 
@@ -92,6 +92,17 @@ def accept(request_id):
 @require_auth
 def decline(request_id):
     data, err, status_code = decline_friend_request(request_id, g.user_id)
+    if err:
+        return error(err, status_code)
+    return success(data)
+
+
+# ── POST /friends/requests/<id>/cancel ────────────────────────────────────────
+
+@friends_bp.route('/requests/<int:request_id>/cancel', methods=['POST'])
+@require_auth
+def cancel(request_id):
+    data, err, status_code = cancel_friend_request(request_id, g.user_id)
     if err:
         return error(err, status_code)
     return success(data)

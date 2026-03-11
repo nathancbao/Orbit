@@ -342,7 +342,7 @@ struct PodView: View {
 
     @ViewBuilder
     private var confirmedDetailsBanner: some View {
-        let time = viewModel.pod?.scheduledTime
+        let time = viewModel.pod?.displayTime
         let place = viewModel.pod?.scheduledPlace
         if time != nil || place != nil {
             HStack(spacing: 12) {

@@ -875,6 +875,11 @@ def list_outgoing_friend_requests(user_id):
     return [_entity_to_dict(e) for e in results]
 
 
+def delete_friend_request(request_id):
+    key = client.key('FriendRequest', int(request_id))
+    client.delete(key)
+
+
 def find_pending_request(from_user_id, to_user_id):
     """Find a pending FriendRequest between two users (one direction)."""
     query = client.query(kind='FriendRequest')

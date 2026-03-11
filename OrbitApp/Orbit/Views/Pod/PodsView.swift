@@ -239,7 +239,7 @@ struct PodRowCard: View {
                     }
                     .foregroundColor(.secondary)
 
-                    if let time = pod.scheduledTime {
+                    if let time = pod.displayTime {
                         HStack(spacing: 4) {
                             Image(systemName: "clock")
                                 .font(.caption2)

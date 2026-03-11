@@ -68,6 +68,16 @@ class FriendsViewModel: ObservableObject {
         }
     }
 
+    func cancelRequest(_ request: FriendRequest) async {
+        do {
+            try await FriendService.shared.cancelRequest(requestId: request.id)
+            outgoingRequests.removeAll { $0.id == request.id }
+            sentRequestUserIds.remove(request.toUserId)
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
     func removeFriend(_ friendship: Friendship) async {
         do {
             try await FriendService.shared.removeFriend(friendshipId: friendship.id)

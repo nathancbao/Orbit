@@ -138,6 +138,15 @@ struct Pod: Codable, Identifiable {
         return f.date(from: raw)
     }
 
+    /// Display string including end time, e.g. "Mon, Mar 9 · 3:00 PM – 4:00 PM".
+    var displayTime: String? {
+        guard let base = scheduledTime, !base.isEmpty else { return nil }
+        guard let endDate = parsedEndTime else { return base }
+        let f = DateFormatter()
+        f.dateFormat = "h:mm a"
+        return "\(base) – \(f.string(from: endDate))"
+    }
+
     /// Whether the activity end time has passed.
     var isActivityCompleted: Bool {
         guard let endTime = parsedEndTime else { return false }

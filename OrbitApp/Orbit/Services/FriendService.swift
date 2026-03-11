@@ -59,6 +59,14 @@ class FriendService {
         )
     }
 
+    func cancelRequest(requestId: Int) async throws {
+        let _: EmptyResponse = try await APIService.shared.request(
+            endpoint: Constants.API.Endpoints.friendRequestCancel(requestId),
+            method: "POST",
+            authenticated: true
+        )
+    }
+
     // MARK: - Remove Friend
 
     func removeFriend(friendshipId: Int) async throws {

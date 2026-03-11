@@ -58,7 +58,10 @@ struct FriendInboxView: View {
                                 .padding(.horizontal, 20)
 
                             ForEach(viewModel.outgoingRequests) { request in
-                                OutgoingRequestCard(request: request)
+                                OutgoingRequestCard(
+                                    request: request,
+                                    onCancel: { Task { await viewModel.cancelRequest(request) } }
+                                )
                                     .padding(.horizontal, 20)
                             }
                         }
@@ -214,6 +217,7 @@ struct IncomingRequestCard: View {
 
 struct OutgoingRequestCard: View {
     let request: FriendRequest
+    let onCancel: () -> Void
 
     var body: some View {
         HStack(spacing: 12) {
@@ -236,14 +240,15 @@ struct OutgoingRequestCard: View {
 
             Spacer()
 
-            Text("pending")
-                .font(.caption2)
-                .fontWeight(.semibold)
-                .padding(.horizontal, 8)
-                .padding(.vertical, 3)
-                .background(Color.orange.opacity(0.15))
-                .foregroundColor(.orange)
-                .clipShape(Capsule())
+            Button(action: onCancel) {
+                Image(systemName: "xmark")
+                    .font(.caption)
+                    .fontWeight(.bold)
+                    .foregroundColor(.secondary)
+                    .frame(width: 32, height: 32)
+                    .background(Color(.systemGray5))
+                    .clipShape(Circle())
+            }
         }
         .padding(14)
         .background(Color.white)
