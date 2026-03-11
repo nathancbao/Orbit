@@ -278,7 +278,7 @@ class ScheduleViewModel: ObservableObject {
                 let remaining = deadline.timeIntervalSinceNow
                 if remaining <= 0 {
                     // Timeout → rotate leadership
-                    await self.transferLeadership(pod: pod)
+                    self.transferLeadership(pod: pod)
                     return
                 }
                 // Update countdown text
