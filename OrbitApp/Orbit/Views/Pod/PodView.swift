@@ -7,6 +7,7 @@ struct PodView: View {
     let podId: String
     let title: String
     let missionMode: MissionMode
+    var onPodNotFound: (() -> Void)?
 
     @StateObject private var viewModel: PodViewModel
     @State private var scheduleVM: ScheduleViewModel?
@@ -37,10 +38,11 @@ struct PodView: View {
         viewModel.pod?.name ?? title
     }
 
-    init(podId: String, title: String, missionMode: MissionMode = .set) {
+    init(podId: String, title: String, missionMode: MissionMode = .set, onPodNotFound: (() -> Void)? = nil) {
         self.podId = podId
         self.title = title
         self.missionMode = missionMode
+        self.onPodNotFound = onPodNotFound
         _viewModel = StateObject(wrappedValue: PodViewModel(podId: podId, missionMode: missionMode))
     }
 
@@ -57,6 +59,7 @@ struct PodView: View {
             }
             .onChange(of: viewModel.podNotFound) {
                 if viewModel.podNotFound {
+                    onPodNotFound?()
                     // Auto-dismiss after a brief delay so user sees the message
                     DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
                         dismiss()

@@ -918,7 +918,7 @@ struct MissionCreateView: View {
                             .font(.subheadline)
                             .foregroundColor(.primary)
                         Spacer()
-                        DatePicker("", selection: $endTime, displayedComponents: .hourAndMinute)
+                        DatePicker("", selection: $endTime, in: startTime..., displayedComponents: .hourAndMinute)
                             .labelsHidden()
                     }
                     .padding(.horizontal, 16)
@@ -930,6 +930,11 @@ struct MissionCreateView: View {
             .onChange(of: startTime) { _, newStart in
                 if endTime <= newStart {
                     endTime = newStart.addingTimeInterval(3600)
+                }
+            }
+            .onChange(of: endTime) { _, newEnd in
+                if newEnd <= startTime {
+                    endTime = startTime.addingTimeInterval(3600)
                 }
             }
 

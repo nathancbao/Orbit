@@ -109,9 +109,12 @@ struct PodsView: View {
                                                 .padding(.top, 40)
                                         }
                                         ForEach(sortedPods) { pod in
-                                            PodRowCard(pod: pod, title: pod.displayName) {
-                                                Task { await loadData() }
-                                            }
+                                            PodRowCard(
+                                                pod: pod,
+                                                title: pod.displayName,
+                                                onDismiss: { Task { await loadData() } },
+                                                onPodNotFound: { pods.removeAll { $0.id == pod.id } }
+                                            )
                                             .padding(.horizontal, 20)
                                         }
                                     } else {
@@ -122,9 +125,11 @@ struct PodsView: View {
                                                 .padding(.top, 40)
                                         }
                                         ForEach(filteredSignals) { signal in
-                                            SignalRsvpCard(signal: signal) {
-                                                Task { await loadData() }
-                                            }
+                                            SignalRsvpCard(
+                                                signal: signal,
+                                                onDismiss: { Task { await loadData() } },
+                                                onPodNotFound: { rsvpedSignals.removeAll { $0.id == signal.id } }
+                                            )
                                             .padding(.horizontal, 20)
                                         }
                                     }
@@ -196,6 +201,7 @@ struct PodRowCard: View {
     let pod: Pod
     let title: String
     var onDismiss: (() -> Void)? = nil
+    var onPodNotFound: (() -> Void)? = nil
     @State private var showPod = false
     @State private var showSurvey = false
 
@@ -264,7 +270,7 @@ struct PodRowCard: View {
         .sheet(isPresented: $showPod, onDismiss: {
             onDismiss?()
         }) {
-            PodView(podId: pod.id, title: title)
+            PodView(podId: pod.id, title: title, onPodNotFound: onPodNotFound)
         }
         .sheet(isPresented: $showSurvey, onDismiss: {
             onDismiss?()
@@ -279,6 +285,7 @@ struct PodRowCard: View {
 struct SignalRsvpCard: View {
     let signal: Signal
     var onDismiss: (() -> Void)? = nil
+    var onPodNotFound: (() -> Void)? = nil
     @State private var showSheet = false
 
     var body: some View {
@@ -347,7 +354,7 @@ struct SignalRsvpCard: View {
             onDismiss?()
         }) {
             if let podId = signal.podId {
-                PodView(podId: podId, title: signal.displayTitle, missionMode: .flex)
+                PodView(podId: podId, title: signal.displayTitle, missionMode: .flex, onPodNotFound: onPodNotFound)
             } else {
                 SignalDetailView(signal: signal)
             }

@@ -144,7 +144,16 @@ struct MissionDetailView: View {
                 }
             }
         }
-        .task { await fetchPodMembers() }
+        .task {
+            await fetchPodMembers()
+            // For flex missions where user RSVP'd but pod_id was lost, resolve it
+            if mission.isFlexMode && !showSignedUp {
+                await resolvePodId()
+                if joinedPodId != nil {
+                    showSignedUp = true
+                }
+            }
+        }
     }
 
     // MARK: - Set Mode Content (unchanged)
@@ -533,9 +542,10 @@ struct MissionDetailView: View {
                     showSignedUp = true
                     joinedPodId = updated.podId
                     withAnimation(.spring(duration: 0.3)) { localToast = true }
-                    if updated.podId == nil {
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) { dismiss() }
-                    }
+                }
+                // If pod_id missing from response, fetch signal fresh to resolve it
+                if updated.podId == nil {
+                    await resolvePodId()
                 }
             } catch {
                 await MainActor.run {
@@ -548,17 +558,31 @@ struct MissionDetailView: View {
                         errorMessage = message
                     }
                 }
+                // If already RSVP'd but pod_id unknown, fetch it
+                if joinedPodId == nil && showSignedUp {
+                    await resolvePodId()
+                }
             }
         }
     }
 
-    private func openPod(podId: String) {
-        Task {
-            let pod = try? await PodService.shared.getPod(id: podId)
+    /// Fetch the signal fresh to resolve the pod_id when it's missing.
+    private func resolvePodId() async {
+        do {
+            let signal = try await SignalService.shared.getSignal(id: mission.id)
             await MainActor.run {
-                joinedPod = pod
+                if let podId = signal.podId {
+                    joinedPodId = podId
+                }
             }
+        } catch {
+            // Best effort — user can still see the mission
         }
+    }
+
+    private func openPod(podId: String) {
+        joinedPodId = podId
+        showPod = true
     }
 
     // MARK: - Member Fetching

@@ -42,6 +42,7 @@ class MissionService {
             "title": title, "description": description,
             "tags": tags, "location": location,
             "date": date, "max_pod_size": maxPodSize,
+            "utc_offset": TimeZone.current.secondsFromGMT(),
         ]
         if let startTime { body["start_time"] = startTime }
         if let endTime { body["end_time"] = endTime }

@@ -155,6 +155,7 @@ def create_mission(data, creator_id, creator_type='user'):
         'creator_id': int(creator_id),
         'creator_type': creator_type,
         'max_pod_size': int(data.get('max_pod_size', 4)),
+        'utc_offset': data.get('utc_offset', 0),
         'status': 'open',
         'embedding': None,
         'created_at': datetime.datetime.utcnow(),

@@ -16,7 +16,13 @@ _MISSION_GRACE_PERIOD = datetime.timedelta(hours=2)
 
 
 def _mission_end_datetime(mission):
-    """Compute the end datetime for a set mission. Returns datetime or None."""
+    """Compute the end datetime for a set mission in UTC. Returns datetime or None.
+
+    Mission date/time fields are stored in the creator's local timezone.
+    utc_offset (seconds east of UTC) is used to convert to UTC for comparison
+    with datetime.utcnow().  Missions created before utc_offset was added
+    default to 0 (UTC), which is safe — they just expire on UTC schedule.
+    """
     date_str = mission.get('date', '')
     if not date_str:
         return None
@@ -25,32 +31,40 @@ def _mission_end_datetime(mission):
     except (ValueError, TypeError):
         return None
 
+    # utc_offset is seconds east of UTC (e.g. -25200 for US Pacific = UTC-7)
+    utc_offset_secs = int(mission.get('utc_offset') or 0)
+
     end_time = mission.get('end_time', '')
     start_time = mission.get('start_time', '')
 
+    local_end = None
     if end_time:
         try:
             parts = end_time.split(':')
-            return dt.replace(hour=int(parts[0]), minute=int(parts[1]) if len(parts) > 1 else 0)
+            local_end = dt.replace(hour=int(parts[0]), minute=int(parts[1]) if len(parts) > 1 else 0)
         except (ValueError, IndexError):
             pass
 
-    if start_time:
+    if local_end is None and start_time:
         try:
             parts = start_time.split(':')
-            return dt.replace(hour=int(parts[0]), minute=int(parts[1]) if len(parts) > 1 else 0) + datetime.timedelta(hours=2)
+            local_end = dt.replace(hour=int(parts[0]), minute=int(parts[1]) if len(parts) > 1 else 0) + datetime.timedelta(hours=2)
         except (ValueError, IndexError):
             pass
 
-    # Date only — treat end of day as end time
-    return dt.replace(hour=23, minute=59)
+    if local_end is None:
+        # Date only — treat end of day as end time
+        local_end = dt.replace(hour=23, minute=59)
+
+    # Convert local time to UTC: UTC = local - offset
+    return local_end - datetime.timedelta(seconds=utc_offset_secs)
 
 
 def check_mission_expiration(mission):
     """Check a mission against server time and handle expiration.
 
     - If past end time: updates status to 'completed' in DB.
-    - If past end time + 1 hour: deletes mission entirely.
+    - If past end time + 2 hours: deletes mission entirely.
 
     Returns:
       'active'    — mission is still ongoing

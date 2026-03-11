@@ -142,9 +142,13 @@ def _resolve_pod_ids(signals, user_id):
         # Clean internal pod_ids from response; expose only pod_id
         s.pop('pod_ids', None)
         if user_pod:
-            s['pod_id'] = user_pod
             pod = get_pod(user_pod)
-            if pod and pod.get('scheduled_time'):
-                s['scheduled_time'] = pod['scheduled_time']
+            if pod:
+                s['pod_id'] = user_pod
+                if pod.get('scheduled_time'):
+                    s['scheduled_time'] = pod['scheduled_time']
+            else:
+                # Pod was deleted — don't expose stale pod_id
+                s.pop('pod_id', None)
         else:
             s.pop('pod_id', None)

@@ -83,8 +83,8 @@ def _set_mission_time_info(mission):
 
     Returns dict with:
       - scheduled_time: display string like "Mon, Mar 9 · 3:00 PM"
-      - scheduled_end_time: ISO string of end datetime (or None)
-      - expires_at: end datetime + 2 hours (or None)
+      - scheduled_end_time: ISO string of end datetime in UTC (or None)
+      - expires_at: end datetime in UTC + 2 hours (or None)
     Returns None if the mission lacks a date.
     """
     date_str = mission.get('date', '')
@@ -95,9 +95,13 @@ def _set_mission_time_info(mission):
     except (ValueError, TypeError):
         return None
 
+    # utc_offset is seconds east of UTC (e.g. -25200 for US Pacific = UTC-7)
+    utc_offset_secs = int(mission.get('utc_offset') or 0)
+    offset_delta = datetime.timedelta(seconds=utc_offset_secs)
+
     result = {}
 
-    # Build display string for start time
+    # Build display string for start time (stays in local time for display)
     parsed_start = _parse_time_of_day(mission.get('start_time', ''))
     if parsed_start:
         h, m = parsed_start
@@ -106,24 +110,24 @@ def _set_mission_time_info(mission):
         time_part = ''
     result['scheduled_time'] = dt.strftime('%a, %b %-d') + time_part
 
-    # Compute end datetime and expires_at
+    # Compute end datetime in UTC and expires_at
     parsed_end = _parse_time_of_day(mission.get('end_time', ''))
     if parsed_end:
         eh, em = parsed_end
-        end_dt = dt.replace(hour=eh, minute=em)
-        result['scheduled_end_time'] = end_dt.isoformat()
-        result['expires_at'] = end_dt + datetime.timedelta(hours=2)
+        end_dt_utc = dt.replace(hour=eh, minute=em) - offset_delta
+        result['scheduled_end_time'] = end_dt_utc.isoformat() + 'Z'
+        result['expires_at'] = (end_dt_utc + datetime.timedelta(hours=2)).isoformat() + 'Z'
     elif parsed_start:
         # No explicit end time — default to start + 2 hours
         sh, sm = parsed_start
-        default_end = dt.replace(hour=sh, minute=sm) + datetime.timedelta(hours=2)
-        result['scheduled_end_time'] = default_end.isoformat()
-        result['expires_at'] = default_end + datetime.timedelta(hours=2)
+        default_end_utc = dt.replace(hour=sh, minute=sm) + datetime.timedelta(hours=2) - offset_delta
+        result['scheduled_end_time'] = default_end_utc.isoformat() + 'Z'
+        result['expires_at'] = (default_end_utc + datetime.timedelta(hours=2)).isoformat() + 'Z'
     else:
         # Date only, no times — expire at end of day + 2 hours
-        end_of_day = dt.replace(hour=23, minute=59)
-        result['scheduled_end_time'] = end_of_day.isoformat()
-        result['expires_at'] = end_of_day + datetime.timedelta(hours=2)
+        end_of_day_utc = dt.replace(hour=23, minute=59) - offset_delta
+        result['scheduled_end_time'] = end_of_day_utc.isoformat() + 'Z'
+        result['expires_at'] = (end_of_day_utc + datetime.timedelta(hours=2)).isoformat() + 'Z'
 
     return result
 
