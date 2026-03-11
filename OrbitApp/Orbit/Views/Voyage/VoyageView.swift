@@ -78,8 +78,26 @@ struct VoyageView: View {
                 if zoomedTile == nil {
                     VStack {
                         Text("Tap on solar systems to explore more activities!")
-                            .font(.system(size: 16, weight: .semibold))
-                            .foregroundColor(.white.opacity(0.8))
+                            .font(.system(size: 15, weight: .semibold, design: .rounded))
+                            .tracking(0.4)
+                            .foregroundStyle(OrbitTheme.gradient)
+                            .padding(.horizontal, 20)
+                            .padding(.vertical, 10)
+                            .background(
+                                Capsule()
+                                    .fill(Color.white.opacity(0.08))
+                                    .overlay(
+                                        Capsule()
+                                            .strokeBorder(
+                                                LinearGradient(
+                                                    colors: [OrbitTheme.pink.opacity(0.4), OrbitTheme.purple.opacity(0.3), OrbitTheme.blue.opacity(0.4)],
+                                                    startPoint: .leading,
+                                                    endPoint: .trailing
+                                                ),
+                                                lineWidth: 1
+                                            )
+                                    )
+                            )
                             .padding(.top, 60)
                         Spacer()
                     }

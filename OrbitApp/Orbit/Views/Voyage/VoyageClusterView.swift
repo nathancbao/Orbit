@@ -167,21 +167,8 @@ struct VoyageBubble: View {
 
     private var bubbleColor: Color {
         let hash = abs(item.id.hashValue)
-        if item.isMission {
-            let colors: [Color] = [
-                Color(hex: "3B82F6"),
-                Color(hex: "0D9488"),
-                Color(hex: "059669"),
-            ]
-            return colors[hash % colors.count]
-        } else {
-            let colors: [Color] = [
-                Color(hex: "D97706"),
-                Color(hex: "DB2777"),
-                Color(hex: "8B5CF6"),
-            ]
-            return colors[hash % colors.count]
-        }
+        let colors: [Color] = [OrbitTheme.pink, OrbitTheme.purple, OrbitTheme.blue]
+        return colors[hash % colors.count]
     }
 
     private var bubbleSize: CGFloat {
