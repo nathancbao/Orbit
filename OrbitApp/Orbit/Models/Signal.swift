@@ -166,7 +166,6 @@ func hourString(_ hour: Int) -> String {
 
 // MARK: - Signal Status
 
-@available(*, deprecated, message: "Use Mission with mode: .flex — signalStatus field")
 enum SignalStatus: String, Codable {
     case pending = "pending"   // waiting for min group
     case active  = "active"    // min met, pod formed
@@ -181,7 +180,7 @@ enum SignalStatus: String, Codable {
 
 // MARK: - Signal
 
-@available(*, deprecated, message: "Use Mission with mode: .flex")
+/// Internal model for decoding /api/signals responses. Convert to Mission via Mission.fromSignal().
 struct Signal: Codable, Identifiable {
     let id: String
     let title: String
@@ -255,7 +254,6 @@ struct Signal: Codable, Identifiable {
 
 // MARK: - Signal Error
 
-@available(*, deprecated, message: "Use Mission with mode: .flex")
 enum SignalError: LocalizedError {
     case notFound
     case invalidForm(String)

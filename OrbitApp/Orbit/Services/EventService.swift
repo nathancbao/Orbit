@@ -73,17 +73,21 @@ class MissionService {
         )
     }
 
-    // MARK: - Flex Mode (wraps SignalService — TODO: migrate to unified /missions endpoints)
+    // MARK: - Flex Mode (calls signal endpoints directly)
 
-    @available(*, deprecated, message: "Transitional — calls SignalService internally")
     func listFlexMissions() async throws -> [Mission] {
-        let signals = try await SignalService.shared.discoverSignals()
-        return signals.map { Mission.fromSignal($0) }
+        let response: SignalDiscoverResponse = try await APIService.shared.request(
+            endpoint: Constants.API.Endpoints.discoverSignals,
+            authenticated: true
+        )
+        return response.signals.map { Mission.fromSignal($0) }
     }
 
-    @available(*, deprecated, message: "Transitional — calls SignalService internally")
     func myFlexMissions() async throws -> [Mission] {
-        let signals = try await SignalService.shared.mySignals()
+        let signals: [Signal] = try await APIService.shared.request(
+            endpoint: Constants.API.Endpoints.signals,
+            authenticated: true
+        )
         return signals.map { Mission.fromSignal($0) }
     }
 
@@ -98,17 +102,50 @@ class MissionService {
         timeRangeStart: Int = 9,
         timeRangeEnd: Int = 21
     ) async throws -> Mission {
-        // TODO: Migrate to POST /missions with mode: "flex" on backend
-        let signal = try await SignalService.shared.createSignal(
-            title: title,
-            minGroupSize: minGroupSize,
-            maxGroupSize: maxGroupSize,
-            availability: availability,
-            description: description,
-            links: links,
-            tags: tags,
-            timeRangeStart: timeRangeStart,
-            timeRangeEnd: timeRangeEnd
+        let dateFormatter = DateFormatter()
+        dateFormatter.dateFormat = "yyyy-MM-dd"
+        dateFormatter.locale = Locale(identifier: "en_US_POSIX")
+
+        let slotsPayload: [[String: Any]] = availability.map { slot in
+            if !slot.hours.isEmpty {
+                return [
+                    "date": dateFormatter.string(from: slot.date),
+                    "hours": slot.hours,
+                ]
+            } else {
+                return [
+                    "date": dateFormatter.string(from: slot.date),
+                    "time_blocks": slot.timeBlocks.map(\.rawValue),
+                ]
+            }
+        }
+
+        let resolvedTitle: String
+        if !title.trimmingCharacters(in: .whitespaces).isEmpty {
+            resolvedTitle = title.trimmingCharacters(in: .whitespaces)
+        } else {
+            resolvedTitle = "Flex Mission"
+        }
+
+        var body: [String: Any] = [
+            "title": resolvedTitle,
+            "min_group_size": minGroupSize,
+            "max_group_size": maxGroupSize,
+            "availability": slotsPayload,
+            "description": description,
+            "time_range_start": timeRangeStart,
+            "time_range_end": timeRangeEnd,
+        ]
+        if !links.isEmpty {
+            body["links"] = links
+        }
+        if !tags.isEmpty {
+            body["tags"] = tags
+        }
+
+        let signal: Signal = try await APIService.shared.request(
+            endpoint: Constants.API.Endpoints.signals,
+            method: "POST", body: body, authenticated: true
         )
         var mission = Mission.fromSignal(signal)
         mission.tags = tags
@@ -116,14 +153,34 @@ class MissionService {
     }
 
     func joinFlexMission(id: String) async throws -> Mission {
-        // TODO: Migrate to POST /missions/{id}/join on backend
-        let signal = try await SignalService.shared.rsvpSignal(id: id)
+        let signal: Signal = try await APIService.shared.request(
+            endpoint: Constants.API.Endpoints.rsvpSignal(id),
+            method: "POST", authenticated: true
+        )
         return Mission.fromSignal(signal)
     }
 
     func deleteFlexMission(id: String) async throws {
-        // TODO: Migrate to DELETE /missions/{id} on backend
-        try await SignalService.shared.deleteSignal(id: id)
+        let _: EmptyResponse = try await APIService.shared.request(
+            endpoint: Constants.API.Endpoints.signal(id),
+            method: "DELETE", authenticated: true
+        )
+    }
+
+    func getFlexMission(id: String) async throws -> Mission {
+        let signal: Signal = try await APIService.shared.request(
+            endpoint: Constants.API.Endpoints.signal(id),
+            authenticated: true
+        )
+        return Mission.fromSignal(signal)
+    }
+
+    func rsvpedFlexMissions() async throws -> [Mission] {
+        let signals: [Signal] = try await APIService.shared.request(
+            endpoint: Constants.API.Endpoints.myRsvps,
+            authenticated: true
+        )
+        return signals.map { Mission.fromSignal($0) }
     }
 
     /// Fetches set missions + flex missions concurrently, returns merged array.
@@ -153,106 +210,3 @@ struct SignalDiscoverResponse: Codable {
     }
 }
 
-// MARK: - Signal Service
-// API client for signals (backend: /api/signals).
-
-@available(*, deprecated, message: "Use MissionService for all activity types")
-class SignalService {
-    static let shared = SignalService()
-    private init() {}
-
-    func discoverSignals() async throws -> [Signal] {
-        let response: SignalDiscoverResponse = try await APIService.shared.request(
-            endpoint: Constants.API.Endpoints.discoverSignals,
-            authenticated: true
-        )
-        return response.signals
-    }
-
-    func mySignals() async throws -> [Signal] {
-        return try await APIService.shared.request(
-            endpoint: Constants.API.Endpoints.signals,
-            authenticated: true
-        )
-    }
-
-    func createSignal(
-        title: String = "",
-        minGroupSize: Int,
-        maxGroupSize: Int,
-        availability: [AvailabilitySlot],
-        description: String,
-        links: [String] = [],
-        tags: [String] = [],
-        timeRangeStart: Int = 9,
-        timeRangeEnd: Int = 21
-    ) async throws -> Signal {
-        let dateFormatter = DateFormatter()
-        dateFormatter.dateFormat = "yyyy-MM-dd"
-        dateFormatter.locale = Locale(identifier: "en_US_POSIX")
-
-        let slotsPayload: [[String: Any]] = availability.map { slot in
-            if !slot.hours.isEmpty {
-                return [
-                    "date": dateFormatter.string(from: slot.date),
-                    "hours": slot.hours,
-                ]
-            } else {
-                return [
-                    "date": dateFormatter.string(from: slot.date),
-                    "time_blocks": slot.timeBlocks.map(\.rawValue),
-                ]
-            }
-        }
-
-        // Use user-provided title if given; otherwise fall back to "Flex Mission"
-        let resolvedTitle: String
-        if !title.trimmingCharacters(in: .whitespaces).isEmpty {
-            resolvedTitle = title.trimmingCharacters(in: .whitespaces)
-        } else {
-            resolvedTitle = "Flex Mission"
-        }
-
-        var body: [String: Any] = [
-            "title": resolvedTitle,
-            "min_group_size": minGroupSize,
-            "max_group_size": maxGroupSize,
-            "availability": slotsPayload,
-            "description": description,
-            "time_range_start": timeRangeStart,
-            "time_range_end": timeRangeEnd,
-        ]
-        if !links.isEmpty {
-            body["links"] = links
-        }
-        if !tags.isEmpty {
-            body["tags"] = tags
-        }
-
-        return try await APIService.shared.request(
-            endpoint: Constants.API.Endpoints.signals,
-            method: "POST", body: body, authenticated: true
-        )
-    }
-
-    func getSignal(id: String) async throws -> Signal {
-        return try await APIService.shared.request(
-            endpoint: Constants.API.Endpoints.signal(id),
-            authenticated: true
-        )
-    }
-
-    func rsvpSignal(id: String) async throws -> Signal {
-        return try await APIService.shared.request(
-            endpoint: Constants.API.Endpoints.rsvpSignal(id),
-            method: "POST", authenticated: true
-        )
-    }
-
-    func deleteSignal(id: String) async throws {
-        let _: EmptyResponse = try await APIService.shared.request(
-            endpoint: Constants.API.Endpoints.signal(id),
-            method: "DELETE", authenticated: true
-        )
-    }
-}

@@ -352,7 +352,7 @@ struct Mission: Codable, Identifiable {
 
     // ── Factory: Convert Signal → Mission (flex mode) ───────────────────
 
-    @available(*, deprecated, message: "Transitional helper — will be removed when backend unifies endpoints")
+    /// Convert a Signal (backend flex entity) to a Mission with mode: .flex.
     static func fromSignal(_ signal: Signal) -> Mission {
         Mission(
             id: signal.id,

@@ -552,12 +552,12 @@ struct MissionDetailView: View {
         }
     }
 
-    /// Fetch the signal fresh to resolve the pod_id when it's missing.
+    /// Fetch the mission fresh to resolve the pod_id when it's missing.
     private func resolvePodId() async {
         do {
-            let signal = try await SignalService.shared.getSignal(id: mission.id)
+            let fetched = try await MissionService.shared.getFlexMission(id: mission.id)
             await MainActor.run {
-                if let podId = signal.podId {
+                if let podId = fetched.podId {
                     joinedPodId = podId
                 }
             }
@@ -713,12 +713,11 @@ struct MemberPreviewSheet: View {
 }
 
 // MARK: - Signal Detail View
-// Shown as a sheet when user taps a signal (e.g., from Discovery).
-// Displays full signal info.
+// Shown as a sheet when user taps a flex mission (e.g., from Discovery).
+// Displays full flex mission info.
 
 struct SignalDetailView: View {
-    let signal: Signal
-    var viewModel: SignalsViewModel?
+    let mission: Mission
     @Environment(\.dismiss) private var dismiss
     @State private var showSignedUp = false
     @State private var localToast = false
@@ -744,11 +743,11 @@ struct SignalDetailView: View {
 
                             // Icon and Title
                             HStack(spacing: 12) {
-                                Image(systemName: signal.activityCategory.icon)
+                                Image(systemName: mission.activityCategory?.icon ?? "star.fill")
                                     .font(.title)
                                     .foregroundStyle(OrbitTheme.gradient)
 
-                                Text(signal.displayTitle)
+                                Text(mission.displayTitle)
                                     .font(.largeTitle)
                                     .fontWeight(.bold)
                             }
@@ -756,36 +755,42 @@ struct SignalDetailView: View {
 
                             // Category and Status
                             HStack(spacing: 16) {
-                                HStack(spacing: 6) {
-                                    Image(systemName: "tag")
-                                        .foregroundStyle(OrbitTheme.gradient)
-                                    Text(signal.activityCategory.displayName)
-                                        .font(.subheadline)
+                                if let category = mission.activityCategory {
+                                    HStack(spacing: 6) {
+                                        Image(systemName: "tag")
+                                            .foregroundStyle(OrbitTheme.gradient)
+                                        Text(category.displayName)
+                                            .font(.subheadline)
+                                    }
                                 }
 
-                                SignalStatusBadge(status: signal.status)
+                                if let status = mission.signalStatus {
+                                    SignalStatusBadge(status: status)
+                                }
                             }
                             .foregroundColor(.secondary)
 
                             // Group Size
-                            HStack(spacing: 6) {
-                                Image(systemName: "person.2.fill")
-                                    .foregroundStyle(OrbitTheme.gradient)
-                                Text(signal.groupSizeLabel)
-                                    .font(.subheadline)
+                            if let label = mission.flexGroupSizeLabel {
+                                HStack(spacing: 6) {
+                                    Image(systemName: "person.2.fill")
+                                        .foregroundStyle(OrbitTheme.gradient)
+                                    Text(label)
+                                        .font(.subheadline)
+                                }
+                                .foregroundColor(.secondary)
                             }
-                            .foregroundColor(.secondary)
 
                             // Description
-                            if !signal.description.isEmpty {
-                                Text(signal.description)
+                            if !mission.description.isEmpty {
+                                Text(mission.description)
                                     .font(.body)
                                     .foregroundColor(.primary)
                                     .lineSpacing(4)
                             }
 
                             // Links
-                            if let links = signal.links, !links.isEmpty {
+                            if let links = mission.links, !links.isEmpty {
                                 VStack(alignment: .leading, spacing: 8) {
                                     ForEach(links, id: \.self) { link in
                                         if let url = URL(string: link) {
@@ -810,23 +815,24 @@ struct SignalDetailView: View {
                             Divider()
 
                             // Availability Section
-                            VStack(alignment: .leading, spacing: 12) {
-                                Text("availability")
-                                    .font(.headline)
+                            if let slots = mission.availability, !slots.isEmpty {
+                                VStack(alignment: .leading, spacing: 12) {
+                                    Text("availability")
+                                        .font(.headline)
 
-                                Text(signal.availabilitySummary)
-                                    .font(.subheadline)
-                                    .foregroundColor(.secondary)
+                                    if let summary = mission.flexAvailabilitySummary {
+                                        Text(summary)
+                                            .font(.subheadline)
+                                            .foregroundColor(.secondary)
+                                    }
 
-                                if !signal.availability.isEmpty {
-                                    ForEach(signal.availability) { slot in
+                                    ForEach(slots) { slot in
                                         VStack(alignment: .leading, spacing: 8) {
                                             Text(slot.dayLabel)
                                                 .font(.subheadline)
                                                 .fontWeight(.medium)
 
                                             if slot.isHourly {
-                                                // New hourly format
                                                 let wrapped = slot.hours.map { WrappedHour(hour: $0) }
                                                 FlowLayout(spacing: 6) {
                                                     ForEach(wrapped) { wh in
@@ -840,7 +846,6 @@ struct SignalDetailView: View {
                                                     }
                                                 }
                                             } else {
-                                                // Legacy time-block format
                                                 HStack(spacing: 6) {
                                                     ForEach(slot.timeBlocks, id: \.self) { block in
                                                         HStack(spacing: 4) {
@@ -896,7 +901,7 @@ struct SignalDetailView: View {
                     } else {
                         Button {
                             UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-                            rsvpSignal()
+                            joinFlexMission()
                         } label: {
                             ZStack {
                                 if isRsvping {
@@ -947,12 +952,12 @@ struct SignalDetailView: View {
             }
             .sheet(isPresented: $showPod) {
                 if let podId = joinedPodId {
-                    PodView(podId: podId, title: signal.displayTitle, missionMode: .flex)
+                    PodView(podId: podId, title: mission.displayTitle, missionMode: .flex)
                 }
             }
             .onAppear {
-                // If the signal already has a pod_id, user already RSVP'd
-                if let podId = signal.podId {
+                // If the mission already has a pod_id, user already RSVP'd
+                if let podId = mission.podId {
                     showSignedUp = true
                     joinedPodId = podId
                 }
@@ -960,23 +965,19 @@ struct SignalDetailView: View {
         }
     }
 
-    private func rsvpSignal() {
+    private func joinFlexMission() {
         isRsvping = true
         rsvpError = nil
         Task {
             do {
-                let rsvpedSignal = try await SignalService.shared.rsvpSignal(id: signal.id)
+                let updated = try await MissionService.shared.joinFlexMission(id: mission.id)
                 await MainActor.run {
                     isRsvping = false
                     showSignedUp = true
-                    joinedPodId = rsvpedSignal.podId
-                    if let viewModel {
-                        viewModel.showToastMessage("You're in!")
-                    } else {
-                        withAnimation(.spring(duration: 0.3)) { localToast = true }
-                    }
+                    joinedPodId = updated.podId
+                    withAnimation(.spring(duration: 0.3)) { localToast = true }
                     // If we got a pod, don't auto-dismiss — let user open the pod
-                    if rsvpedSignal.podId == nil {
+                    if updated.podId == nil {
                         DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) { dismiss() }
                     }
                 }
@@ -987,7 +988,7 @@ struct SignalDetailView: View {
                     if message.localizedCaseInsensitiveContains("already") {
                         // User already RSVP'd — treat as success
                         showSignedUp = true
-                        joinedPodId = signal.podId
+                        joinedPodId = mission.podId
                     } else {
                         rsvpError = message
                     }

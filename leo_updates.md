@@ -122,6 +122,28 @@ The recommendation engine now includes flex missions in the candidate pool along
 | `OrbitServer/services/embedding_service.py` | `preload_embeddings()` handles UUID string IDs (signals) without crashing |
 | `OrbitServer/api/missions.py` | `/missions/suggested` splits pod annotation — flex missions get `not_joined` directly |
 
-### Frontend Impact
+### Frontend: Explore Page AI Suggestions
 
-No frontend changes needed. The `Mission` Swift model already defaults `mode` to `.set` when absent, and correctly parses `"flex"` when present. Flex suggestions will render with their activity category display title, availability grid, and RSVP flow as usual.
+The Explore page (`MissionsView.swift`) now displays a **"Recommended for You"** horizontal scroll section at the top of the Discover tab. Uses the existing `SuggestedMissionCard` component, which was updated to handle flex missions (shows `displayTitle`, FLEX/SET badge, "Flexible time" for flex dates).
+
+### Frontend: Signal → Mission Unification
+
+Eliminated all deprecated `SignalService` / `Signal` type warnings (~40 → 0). The iOS app now uses `MissionService` and `Mission` (with `mode: .flex`) everywhere.
+
+**Deleted files (dead code):**
+- `SignalsView.swift` — standalone signals UI, not navigated to
+- `SignalFormView.swift` — signal creation form, not navigated to
+- `SignalsViewModel.swift` — only used by above two views
+
+**Refactored files:**
+
+| File | Change |
+|------|--------|
+| `EventService.swift` | `MissionService` now calls signal endpoints directly. Removed `SignalService` class entirely. Added `getFlexMission(id:)` and `rsvpedFlexMissions()` methods. |
+| `DiscoveryViewModel.swift` | Uses `MissionService` instead of `SignalService`. No more `Signal` type or `fromSignal()` in the view model. |
+| `EventDiscoverViewModel.swift` | `listFlexMissions()` / `myFlexMissions()` no longer deprecated — they call signal endpoints directly via `MissionService`. |
+| `PodsView.swift` | Flex tab uses `Mission` instead of `Signal`. `SignalRsvpCard` → `FlexMissionRsvpCard`. Loads via `MissionService.shared.rsvpedFlexMissions()`. |
+| `VoyageView.swift` | Removed `selectedSignal: Signal?` state. Flex items fetched via `MissionService.shared.getFlexMission(id:)` and presented as `MissionDetailView`. |
+| `EventDetailView.swift` | `SignalDetailView` now takes `mission: Mission` instead of `signal: Signal`. RSVP calls `MissionService.shared.joinFlexMission(id:)`. |
+| `Signal.swift` | Removed `@deprecated` from `Signal`, `SignalStatus`, `SignalError` — still needed internally for decoding backend responses. |
+| `Event.swift` | Removed `@deprecated` from `fromSignal()` — actively used by `MissionService` as the Signal→Mission conversion layer. |

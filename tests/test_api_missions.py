@@ -71,7 +71,9 @@ class TestCreateMission:
     @patch('OrbitServer.api.missions.create_new_mission')
     def test_accepts_missing_description(self, mock_create, client):
         mock_create.return_value = {"id": 1, "title": "Hike", "status": "open"}
-        resp = client.post('/api/missions', headers=auth_header(), json={"title": "Hike"})
+        resp = client.post('/api/missions', headers=auth_header(),
+                           json={"title": "Hike", "date": "2026-06-15",
+                                 "start_time": "14:00", "end_time": "16:00"})
         assert resp.status_code == 201
 
     def test_rejects_long_title(self, client):
@@ -83,7 +85,9 @@ class TestCreateMission:
     def test_creates_mission(self, mock_create, client):
         mock_create.return_value = {"id": 1, "title": "Hike", "status": "open"}
         resp = client.post('/api/missions', headers=auth_header(),
-                           json={"title": "Hike", "description": "Trail run"})
+                           json={"title": "Hike", "description": "Trail run",
+                                 "date": "2026-06-15", "start_time": "14:00",
+                                 "end_time": "16:00"})
         body = json.loads(resp.data)
         assert resp.status_code == 201
         assert body["success"] is True
@@ -92,7 +96,9 @@ class TestCreateMission:
     def test_creates_mission_with_tags(self, mock_create, client):
         mock_create.return_value = {"id": 1, "title": "Hike", "tags": ["hiking", "outdoors"]}
         resp = client.post('/api/missions', headers=auth_header(),
-                           json={"title": "Hike", "description": "Trail run", "tags": ["hiking", "outdoors"]})
+                           json={"title": "Hike", "description": "Trail run",
+                                 "tags": ["hiking", "outdoors"], "date": "2026-06-15",
+                                 "start_time": "14:00", "end_time": "16:00"})
         assert resp.status_code == 201
 
     @patch('OrbitServer.api.missions.get_or_create_mission_embedding')
@@ -101,7 +107,9 @@ class TestCreateMission:
         mock_create.return_value = {"id": 5, "title": "Yoga", "status": "open"}
         mock_embed.return_value = None
         resp = client.post('/api/missions', headers=auth_header(),
-                           json={"title": "Yoga", "description": "Morning flow"})
+                           json={"title": "Yoga", "description": "Morning flow",
+                                 "date": "2026-06-15", "start_time": "09:00",
+                                 "end_time": "10:00"})
         assert resp.status_code == 201
 
 

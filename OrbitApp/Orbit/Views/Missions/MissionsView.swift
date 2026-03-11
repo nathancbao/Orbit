@@ -85,6 +85,33 @@ struct MissionsView: View {
                                 }
                             }
 
+                            // AI Suggested Section (Explore tab only)
+                            if segment == .discover && !viewModel.suggestedMissions.isEmpty && searchText.isEmpty {
+                                VStack(alignment: .leading, spacing: 10) {
+                                    HStack(spacing: 6) {
+                                        Image(systemName: "sparkles")
+                                            .font(.subheadline)
+                                            .foregroundStyle(OrbitTheme.gradient)
+                                        Text("Recommended for You")
+                                            .font(.subheadline)
+                                            .fontWeight(.semibold)
+                                    }
+                                    .padding(.horizontal, 20)
+
+                                    ScrollView(.horizontal, showsIndicators: false) {
+                                        HStack(spacing: 12) {
+                                            ForEach(viewModel.suggestedMissions) { mission in
+                                                SuggestedMissionCard(mission: mission) {
+                                                    selectedMission = mission
+                                                }
+                                            }
+                                        }
+                                        .padding(.horizontal, 20)
+                                    }
+                                }
+                                .padding(.bottom, 8)
+                            }
+
                             // Missions List
                             if viewModel.isLoading && viewModel.allMissions.isEmpty && viewModel.allFlexMissions.isEmpty {
                                 HStack { Spacer(); ProgressView(); Spacer() }
@@ -266,15 +293,23 @@ struct SuggestedMissionCard: View {
                 }
                 .foregroundStyle(OrbitTheme.gradient)
 
-                Text(mission.title)
+                Text(mission.isFlexMode ? mission.displayTitle : mission.title)
                     .font(.headline)
                     .fontWeight(.bold)
                     .foregroundColor(.primary)
                     .lineLimit(2)
 
-                Label(mission.displayDate, systemImage: "calendar")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
+                HStack(spacing: 4) {
+                    Text(mission.isFlexMode ? "FLEX" : "SET")
+                        .font(.system(size: 9, weight: .bold))
+                        .padding(.horizontal, 5)
+                        .padding(.vertical, 2)
+                        .background(mission.isFlexMode ? Color.white.opacity(0.15) : OrbitTheme.purple.opacity(0.12))
+                        .cornerRadius(4)
+                    Label(mission.isFlexMode ? "Flexible time" : mission.displayDate, systemImage: mission.isFlexMode ? "clock.arrow.2.circlepath" : "calendar")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
 
                 MissionSpotsLabel(mission: mission)
             }

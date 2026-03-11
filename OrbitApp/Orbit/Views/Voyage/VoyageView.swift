@@ -45,7 +45,6 @@ struct VoyageView: View {
 
     // Detail sheet
     @State private var selectedMission: Mission? = nil
-    @State private var selectedSignal: Signal? = nil
     @State private var isLoadingDetail = false
     @State private var voyageOpenPodId: String? = nil
     @State private var voyageOpenPodTitle: String = ""
@@ -162,9 +161,6 @@ struct VoyageView: View {
             if let podId = voyageOpenPodId {
                 PodView(podId: podId, title: voyageOpenPodTitle, missionMode: voyageOpenPodMode)
             }
-        }
-        .sheet(item: $selectedSignal) { signal in
-            SignalDetailView(signal: signal)
         }
     }
 
@@ -468,10 +464,10 @@ struct VoyageView: View {
                 }
             } else {
                 do {
-                    let signal = try await SignalService.shared.getSignal(id: item.id)
-                    selectedSignal = signal
+                    let mission = try await MissionService.shared.getFlexMission(id: item.id)
+                    selectedMission = mission
                 } catch {
-                    print("[Voyage] Failed to fetch signal \(item.id): \(error)")
+                    print("[Voyage] Failed to fetch flex mission \(item.id): \(error)")
                 }
             }
         }

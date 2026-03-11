@@ -88,20 +88,17 @@ class DiscoveryViewModel: ObservableObject {
         let missions = (try? await MissionService.shared.listMissions()) ?? []
         let suggested = (try? await MissionService.shared.suggestedMissions()) ?? []
 
-        // Fetch signals and convert to flex missions
-        let mySignals = (try? await SignalService.shared.mySignals()) ?? []
-        let discoverSignals = (try? await SignalService.shared.discoverSignals()) ?? []
-        let rsvpSignals: [Signal] = (try? await APIService.shared.request(
-            endpoint: Constants.API.Endpoints.myRsvps,
-            authenticated: true
-        )) ?? []
+        // Fetch flex missions
+        let myFlexMissions = (try? await MissionService.shared.myFlexMissions()) ?? []
+        let discoverFlexMissions = (try? await MissionService.shared.listFlexMissions()) ?? []
+        let rsvpFlexMissions = (try? await MissionService.shared.rsvpedFlexMissions()) ?? []
 
         categorize(
             missions: missions,
-            mySignals: mySignals,
-            discoverSignals: discoverSignals,
+            myFlexMissions: myFlexMissions,
+            discoverFlexMissions: discoverFlexMissions,
             suggested: suggested,
-            rsvpSignals: rsvpSignals
+            rsvpFlexMissions: rsvpFlexMissions
         )
         hasLoaded = true
     }
@@ -118,18 +115,13 @@ class DiscoveryViewModel: ObservableObject {
 
     private func categorize(
         missions: [Mission],
-        mySignals: [Signal],
-        discoverSignals: [Signal],
+        myFlexMissions: [Mission],
+        discoverFlexMissions: [Mission],
         suggested: [Mission],
-        rsvpSignals: [Signal]
+        rsvpFlexMissions: [Mission]
     ) {
         var result: [DiscoveryItem] = []
         let userId = currentUserId
-
-        // Convert signals to flex missions
-        let myFlexMissions = mySignals.map { Mission.fromSignal($0) }
-        let discoverFlexMissions = discoverSignals.map { Mission.fromSignal($0) }
-        let rsvpFlexMissions = rsvpSignals.map { Mission.fromSignal($0) }
 
         // 1. Hosted + Joined set missions
         for mission in missions {

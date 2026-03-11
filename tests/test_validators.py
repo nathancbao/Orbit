@@ -231,7 +231,10 @@ class TestValidateProfileData:
 
 class TestValidateMissionData:
     def test_valid_event(self):
-        valid, errors = validate_mission_data({"title": "Hike", "description": "Trail run"})
+        valid, errors = validate_mission_data({
+            "title": "Hike", "description": "Trail run",
+            "date": "2026-06-15", "start_time": "14:00", "end_time": "16:00"
+        })
         assert valid is True
 
     def test_rejects_missing_title(self):
@@ -239,7 +242,10 @@ class TestValidateMissionData:
         assert valid is False
 
     def test_accepts_missing_description(self):
-        valid, errors = validate_mission_data({"title": "Hike"})
+        valid, errors = validate_mission_data({
+            "title": "Hike", "date": "2026-06-15",
+            "start_time": "14:00", "end_time": "16:00"
+        })
         assert valid is True
 
     def test_rejects_long_title(self):
@@ -271,7 +277,8 @@ class TestValidateMissionData:
 
     def test_accepts_valid_pod_size(self):
         valid, errors = validate_mission_data({
-            "title": "Hike", "description": "Fun", "max_pod_size": 4
+            "title": "Hike", "description": "Fun", "max_pod_size": 4,
+            "date": "2026-06-15", "start_time": "14:00", "end_time": "16:00"
         })
         assert valid is True
 
@@ -283,7 +290,8 @@ class TestValidateMissionData:
 
     def test_accepts_valid_date(self):
         valid, errors = validate_mission_data({
-            "title": "Hike", "description": "Fun", "date": "2026-06-15"
+            "title": "Hike", "description": "Fun", "date": "2026-06-15",
+            "start_time": "14:00", "end_time": "16:00"
         })
         assert valid is True
 

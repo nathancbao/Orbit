@@ -12,13 +12,13 @@ struct PodsView: View {
     @Binding var userProfile: Profile
     var isActive: Bool = false
     @State private var pods: [Pod] = []
-    @State private var rsvpedSignals: [Signal] = []
+    @State private var rsvpedFlexMissions: [Mission] = []
     @State private var isLoading = false
     @State private var showProfile = false
     @State private var segment: PodSegment = .set
     @State private var searchText = ""
 
-    private var isEmpty: Bool { pods.isEmpty && rsvpedSignals.isEmpty }
+    private var isEmpty: Bool { pods.isEmpty && rsvpedFlexMissions.isEmpty }
 
     /// Set pods sorted by scheduled time (soonest first), filtered by search.
     private var sortedPods: [Pod] {
@@ -31,14 +31,14 @@ struct PodsView: View {
         return sorted.filter { $0.displayName.localizedCaseInsensitiveContains(searchText) }
     }
 
-    /// Flex signals filtered by search.
-    private var filteredSignals: [Signal] {
-        if searchText.isEmpty { return rsvpedSignals }
-        return rsvpedSignals.filter { $0.displayTitle.localizedCaseInsensitiveContains(searchText) }
+    /// Flex missions filtered by search.
+    private var filteredFlexMissions: [Mission] {
+        if searchText.isEmpty { return rsvpedFlexMissions }
+        return rsvpedFlexMissions.filter { $0.displayTitle.localizedCaseInsensitiveContains(searchText) }
     }
 
     private var isSegmentDataEmpty: Bool {
-        segment == .set ? pods.isEmpty : rsvpedSignals.isEmpty
+        segment == .set ? pods.isEmpty : rsvpedFlexMissions.isEmpty
     }
 
     var body: some View {
@@ -46,7 +46,7 @@ struct PodsView: View {
             ZStack {
                 Color(.systemBackground).ignoresSafeArea()
 
-                if isLoading && pods.isEmpty && rsvpedSignals.isEmpty {
+                if isLoading && pods.isEmpty && rsvpedFlexMissions.isEmpty {
                     ProgressView()
                         .tint(OrbitTheme.purple)
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -118,17 +118,17 @@ struct PodsView: View {
                                             .padding(.horizontal, 20)
                                         }
                                     } else {
-                                        if filteredSignals.isEmpty {
+                                        if filteredFlexMissions.isEmpty {
                                             Text("no matches")
                                                 .font(.subheadline)
                                                 .foregroundColor(.secondary)
                                                 .padding(.top, 40)
                                         }
-                                        ForEach(filteredSignals) { signal in
-                                            SignalRsvpCard(
-                                                signal: signal,
+                                        ForEach(filteredFlexMissions) { mission in
+                                            FlexMissionRsvpCard(
+                                                mission: mission,
                                                 onDismiss: { Task { await loadData() } },
-                                                onPodNotFound: { rsvpedSignals.removeAll { $0.id == signal.id } }
+                                                onPodNotFound: { rsvpedFlexMissions.removeAll { $0.id == mission.id } }
                                             )
                                             .padding(.horizontal, 20)
                                         }
@@ -181,15 +181,12 @@ struct PodsView: View {
             endpoint: Constants.API.Endpoints.myPods,
             authenticated: true
         )
-        async let rsvpsResult: [Signal]? = try? APIService.shared.request(
-            endpoint: Constants.API.Endpoints.myRsvps,
-            authenticated: true
-        )
+        async let rsvpsResult: [Mission]? = try? MissionService.shared.rsvpedFlexMissions()
         if let newPods = await podsResult {
             pods = newPods
         }
-        if let newSignals = await rsvpsResult {
-            rsvpedSignals = newSignals
+        if let newMissions = await rsvpsResult {
+            rsvpedFlexMissions = newMissions
         }
         isLoading = false
     }
@@ -280,10 +277,10 @@ struct PodRowCard: View {
     }
 }
 
-// MARK: - Signal RSVP Card (Black Theme)
+// MARK: - Flex Mission RSVP Card (Black Theme)
 
-struct SignalRsvpCard: View {
-    let signal: Signal
+struct FlexMissionRsvpCard: View {
+    let mission: Mission
     var onDismiss: (() -> Void)? = nil
     var onPodNotFound: (() -> Void)? = nil
     @State private var showSheet = false
@@ -298,23 +295,25 @@ struct SignalRsvpCard: View {
 
                 VStack(alignment: .leading, spacing: 6) {
                     HStack(spacing: 8) {
-                        Image(systemName: signal.activityCategory.icon)
+                        Image(systemName: mission.activityCategory?.icon ?? "star.fill")
                             .font(.caption)
                             .foregroundColor(.white.opacity(0.8))
-                        Text(signal.displayTitle)
+                        Text(mission.displayTitle)
                             .font(.headline)
                             .foregroundColor(.white)
                     }
 
-                    HStack(spacing: 4) {
-                        Image(systemName: "person.2.fill")
-                            .font(.caption2)
-                        Text(signal.groupSizeLabel)
-                            .font(.caption)
+                    if let groupLabel = mission.flexGroupSizeLabel {
+                        HStack(spacing: 4) {
+                            Image(systemName: "person.2.fill")
+                                .font(.caption2)
+                            Text(groupLabel)
+                                .font(.caption)
+                        }
+                        .foregroundColor(.white.opacity(0.6))
                     }
-                    .foregroundColor(.white.opacity(0.6))
 
-                    if let score = signal.matchScore {
+                    if let score = mission.matchScore {
                         Text("\(Int(score * 100))% match")
                             .font(.caption2)
                             .fontWeight(.semibold)
@@ -328,20 +327,24 @@ struct SignalRsvpCard: View {
                             .clipShape(Capsule())
                     }
 
-                    HStack(spacing: 4) {
-                        Image(systemName: "calendar")
-                            .font(.caption2)
-                        Text(signal.availabilitySummary)
-                            .font(.caption)
+                    if let summary = mission.flexAvailabilitySummary {
+                        HStack(spacing: 4) {
+                            Image(systemName: "calendar")
+                                .font(.caption2)
+                            Text(summary)
+                                .font(.caption)
+                        }
+                        .foregroundColor(.white.opacity(0.6))
                     }
-                    .foregroundColor(.white.opacity(0.6))
 
-                    SignalStatusBadgeDark(status: signal.status)
+                    if let status = mission.signalStatus {
+                        SignalStatusBadgeDark(status: status)
+                    }
                 }
 
                 Spacer()
 
-                Image(systemName: signal.podId != nil ? "message.fill" : "antenna.radiowaves.left.and.right")
+                Image(systemName: mission.podId != nil ? "message.fill" : "antenna.radiowaves.left.and.right")
                     .foregroundColor(.white.opacity(0.5))
             }
             .padding(16)
@@ -353,10 +356,10 @@ struct SignalRsvpCard: View {
         .sheet(isPresented: $showSheet, onDismiss: {
             onDismiss?()
         }) {
-            if let podId = signal.podId {
-                PodView(podId: podId, title: signal.displayTitle, missionMode: .flex, onPodNotFound: onPodNotFound)
+            if let podId = mission.podId {
+                PodView(podId: podId, title: mission.displayTitle, missionMode: .flex, onPodNotFound: onPodNotFound)
             } else {
-                SignalDetailView(signal: signal)
+                MissionDetailView(mission: mission, onJoined: { onDismiss?() })
             }
         }
     }
