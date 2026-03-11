@@ -101,7 +101,7 @@ struct PlanetNode: Identifiable {
     var icon: String {
         switch type {
         case .mission(let m):
-            return m.isFlexMode ? (m.activityCategory?.icon ?? "star") : "calendar.circle.fill"
+            return m.isFlexMode ? "antenna.radiowaves.left.and.right" : "calendar.circle.fill"
         case .template:             return "sparkles"
         }
     }

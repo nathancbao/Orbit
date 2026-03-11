@@ -191,6 +191,23 @@ struct VoyageBubble: View {
                     )
                     .frame(width: bubbleSize * 1.6, height: bubbleSize * 1.6)
 
+                // Saturn-like ring for set missions
+                if item.isMission {
+                    Ellipse()
+                        .stroke(
+                            LinearGradient(
+                                colors: [
+                                    bubbleColor.opacity(0.5),
+                                    bubbleColor.opacity(0.2)
+                                ],
+                                startPoint: .leading,
+                                endPoint: .trailing
+                            ),
+                            lineWidth: 2 * scale
+                        )
+                        .frame(width: bubbleSize + 22 * scale, height: 11 * scale)
+                }
+
                 // Core
                 Circle()
                     .fill(
