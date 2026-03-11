@@ -147,3 +147,15 @@ Eliminated all deprecated `SignalService` / `Signal` type warnings (~40 → 0). 
 | `EventDetailView.swift` | `SignalDetailView` now takes `mission: Mission` instead of `signal: Signal`. RSVP calls `MissionService.shared.joinFlexMission(id:)`. |
 | `Signal.swift` | Removed `@deprecated` from `Signal`, `SignalStatus`, `SignalError` — still needed internally for decoding backend responses. |
 | `Event.swift` | Removed `@deprecated` from `fromSignal()` — actively used by `MissionService` as the Signal→Mission conversion layer. |
+
+---
+
+## Pod Detail Survey Bug Fix
+
+`get_pod_with_members()` in `pod_service.py` (used by `GET /pods/<id>`) was missing the enrichment that `get_user_pods()` already had. The pod detail response now includes:
+
+- **`mission_tags`** — needed by SurveyView's "Add to your interests" section
+- **`mission_title`** — displayed in pod header
+- **`has_pending_survey`** — survey eligibility flag (pod completed + user hasn't submitted + within 7-day window)
+
+Without this fix, users opening a completed pod would see an empty tag selection in the survey.

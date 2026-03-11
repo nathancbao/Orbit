@@ -335,6 +335,34 @@ def get_pod_with_members(pod_id, requesting_user_id):
             'photo': user.get('photo'),
         })
 
+    # Enrich with mission title/tags and survey eligibility
+    mission_id = pod.get('mission_id')
+    if mission_id is not None:
+        from OrbitServer.models.models import get_mission
+        mission = get_mission(int(mission_id))
+        pod['mission_title'] = mission.get('title', 'Untitled') if mission else 'Untitled'
+        pod['mission_tags'] = mission.get('tags', []) if mission else []
+    else:
+        pod['mission_title'] = 'Untitled'
+        pod['mission_tags'] = []
+
+    survey_completed_by = pod.get('survey_completed_by') or []
+    completed_at_raw = pod.get('completed_at')
+    if completed_at_raw and isinstance(completed_at_raw, str):
+        try:
+            completed_at = datetime.datetime.fromisoformat(completed_at_raw.replace('Z', '+00:00')).replace(tzinfo=None)
+        except ValueError:
+            completed_at = None
+    else:
+        completed_at = completed_at_raw if isinstance(completed_at_raw, datetime.datetime) else None
+
+    survey_window = datetime.timedelta(days=7)
+    pod['has_pending_survey'] = (
+        pod.get('status') == 'completed'
+        and uid not in survey_completed_by
+        and (completed_at is None or (now - completed_at) < survey_window)
+    )
+
     return {**pod, 'members': members}, None, None
 
 
