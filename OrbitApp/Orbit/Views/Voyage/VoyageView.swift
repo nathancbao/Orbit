@@ -170,6 +170,17 @@ struct VoyageView: View {
 
     // MARK: - Tile Content Layer
 
+    /// Deterministic random offset so clusters don't sit on a perfect grid.
+    private func tileJitter(tx: Int, ty: Int, tileSize: CGFloat) -> CGPoint {
+        var s = UInt64(abs(tx &* 73856093 ^ ty &* 19349663))
+        s = s ^ (s >> 13)
+        let jx = CGFloat(s % 1000) / 1000.0 - 0.5 // -0.5...0.5
+        s = s &* 6364136223846793005 &+ 1
+        let jy = CGFloat(s % 1000) / 1000.0 - 0.5
+        let maxJitter = tileSize * 0.25
+        return CGPoint(x: jx * maxJitter, y: jy * maxJitter)
+    }
+
     private func tileContentLayer(size: CGSize) -> some View {
         let cx = viewModel.currentTileX
         let cy = viewModel.currentTileY
@@ -182,9 +193,10 @@ struct VoyageView: View {
                     let ty = cy + dy
                     let key = "\(tx),\(ty)"
 
-                    // Tile centre in screen space
-                    let centerX = CGFloat(tx) * tileSize + viewModel.voyagePosition.x + size.width / 2 + tileSize / 2
-                    let centerY = CGFloat(ty) * tileSize + viewModel.voyagePosition.y + size.height / 2 + tileSize / 2
+                    // Tile centre in screen space + deterministic jitter
+                    let jitter = tileJitter(tx: tx, ty: ty, tileSize: tileSize)
+                    let centerX = CGFloat(tx) * tileSize + viewModel.voyagePosition.x + size.width / 2 + tileSize / 2 + jitter.x
+                    let centerY = CGFloat(ty) * tileSize + viewModel.voyagePosition.y + size.height / 2 + tileSize / 2 + jitter.y
 
                     // Only render if roughly on screen
                     if centerX > -tileSize && centerX < size.width + tileSize &&
