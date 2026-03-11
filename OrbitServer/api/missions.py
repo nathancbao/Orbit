@@ -8,7 +8,7 @@ from OrbitServer.utils.auth import require_auth
 from OrbitServer.utils.validators import validate_mission_data
 from OrbitServer.services.mission_service import (
     get_missions_for_user, create_new_mission, get_mission_detail,
-    edit_mission, remove_mission,
+    edit_mission, remove_mission, check_mission_expiration,
 )
 from OrbitServer.services.pod_service import join_mission, leave_mission
 from OrbitServer.services.ai_suggestion_service import get_suggested_missions
@@ -126,6 +126,9 @@ def suggested():
     except Exception:
         logger.exception("Failed to get suggested missions")
         return success([])
+
+    # Check expiration server-side and filter out deleted missions
+    missions = [m for m in missions if check_mission_expiration(m) != 'deleted']
 
     # Annotate pod status — only for set missions; flex missions use RSVPs instead
     set_missions = [m for m in missions if m.get('mode') != 'flex']

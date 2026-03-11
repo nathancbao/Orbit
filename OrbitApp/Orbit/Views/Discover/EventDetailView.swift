@@ -157,6 +157,26 @@ struct MissionDetailView: View {
                     .fontWeight(.bold)
                     .padding(.top, 8)
 
+                if mission.status == "completed" {
+                    HStack(spacing: 10) {
+                        Image(systemName: "checkmark.circle.fill")
+                            .font(.system(size: 20))
+                            .foregroundColor(Color(hex: "059669"))
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Mission completed!")
+                                .font(.subheadline)
+                                .fontWeight(.semibold)
+                            Text("This mission will be removed shortly.")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                        Spacer()
+                    }
+                    .padding(14)
+                    .background(Color(hex: "059669").opacity(0.08))
+                    .cornerRadius(12)
+                }
+
                 HStack(spacing: 16) {
                     HStack(spacing: 6) {
                         Image(systemName: "calendar")
@@ -224,8 +244,7 @@ struct MissionDetailView: View {
 
     @ViewBuilder
     private var setActionButton: some View {
-        switch mission.userPodStatus {
-        case "in_pod":
+        if mission.status == "completed" {
             if let podId = mission.userPodId {
                 Button(action: { openPod(podId: podId) }) {
                     Label("open your pod", systemImage: "person.3.fill")
@@ -236,12 +255,23 @@ struct MissionDetailView: View {
                         .clipShape(Capsule())
                 }
             }
-        case "pod_full":
+        } else if mission.userPodStatus == "in_pod" {
+            if let podId = mission.userPodId {
+                Button(action: { openPod(podId: podId) }) {
+                    Label("open your pod", systemImage: "person.3.fill")
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 16)
+                        .background(OrbitTheme.gradientFill)
+                        .foregroundColor(.white)
+                        .clipShape(Capsule())
+                }
+            }
+        } else if mission.userPodStatus == "pod_full" {
             Text("all pods are currently full")
                 .frame(maxWidth: .infinity, alignment: .center)
                 .foregroundColor(.secondary)
                 .font(.subheadline)
-        default:
+        } else {
             Button(action: joinSetMission) {
                 ZStack {
                     if isJoining {
