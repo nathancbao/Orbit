@@ -261,7 +261,7 @@ def create_pod(mission_id, max_size=4, first_member_id=None):
         'kick_votes': {},
         'schedule_data': {'entries': {}},
         'created_at': now,
-        'expires_at': now + datetime.timedelta(days=2),
+        'expires_at': now + datetime.timedelta(days=14),
     })
     client.put(entity)
     return _entity_to_dict(entity)
@@ -676,7 +676,7 @@ def create_signal_pod(pod_id, signal_id, max_size=6, first_member_id=None):
         'kick_votes': {},
         'schedule_data': {'entries': {}},
         'created_at': now,
-        'expires_at': now + datetime.timedelta(days=2),
+        'expires_at': now + datetime.timedelta(days=14),
     })
     client.put(entity)
     return _entity_to_dict(entity)
@@ -694,6 +694,28 @@ def get_user_pods(user_id, limit=100):
 
     now = datetime.datetime.utcnow()
     survey_window = datetime.timedelta(days=7)
+
+    # Filter out expired pods (2 hours after scheduled_end_time)
+    live_pods = []
+    for pod in pods:
+        end_time_raw = pod.get('scheduled_end_time')
+        if end_time_raw:
+            end_dt = None
+            if isinstance(end_time_raw, str):
+                try:
+                    end_dt = datetime.datetime.fromisoformat(
+                        end_time_raw.replace('Z', '+00:00')
+                    ).replace(tzinfo=None)
+                except (ValueError, TypeError):
+                    end_dt = None
+            elif isinstance(end_time_raw, datetime.datetime):
+                end_dt = end_time_raw
+            if end_dt and now > end_dt + datetime.timedelta(hours=2):
+                # Pod expired — delete and skip
+                delete_pod(pod['id'])
+                continue
+        live_pods.append(pod)
+    pods = live_pods
 
     for pod in pods:
         mission_id = pod.get('mission_id')

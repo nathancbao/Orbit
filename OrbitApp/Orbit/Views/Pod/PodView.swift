@@ -55,6 +55,30 @@ struct PodView: View {
                     scheduleVM?.reloadGrid()
                 }
             }
+            .onChange(of: viewModel.podNotFound) {
+                if viewModel.podNotFound {
+                    // Auto-dismiss after a brief delay so user sees the message
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+                        dismiss()
+                    }
+                }
+            }
+            .overlay {
+                if viewModel.podNotFound {
+                    ZStack {
+                        Color(.systemBackground).ignoresSafeArea()
+                        VStack(spacing: 12) {
+                            Image(systemName: "trash.circle.fill")
+                                .font(.system(size: 44))
+                                .foregroundColor(.secondary)
+                            Text("Pod not found. Deleting.")
+                                .font(.headline)
+                                .foregroundColor(.primary)
+                        }
+                    }
+                    .transition(.opacity)
+                }
+            }
             .task {
                 await viewModel.load()
                 createScheduleVMIfNeeded()

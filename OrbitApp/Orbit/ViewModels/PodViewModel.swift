@@ -12,6 +12,7 @@ class PodViewModel: ObservableObject {
     @Published var didLeave = false
     @Published var errorMessage: String?
     @Published var messageText: String = ""
+    @Published var podNotFound = false
 
     // Flex mode routing
     @Published var missionMode: MissionMode = .set
@@ -34,7 +35,16 @@ class PodViewModel: ObservableObject {
 
         // Each request is independent — one failure must not block the others.
         do { pod = try await PodService.shared.getPod(id: podId) }
-        catch { errorMessage = error.localizedDescription }
+        catch {
+            // If pod doesn't exist on backend, signal auto-dismiss
+            let msg = error.localizedDescription.lowercased()
+            if msg.contains("not found") || msg.contains("expired") {
+                podNotFound = true
+                isLoading = false
+                return
+            }
+            errorMessage = error.localizedDescription
+        }
 
         // Populate local schedule grid from backend data.
         if let pod = pod {

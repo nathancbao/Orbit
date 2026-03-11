@@ -11,8 +11,8 @@ from OrbitServer.services.embedding_service import invalidate_cache, get_or_crea
 
 logger = logging.getLogger(__name__)
 
-# How long after end time before auto-deletion (seconds)
-_MISSION_GRACE_PERIOD = datetime.timedelta(hours=1)
+# How long after end time before auto-deletion
+_MISSION_GRACE_PERIOD = datetime.timedelta(hours=2)
 
 
 def _mission_end_datetime(mission):

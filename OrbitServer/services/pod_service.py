@@ -280,17 +280,21 @@ def get_pod_with_members(pod_id, requesting_user_id):
     if not pod:
         return None, "Pod not found", 404
 
-    # Check if pod has expired (2 hours after activity end time)
-    expires_at = pod.get('expires_at')
-    if expires_at:
-        if isinstance(expires_at, str):
+    # Check if pod has expired (2 hours after scheduled_end_time)
+    now = datetime.datetime.utcnow()
+    end_time_raw = pod.get('scheduled_end_time')
+    if end_time_raw:
+        end_dt = None
+        if isinstance(end_time_raw, str):
             try:
-                expires_at = datetime.datetime.fromisoformat(
-                    expires_at.replace('Z', '+00:00')
+                end_dt = datetime.datetime.fromisoformat(
+                    end_time_raw.replace('Z', '+00:00')
                 ).replace(tzinfo=None)
             except (ValueError, TypeError):
-                expires_at = None
-        if isinstance(expires_at, datetime.datetime) and datetime.datetime.utcnow() > expires_at:
+                end_dt = None
+        elif isinstance(end_time_raw, datetime.datetime):
+            end_dt = end_time_raw
+        if end_dt and now > end_dt + datetime.timedelta(hours=2):
             delete_pod(pod_id)
             return None, "This pod has expired and been removed", 410
 
