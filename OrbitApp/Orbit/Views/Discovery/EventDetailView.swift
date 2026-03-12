@@ -91,6 +91,7 @@ struct MissionDetailView: View {
     @State private var localToast = false
     @State private var joinedPodId: String?
     @State private var showEditSheet = false
+    @State private var showDeleteAlert = false
 
     // Member profiles
     @State private var podMembers: [PodMember] = []
@@ -147,9 +148,20 @@ struct MissionDetailView: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
-                    if isCreator, let vm = viewModel {
-                        Button("Edit") {
-                            showEditSheet = true
+                    if isCreator, viewModel != nil {
+                        Menu {
+                            Button {
+                                showEditSheet = true
+                            } label: {
+                                Label("Edit", systemImage: "pencil")
+                            }
+                            Button(role: .destructive) {
+                                showDeleteAlert = true
+                            } label: {
+                                Label("Delete Mission", systemImage: "trash")
+                            }
+                        } label: {
+                            Image(systemName: "ellipsis.circle")
                         }
                     }
                 }
@@ -168,6 +180,23 @@ struct MissionDetailView: View {
                     }
                 )
             }
+        }
+        .alert("Delete Mission?", isPresented: $showDeleteAlert) {
+            Button("Delete", role: .destructive) {
+                Task {
+                    if let vm = viewModel {
+                        if mission.isFlexMode {
+                            await vm.deleteFlexMission(id: mission.id)
+                        } else {
+                            await vm.deleteSetMission(id: mission.id)
+                        }
+                        dismiss()
+                    }
+                }
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("This will permanently remove the mission. This action cannot be undone.")
         }
         .sheet(item: $selectedMemberForPreview) { member in
             MemberPreviewSheet(member: member)

@@ -91,6 +91,13 @@ class MissionService {
         )
     }
 
+    func deleteSetMission(id: String) async throws {
+        let _: EmptyResponse = try await APIService.shared.request(
+            endpoint: Constants.API.Endpoints.mission(id),
+            method: "DELETE", authenticated: true
+        )
+    }
+
     func skipMission(id: String) async throws {
         let _: EmptyResponse = try await APIService.shared.request(
             endpoint: Constants.API.Endpoints.skipMission(id),

@@ -236,12 +236,22 @@ class MissionsViewModel: ObservableObject {
         }
     }
 
-    // MARK: - Delete Flex
+    // MARK: - Delete
 
     func deleteFlexMission(id: String) async {
         do {
             try await MissionService.shared.deleteFlexMission(id: id)
             allFlexMissions.removeAll { $0.id == id }
+            showToastMessage("Mission removed")
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    func deleteSetMission(id: String) async {
+        do {
+            try await MissionService.shared.deleteSetMission(id: id)
+            allMissions.removeAll { $0.id == id }
             showToastMessage("Mission removed")
         } catch {
             errorMessage = error.localizedDescription
