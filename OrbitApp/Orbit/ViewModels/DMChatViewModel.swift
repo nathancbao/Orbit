@@ -43,7 +43,7 @@ class DMChatViewModel: ObservableObject {
     }
 
     func startPolling() {
-        pollTimer = Timer.scheduledTimer(withTimeInterval: 5.0, repeats: true) { [weak self] _ in
+        pollTimer = Timer.scheduledTimer(withTimeInterval: 3.0, repeats: true) { [weak self] _ in
             guard let self else { return }
             Task { @MainActor in
                 await self.load()
