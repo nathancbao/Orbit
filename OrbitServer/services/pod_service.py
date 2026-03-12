@@ -258,13 +258,17 @@ def leave_pod(pod_id, user_id):
     if not pod:
         return False, ("Pod not found", 404)
 
-    member_ids = pod.get('member_ids') or []
+    # Normalise member_ids to ints so mixed-type lists (e.g. ["42"] vs [42])
+    # don't cause false "not a member" results.
+    member_ids = [_safe_int(m) for m in (pod.get('member_ids') or []) if _safe_int(m) is not None]
     if uid not in member_ids:
-        return False, ("You are not a member of this pod", 403)
+        # Truly not present — nothing to remove, but treat as success so the
+        # client can clean up stale pod references from its list.
+        return True, None
 
     def _remove(entity):
-        m_ids = [m for m in (entity.get('member_ids') or []) if m != uid]
-        confirmed = [c for c in (entity.get('confirmed_attendees') or []) if c != uid]
+        m_ids = [m for m in (entity.get('member_ids') or []) if _safe_int(m) != uid]
+        confirmed = [c for c in (entity.get('confirmed_attendees') or []) if _safe_int(c) != uid]
         entity['member_ids'] = m_ids
         entity['confirmed_attendees'] = confirmed
         entity['status'] = 'open' if len(m_ids) < entity.get('max_size', 4) else entity.get('status', 'open')
@@ -320,7 +324,9 @@ def get_pod_with_members(pod_id, requesting_user_id):
             delete_pod(pod_id)
             return None, "This pod has expired and been removed", 410
 
-    member_ids = pod.get('member_ids') or []
+    # Normalise member_ids to ints so mixed-type lists don't cause false 403s.
+    member_ids = [_safe_int(m) for m in (pod.get('member_ids') or [])]
+    member_ids = [m for m in member_ids if m is not None]
     if uid not in member_ids:
         return None, "You are not a member of this pod", 403
 
@@ -382,7 +388,7 @@ def vote_to_kick(pod_id, kicker_user_id, target_user_id):
     if not pod:
         return None, False, "Pod not found", 404
 
-    member_ids = list(pod.get('member_ids') or [])
+    member_ids = [_safe_int(m) for m in (pod.get('member_ids') or []) if _safe_int(m) is not None]
     if kicker_uid not in member_ids:
         return None, False, "You are not a member of this pod", 403
     if target_uid not in member_ids:
@@ -475,7 +481,7 @@ def confirm_attendance(pod_id, user_id):
     if not pod:
         return None, "Pod not found", 404
 
-    member_ids = pod.get('member_ids') or []
+    member_ids = [_safe_int(m) for m in (pod.get('member_ids') or []) if _safe_int(m) is not None]
     if uid not in member_ids:
         return None, "You are not a member of this pod", 403
 
