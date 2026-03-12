@@ -799,7 +799,7 @@ struct DiscoveryView: View {
                 x: geometry.size.width / 2,
                 y: geometry.size.height / 2 - 40
             )
-            let halfScreen = max(geometry.size.width, geometry.size.height) / 2
+            let halfScreen = min(geometry.size.width, geometry.size.height) / 2
 
             ZStack {
                 // Background
