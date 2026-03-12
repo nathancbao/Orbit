@@ -10,7 +10,6 @@ struct FriendsView: View {
     @State private var showProfile = false
     @State private var showInbox = false
     @State private var showSearch = false
-    @State private var friendToRemove: Friendship?
 
     var body: some View {
         NavigationStack {
@@ -63,18 +62,14 @@ struct FriendsView: View {
                             ForEach(viewModel.filteredFriends) { friendship in
                                 FriendRowCard(
                                     friendship: friendship,
-                                    hasUnread: viewModel.unreadFriendIds.contains(friendship.friend?.userId ?? -1)
+                                    hasUnread: viewModel.unreadFriendIds.contains(friendship.friend?.userId ?? -1),
+                                    onRemove: {
+                                        Task { await viewModel.removeFriend(friendship) }
+                                    }
                                 )
                                 .listRowInsets(EdgeInsets(top: 6, leading: 20, bottom: 6, trailing: 20))
                                 .listRowSeparator(.hidden)
                                 .listRowBackground(Color.clear)
-                                .swipeActions(edge: .trailing, allowsFullSwipe: false) {
-                                    Button(role: .destructive) {
-                                        friendToRemove = friendship
-                                    } label: {
-                                        Label("Remove", systemImage: "person.badge.minus")
-                                    }
-                                }
                             }
 
                             if viewModel.filteredFriends.isEmpty && !viewModel.searchText.isEmpty {
@@ -91,19 +86,6 @@ struct FriendsView: View {
                         .refreshable { await viewModel.loadAll() }
                         .onReceive(NotificationCenter.default.publisher(for: UIApplication.didBecomeActiveNotification)) { _ in
                             Task { await viewModel.loadAll() }
-                        }
-                        .confirmationDialog(
-                            "Remove \(friendToRemove?.friend?.name ?? "Friend")?",
-                            isPresented: Binding(get: { friendToRemove != nil }, set: { if !$0 { friendToRemove = nil } }),
-                            titleVisibility: .visible
-                        ) {
-                            Button("Remove Friend", role: .destructive) {
-                                if let f = friendToRemove { Task { await viewModel.removeFriend(f) } }
-                                friendToRemove = nil
-                            }
-                            Button("Cancel", role: .cancel) { friendToRemove = nil }
-                        } message: {
-                            Text("They won't be notified.")
                         }
                     }
                 }
