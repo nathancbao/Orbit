@@ -116,9 +116,11 @@ struct FriendsView: View {
                         Button { showInbox = true } label: {
                             ZStack(alignment: .topTrailing) {
                                 Image(systemName: "tray")
-                                    .font(.system(size: 18))
+                                    .resizable()
+                                    .scaledToFit()
                                     .fontWeight(.medium)
                                     .foregroundStyle(Color.primary)
+                                    .frame(width: 22, height: 22)
                                 if viewModel.inboxCount > 0 {
                                     Text("\(viewModel.inboxCount)")
                                         .font(.system(size: 10, weight: .bold))
@@ -132,9 +134,11 @@ struct FriendsView: View {
                         }
                         Button { showSearch = true } label: {
                             Image(systemName: "person.badge.plus")
-                                .font(.system(size: 18))
+                                .resizable()
+                                .scaledToFit()
                                 .fontWeight(.medium)
                                 .foregroundStyle(Color.primary)
+                                .frame(width: 22, height: 22)
                         }
                     }
                 }
