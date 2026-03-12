@@ -80,6 +80,40 @@ struct PodView: View {
                         }
                     }
                     .transition(.opacity)
+                } else if viewModel.notAMember {
+                    ZStack {
+                        Color(.systemBackground).ignoresSafeArea()
+                        VStack(spacing: 16) {
+                            Image(systemName: "person.fill.xmark")
+                                .font(.system(size: 44))
+                                .foregroundColor(.secondary)
+                            Text("You are not a member of this pod.")
+                                .font(.headline)
+                                .foregroundColor(.primary)
+                                .multilineTextAlignment(.center)
+                            Text("This pod may have been removed or you were kicked.")
+                                .font(.subheadline)
+                                .foregroundColor(.secondary)
+                                .multilineTextAlignment(.center)
+                                .padding(.horizontal, 40)
+                            Button {
+                                Task {
+                                    await viewModel.leavePod()
+                                    onPodNotFound?()
+                                }
+                            } label: {
+                                Text("Remove from My Pods")
+                                    .fontWeight(.semibold)
+                                    .foregroundColor(.white)
+                                    .padding(.horizontal, 24)
+                                    .padding(.vertical, 12)
+                                    .background(OrbitTheme.gradientFill)
+                                    .clipShape(Capsule())
+                            }
+                            .disabled(viewModel.isLeaving)
+                        }
+                    }
+                    .transition(.opacity)
                 }
             }
             .task {

@@ -13,6 +13,7 @@ class PodViewModel: ObservableObject {
     @Published var errorMessage: String?
     @Published var messageText: String = ""
     @Published var podNotFound = false
+    @Published var notAMember = false
 
     // Flex mode routing
     @Published var missionMode: MissionMode = .set
@@ -36,10 +37,16 @@ class PodViewModel: ObservableObject {
         // Each request is independent — one failure must not block the others.
         do { pod = try await PodService.shared.getPod(id: podId) }
         catch {
-            // If pod doesn't exist on backend, signal auto-dismiss
             let msg = error.localizedDescription.lowercased()
+            // Pod doesn't exist on backend — signal auto-dismiss
             if msg.contains("not found") || msg.contains("expired") {
                 podNotFound = true
+                isLoading = false
+                return
+            }
+            // User isn't in this pod's member list — let them remove it
+            if msg.contains("not a member") {
+                notAMember = true
                 isLoading = false
                 return
             }
@@ -121,7 +128,14 @@ class PodViewModel: ObservableObject {
             try await PodService.shared.leavePod(podId: podId)
             didLeave = true
         } catch {
-            errorMessage = error.localizedDescription
+            // If the server says we're not a member, treat as successful leave
+            // so the user can remove this stale pod from their list.
+            let msg = error.localizedDescription.lowercased()
+            if msg.contains("not a member") || msg.contains("not found") {
+                didLeave = true
+            } else {
+                errorMessage = error.localizedDescription
+            }
         }
         isLeaving = false
     }
