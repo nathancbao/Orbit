@@ -9,6 +9,7 @@ struct MainTabView: View {
     @State private var deepLinkProfile: Profile?
     @State private var deepLinkUserId: Int?
     @State private var showDeepLinkProfile = false
+    @State private var unreadDMCount: Int = 0
 
     init(profile: Profile, onEditProfile: @escaping () -> Void, deepLinkFriendId: Binding<Int?>) {
         _profile = State(initialValue: profile)
@@ -94,22 +95,36 @@ struct MainTabView: View {
                         withAnimation(.easeInOut(duration: 0.15)) {
                             selectedTab = tab
                         }
+                        if tab == .friends { unreadDMCount = 0 }
                     } label: {
                         VStack(spacing: 4) {
-                            Group {
-                                if let icon = selectedTab == tab ? tab.colorIcon : tab.blankIcon {
-                                    Image(icon)
-                                        .renderingMode(.original)
-                                        .resizable()
-                                        .aspectRatio(contentMode: .fit)
-                                } else {
-                                    Image(systemName: selectedTab == tab ? tab.sfSymbolFilled : tab.sfSymbol)
-                                        .resizable()
-                                        .aspectRatio(contentMode: .fit)
-                                        .foregroundColor(selectedTab == tab ? OrbitTheme.purple : .black)
+                            ZStack(alignment: .topTrailing) {
+                                Group {
+                                    if let icon = selectedTab == tab ? tab.colorIcon : tab.blankIcon {
+                                        Image(icon)
+                                            .renderingMode(.original)
+                                            .resizable()
+                                            .aspectRatio(contentMode: .fit)
+                                    } else {
+                                        Image(systemName: selectedTab == tab ? tab.sfSymbolFilled : tab.sfSymbol)
+                                            .resizable()
+                                            .aspectRatio(contentMode: .fit)
+                                            .foregroundColor(selectedTab == tab ? OrbitTheme.purple : .black)
+                                    }
+                                }
+                                .frame(width: 24, height: 24)
+
+                                if tab == .friends && unreadDMCount > 0 {
+                                    Text(unreadDMCount > 9 ? "9+" : "\(unreadDMCount)")
+                                        .font(.system(size: 9, weight: .bold))
+                                        .foregroundColor(.white)
+                                        .padding(.horizontal, 4)
+                                        .padding(.vertical, 2)
+                                        .background(Color.red)
+                                        .clipShape(Capsule())
+                                        .offset(x: 8, y: -4)
                                 }
                             }
-                            .frame(width: 24, height: 24)
 
                             Text(tab.label)
                                 .font(.caption2)
@@ -134,6 +149,9 @@ struct MainTabView: View {
         .ignoresSafeArea(edges: .bottom)
         .onAppear { resolveDeepLink(deepLinkFriendId) }
         .onChange(of: deepLinkFriendId) { _, friendId in resolveDeepLink(friendId) }
+        .onReceive(NotificationCenter.default.publisher(for: .unreadDMCountChanged)) { notification in
+            unreadDMCount = notification.userInfo?["count"] as? Int ?? 0
+        }
         .sheet(isPresented: $showDeepLinkProfile) {
             if let friendProfile = deepLinkProfile, let userId = deepLinkUserId {
                 ProfileDisplayView(

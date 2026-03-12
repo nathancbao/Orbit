@@ -61,8 +61,11 @@ struct FriendsView: View {
                         ScrollView {
                             LazyVStack(spacing: 12) {
                                 ForEach(viewModel.filteredFriends) { friendship in
-                                    FriendRowCard(friendship: friendship)
-                                        .padding(.horizontal, 20)
+                                    FriendRowCard(
+                                        friendship: friendship,
+                                        hasUnread: viewModel.unreadFriendIds.contains(friendship.friend?.userId ?? -1)
+                                    )
+                                    .padding(.horizontal, 20)
                                 }
 
                                 if viewModel.filteredFriends.isEmpty && !viewModel.searchText.isEmpty {
@@ -76,6 +79,9 @@ struct FriendsView: View {
                             .padding(.bottom, 80)
                         }
                         .refreshable { await viewModel.loadAll() }
+        .onReceive(NotificationCenter.default.publisher(for: UIApplication.didBecomeActiveNotification)) { _ in
+            Task { await viewModel.loadAll() }
+        }
                     }
                 }
             }

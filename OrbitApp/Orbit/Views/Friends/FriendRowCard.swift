@@ -2,6 +2,7 @@ import SwiftUI
 
 struct FriendRowCard: View {
     let friendship: Friendship
+    var hasUnread: Bool = false
     @State private var showProfile = false
     @State private var showDMChat = false
 
@@ -32,12 +33,20 @@ struct FriendRowCard: View {
                 Button {
                     showDMChat = true
                 } label: {
-                    Image(systemName: "bubble.left.fill")
-                        .font(.system(size: 16))
-                        .foregroundStyle(OrbitTheme.gradient)
-                        .frame(width: 36, height: 36)
-                        .background(Color(.systemGray6))
-                        .clipShape(Circle())
+                    ZStack(alignment: .topTrailing) {
+                        Image(systemName: "bubble.left.fill")
+                            .font(.system(size: 16))
+                            .foregroundStyle(OrbitTheme.gradient)
+                            .frame(width: 36, height: 36)
+                            .background(Color(.systemGray6))
+                            .clipShape(Circle())
+                        if hasUnread {
+                            Circle()
+                                .fill(Color.red)
+                                .frame(width: 10, height: 10)
+                                .offset(x: 2, y: -2)
+                        }
+                    }
                 }
                 .buttonStyle(.plain)
 

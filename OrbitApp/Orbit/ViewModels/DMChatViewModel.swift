@@ -22,6 +22,8 @@ class DMChatViewModel: ObservableObject {
     func load() async {
         do {
             messages = try await ChatService.shared.getDMMessages(friendId: friendId)
+            // Mark conversation as read
+            UserDefaults.standard.set(Date().timeIntervalSince1970, forKey: "dm_last_seen_\(friendId)")
         } catch {
             print("[DM] load error: \(error)")
         }

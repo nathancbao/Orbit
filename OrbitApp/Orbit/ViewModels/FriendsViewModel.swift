@@ -1,12 +1,17 @@
 import Foundation
 import Combine
 
+extension Notification.Name {
+    static let unreadDMCountChanged = Notification.Name("unreadDMCountChanged")
+}
+
 @MainActor
 class FriendsViewModel: ObservableObject {
     @Published var friends: [Friendship] = []
     @Published var incomingRequests: [FriendRequest] = []
     @Published var outgoingRequests: [FriendRequest] = []
     @Published var podInvites: [PodInvite] = []
+    @Published var unreadFriendIds: Set<Int> = []
     @Published var isLoading = false
     @Published var errorMessage: String?
     @Published var searchText: String = ""
@@ -38,13 +43,46 @@ class FriendsViewModel: ObservableObject {
         async let incomingResult = FriendService.shared.getIncomingRequests()
         async let outgoingResult = FriendService.shared.getOutgoingRequests()
         async let podInvitesResult = PodService.shared.getIncomingInvites()
+        async let conversationsResult = try? ChatService.shared.getDMConversations()
 
         do { friends = try await friendsResult } catch { print("[Friends] friends error: \(error)") }
         do { incomingRequests = try await incomingResult } catch { print("[Friends] incoming error: \(error)") }
         do { outgoingRequests = try await outgoingResult } catch { print("[Friends] outgoing error: \(error)") }
         do { podInvites = try await podInvitesResult } catch { print("[Friends] pod invites error: \(error)") }
 
+        if let conversations = await conversationsResult {
+            refreshUnread(from: conversations)
+        }
+
         isLoading = false
+    }
+
+    func markRead(friendId: Int) {
+        UserDefaults.standard.set(Date().timeIntervalSince1970, forKey: "dm_last_seen_\(friendId)")
+        unreadFriendIds.remove(friendId)
+    }
+
+    private func refreshUnread(from conversations: [DMConversation]) {
+        let currentUserId = UserDefaults.standard.integer(forKey: "orbit_user_id")
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        var unread = Set<Int>()
+        for conv in conversations {
+            guard let lastSenderId = conv.lastMessageUserId, lastSenderId != currentUserId else { continue }
+            let lastSeen = UserDefaults.standard.double(forKey: "dm_last_seen_\(conv.friendId)")
+            let msgTime = formatter.date(from: conv.lastMessageAt)?.timeIntervalSince1970
+                ?? ISO8601DateFormatter().date(from: conv.lastMessageAt)?.timeIntervalSince1970
+                ?? 0
+            if msgTime > lastSeen {
+                unread.insert(conv.friendId)
+            }
+        }
+        unreadFriendIds = unread
+        NotificationCenter.default.post(
+            name: .unreadDMCountChanged,
+            object: nil,
+            userInfo: ["count": unread.count]
+        )
     }
 
     // MARK: - Actions
