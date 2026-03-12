@@ -97,6 +97,11 @@ struct ContentView: View {
                 currentProfile = profile
                 appState = .home
             }
+        } catch NetworkError.unauthorized {
+            // Stale tokens — force back to login
+            await MainActor.run {
+                appState = .auth
+            }
         } catch {
             await MainActor.run {
                 appState = .profileSetup

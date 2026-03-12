@@ -142,13 +142,17 @@ def verify_code(email, code):
 
 
 def refresh_access_token(refresh_token):
-    record = get_refresh_token(_hash_token(refresh_token))
+    token_hash = _hash_token(refresh_token)
+    record = get_refresh_token(token_hash)
     if not record:
+        logger.warning("Refresh failed: hash not found in Datastore (hash prefix: %s...)",
+                       token_hash[:16])
         return None, "Invalid refresh token"
 
     payload, err = decode_token(refresh_token)
     if err:
-        delete_refresh_token(_hash_token(refresh_token))
+        logger.warning("Refresh failed: %s (hash prefix: %s...)", err, token_hash[:16])
+        delete_refresh_token(token_hash)
         return None, err
 
     if payload.get('type') != 'refresh':

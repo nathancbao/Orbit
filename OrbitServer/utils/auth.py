@@ -1,11 +1,14 @@
 import os
 import datetime
+import logging
 from functools import wraps
 
 import jwt
 from flask import request, g
 
 from OrbitServer.utils.responses import error
+
+logger = logging.getLogger(__name__)
 
 JWT_SECRET = os.environ.get('JWT_SECRET', 'dev-secret-change-me')
 ACCESS_TOKEN_EXPIRY = datetime.timedelta(minutes=15)
@@ -47,11 +50,15 @@ def require_auth(f):
     def decorated(*args, **kwargs):
         auth_header = request.headers.get('Authorization', '')
         if not auth_header.startswith('Bearer '):
+            logger.warning("Auth failed: missing/invalid header for %s %s",
+                           request.method, request.path)
             return error("Missing or invalid Authorization header", 401)
 
         token = auth_header[7:]
         payload, err = decode_token(token)
         if err:
+            logger.warning("Auth failed: %s for %s %s (token prefix: %s...)",
+                           err, request.method, request.path, token[:20] if token else "empty")
             return error(err, 401)
 
         if payload.get('type') != 'access':

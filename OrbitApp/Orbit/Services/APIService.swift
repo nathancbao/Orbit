@@ -165,6 +165,12 @@ class APIService {
                             authenticated: authenticated, isRetry: true
                         )
                     } catch {
+                        // Refresh failed — tokens are stale, force re-login
+                        KeychainHelper.shared.delete(forKey: Constants.Keychain.accessToken)
+                        KeychainHelper.shared.delete(forKey: Constants.Keychain.refreshToken)
+                        await MainActor.run {
+                            NotificationCenter.default.post(name: .didLogout, object: nil)
+                        }
                         throw NetworkError.unauthorized
                     }
                 }
