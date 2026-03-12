@@ -1084,14 +1084,15 @@ struct DiscoveryView: View {
     /// Check if a candidate position is valid: no overlap, clear of center profile, and within screen bounds.
     private func isValidPosition(x: CGFloat, y: CGFloat, placed: [(x: CGFloat, y: CGFloat)],
                                   screenSize: CGSize, center: CGPoint) -> Bool {
-        // Planet radius (half of 52pt size) plus padding
-        let margin: CGFloat = 36
+        let sideMargin: CGFloat = 44   // planet radius (26) + ring (11) + padding
+        let topMargin: CGFloat = 90    // top bar + motivational banner + padding
+        let bottomMargin: CGFloat = 80 // VOYAGE button + padding
         let screenX = center.x + x
         let screenY = center.y + y
-        guard screenX >= margin,
-              screenX <= screenSize.width - margin,
-              screenY >= margin,
-              screenY <= screenSize.height - margin else {
+        guard screenX >= sideMargin,
+              screenX <= screenSize.width - sideMargin,
+              screenY >= topMargin,
+              screenY <= screenSize.height - bottomMargin else {
             return false
         }
         // Ensure planet doesn't overlap center profile node
@@ -1156,12 +1157,12 @@ struct DiscoveryView: View {
                     }
                 }
 
-                // Phase 3: exhaustive sweep as last resort
+                // Phase 3: fine-grained exhaustive sweep as last resort
                 if !foundSpot {
                     let minR = minCenterDistance
                     let maxR = 0.98 * halfScreen
-                    let rStep: CGFloat = 20
-                    let aStep = 0.25
+                    let rStep: CGFloat = 10
+                    let aStep = 0.12
                     outerLoop: for r in stride(from: minR, through: maxR, by: rStep) {
                         for a in stride(from: 0.0, to: Double.pi * 2, by: aStep) {
                             let x = r * cos(a)
@@ -1175,6 +1176,9 @@ struct DiscoveryView: View {
                         }
                     }
                 }
+
+                // Only place planet if a valid, non-overlapping position was found
+                guard foundSpot else { continue }
 
                 let px = radius * cos(angle)
                 let py = radius * sin(angle) * verticalStretch
