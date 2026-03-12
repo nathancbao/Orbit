@@ -82,7 +82,7 @@ struct TopWavyLines: View {
         GeometryReader { geo in
             ZStack {
                 // Line 1 - Pink (bottom of the three)
-                WavyLinePath(
+                WavyLineShape(
                     startPoint: CGPoint(x: -20, y: geo.size.height - 20),
                     endPoint: CGPoint(x: geo.size.width + 20, y: 80),
                     waveHeight: 15,
@@ -91,7 +91,7 @@ struct TopWavyLines: View {
                 .stroke(OrbitTheme.gradient, lineWidth: 2.5)
 
                 // Line 2 - Purple (middle)
-                WavyLinePath(
+                WavyLineShape(
                     startPoint: CGPoint(x: -20, y: geo.size.height - 50),
                     endPoint: CGPoint(x: geo.size.width + 20, y: 50),
                     waveHeight: 12,
@@ -100,7 +100,7 @@ struct TopWavyLines: View {
                 .stroke(OrbitTheme.gradient, lineWidth: 2.5)
 
                 // Line 3 - Blue (top)
-                WavyLinePath(
+                WavyLineShape(
                     startPoint: CGPoint(x: -20, y: geo.size.height - 80),
                     endPoint: CGPoint(x: geo.size.width + 20, y: 20),
                     waveHeight: 18,
@@ -119,7 +119,7 @@ struct BottomWavyLines: View {
         GeometryReader { geo in
             ZStack {
                 // Line 1 - Pink (top of the three)
-                WavyLinePath(
+                WavyLineShape(
                     startPoint: CGPoint(x: -20, y: 30),
                     endPoint: CGPoint(x: geo.size.width + 20, y: geo.size.height - 60),
                     waveHeight: 18,
@@ -128,7 +128,7 @@ struct BottomWavyLines: View {
                 .stroke(OrbitTheme.gradient, lineWidth: 2.5)
 
                 // Line 2 - Purple (middle)
-                WavyLinePath(
+                WavyLineShape(
                     startPoint: CGPoint(x: -20, y: 70),
                     endPoint: CGPoint(x: geo.size.width + 20, y: geo.size.height - 30),
                     waveHeight: 15,
@@ -137,7 +137,7 @@ struct BottomWavyLines: View {
                 .stroke(OrbitTheme.gradient, lineWidth: 2.5)
 
                 // Line 3 - Blue (bottom)
-                WavyLinePath(
+                WavyLineShape(
                     startPoint: CGPoint(x: -20, y: 110),
                     endPoint: CGPoint(x: geo.size.width + 20, y: geo.size.height),
                     waveHeight: 20,
@@ -149,33 +149,6 @@ struct BottomWavyLines: View {
     }
 }
 
-// MARK: - Wavy Line Path
-
-struct WavyLinePath: Shape {
-    let startPoint: CGPoint
-    let endPoint: CGPoint
-    let waveHeight: CGFloat
-    let frequency: CGFloat
-
-    func path(in rect: CGRect) -> Path {
-        var path = Path()
-        path.move(to: startPoint)
-
-        let deltaX = endPoint.x - startPoint.x
-        let deltaY = endPoint.y - startPoint.y
-        let steps = 80
-
-        for i in 1...steps {
-            let progress = CGFloat(i) / CGFloat(steps)
-            let x = startPoint.x + deltaX * progress
-            let baseY = startPoint.y + deltaY * progress
-            let wave = sin(progress * .pi * 2 * frequency) * waveHeight
-            path.addLine(to: CGPoint(x: x, y: baseY + wave))
-        }
-
-        return path
-    }
-}
 
 // MARK: - Sparkles
 

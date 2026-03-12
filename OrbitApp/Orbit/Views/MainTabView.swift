@@ -132,18 +132,8 @@ struct MainTabView: View {
             )
         }
         .ignoresSafeArea(edges: .bottom)
-        .onAppear { handleDeepLinkIfNeeded() }
-        .onChange(of: deepLinkFriendId) { _, friendId in
-            guard let friendId else { return }
-            Task {
-                if let friendProfile = try? await ProfileService.shared.getUserProfile(id: friendId) {
-                    deepLinkProfile = friendProfile
-                    deepLinkUserId = friendId
-                    showDeepLinkProfile = true
-                }
-                deepLinkFriendId = nil
-            }
-        }
+        .onAppear { resolveDeepLink(deepLinkFriendId) }
+        .onChange(of: deepLinkFriendId) { _, friendId in resolveDeepLink(friendId) }
         .sheet(isPresented: $showDeepLinkProfile) {
             if let friendProfile = deepLinkProfile, let userId = deepLinkUserId {
                 ProfileDisplayView(
@@ -154,8 +144,8 @@ struct MainTabView: View {
         }
     }
 
-    private func handleDeepLinkIfNeeded() {
-        guard let friendId = deepLinkFriendId else { return }
+    private func resolveDeepLink(_ friendId: Int?) {
+        guard let friendId else { return }
         Task {
             if let friendProfile = try? await ProfileService.shared.getUserProfile(id: friendId) {
                 deepLinkProfile = friendProfile

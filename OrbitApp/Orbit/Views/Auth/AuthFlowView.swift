@@ -281,76 +281,34 @@ struct EnvelopeShape: Shape {
 // MARK: - Wavy Lines Background
 
 struct WavyLinesView: View {
-    private let gradient = LinearGradient(
-        colors: [
-            Color(red: 0.9, green: 0.6, blue: 0.7),    // Pink
-            Color(red: 0.7, green: 0.65, blue: 0.85),  // Purple
-            Color(red: 0.45, green: 0.55, blue: 0.85)  // Blue
-        ],
-        startPoint: .leading,
-        endPoint: .trailing
-    )
-
     var body: some View {
         GeometryReader { geo in
             ZStack {
-                // Bottom line
-                WavyLine(
+                WavyLineShape(
                     startPoint: CGPoint(x: -20, y: geo.size.height - 20),
                     endPoint: CGPoint(x: geo.size.width + 20, y: geo.size.height - 90),
-                    waveHeight: 20,
-                    frequency: 1.5
+                    waveHeight: 20, frequency: 1.5
                 )
-                .stroke(gradient, lineWidth: 2.5)
+                .stroke(OrbitTheme.gradient, lineWidth: 2.5)
 
-                // Middle line (crosses the top line)
-                WavyLine(
+                WavyLineShape(
                     startPoint: CGPoint(x: -20, y: geo.size.height - 55),
                     endPoint: CGPoint(x: geo.size.width + 20, y: geo.size.height - 170),
-                    waveHeight: 22,
-                    frequency: 1.4
+                    waveHeight: 22, frequency: 1.4
                 )
-                .stroke(gradient, lineWidth: 2.5)
+                .stroke(OrbitTheme.gradient, lineWidth: 2.5)
 
-                // Top line
-                WavyLine(
+                WavyLineShape(
                     startPoint: CGPoint(x: -20, y: geo.size.height - 105),
                     endPoint: CGPoint(x: geo.size.width + 20, y: geo.size.height - 160),
-                    waveHeight: 18,
-                    frequency: 1.7
+                    waveHeight: 18, frequency: 1.7
                 )
-                .stroke(gradient, lineWidth: 2.5)
+                .stroke(OrbitTheme.gradient, lineWidth: 2.5)
             }
         }
     }
 }
 
-// Custom wavy line shape
-struct WavyLine: Shape {
-    let startPoint: CGPoint
-    let endPoint: CGPoint
-    let waveHeight: CGFloat
-    let frequency: CGFloat
-
-    func path(in rect: CGRect) -> Path {
-        var path = Path()
-        path.move(to: startPoint)
-
-        let deltaX = endPoint.x - startPoint.x
-        let deltaY = endPoint.y - startPoint.y
-        let steps = 80
-
-        for i in 1...steps {
-            let progress = CGFloat(i) / CGFloat(steps)
-            let x = startPoint.x + deltaX * progress
-            let baseY = startPoint.y + deltaY * progress
-            let wave = sin(progress * .pi * 2 * frequency) * waveHeight
-            path.addLine(to: CGPoint(x: x, y: baseY + wave))
-        }
-
-        return path
-    }
-}
 
 // MARK: - Gradient Arrow Button
 
@@ -363,16 +321,7 @@ struct GradientArrowButton: View {
         Button(action: action) {
             ZStack {
                 Circle()
-                    .fill(
-                        LinearGradient(
-                            colors: [
-                                Color(red: 0.55, green: 0.6, blue: 0.85),
-                                Color(red: 0.85, green: 0.55, blue: 0.7)
-                            ],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        )
-                    )
+                    .fill(OrbitTheme.gradientFill)
                     .frame(width: 70, height: 70)
                     .shadow(color: .black.opacity(0.15), radius: 6, x: 0, y: 3)
 

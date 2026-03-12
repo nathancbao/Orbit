@@ -55,7 +55,14 @@ struct ContentView: View {
                         deepLinkFriendId: $deepLinkFriendId
                     )
                 } else {
-                    HomeView()
+                    // No profile loaded — send to setup instead of dead screen
+                    QuickProfileSetupView(
+                        onComplete: { profile, _ in
+                            currentProfile = profile
+                            appState = .home
+                        },
+                        onCancel: nil
+                    )
                 }
             }
         }
@@ -85,23 +92,6 @@ struct ContentView: View {
     }
 }
 
-// MARK: - Fallback Home View
-
-struct HomeView: View {
-    var body: some View {
-        VStack(spacing: 16) {
-            Image(systemName: "checkmark.circle.fill")
-                .font(.system(size: 64))
-                .foregroundColor(.green)
-            Text("You're in orbit.")
-                .font(.title)
-                .fontWeight(.bold)
-            Text("Discover events to get started.")
-                .foregroundColor(.secondary)
-        }
-        .padding()
-    }
-}
 
 #Preview {
     ContentView(deepLinkFriendId: .constant(nil))

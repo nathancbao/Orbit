@@ -17,8 +17,9 @@ struct PodsView: View {
     @State private var showProfile = false
     @State private var segment: PodSegment = .set
     @State private var searchText = ""
-
-    private var isEmpty: Bool { pods.isEmpty && rsvpedFlexMissions.isEmpty }
+    @State private var showRecommendations = false
+    @State private var recommendedMissions: [Mission] = []
+    @State private var recommendedMissionForDetail: Mission? = nil
 
     /// Set pods sorted by scheduled time (soonest first), filtered by search.
     private var sortedPods: [Pod] {
@@ -50,19 +51,6 @@ struct PodsView: View {
                     ProgressView()
                         .tint(OrbitTheme.purple)
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
-                } else if isEmpty {
-                    VStack(spacing: 16) {
-                        Image(systemName: "person.3")
-                            .font(.system(size: 48))
-                            .foregroundStyle(OrbitTheme.gradient)
-                        Text("no pods yet")
-                            .font(.headline)
-                        Text("join a mission to form a pod")
-                            .font(.subheadline)
-                            .foregroundColor(.secondary)
-                            .multilineTextAlignment(.center)
-                            .padding(.horizontal, 40)
-                    }
                 } else {
                     VStack(spacing: 0) {
                         Picker("", selection: $segment) {
@@ -91,10 +79,14 @@ struct PodsView: View {
                                 Spacer()
                                 Image(systemName: segment == .set ? "calendar" : "antenna.radiowaves.left.and.right")
                                     .font(.system(size: 36))
-                                    .foregroundColor(.secondary)
+                                    .foregroundStyle(OrbitTheme.gradient)
                                 Text(segment == .set ? "no set pods yet" : "no flex pods yet")
                                     .font(.headline)
+                                Text("join a mission to form a pod")
+                                    .font(.subheadline)
                                     .foregroundColor(.secondary)
+                                    .multilineTextAlignment(.center)
+                                    .padding(.horizontal, 40)
                                 Spacer()
                             }
                             .frame(maxWidth: .infinity)
@@ -146,11 +138,27 @@ struct PodsView: View {
             .navigationBarTitleDisplayMode(.large)
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
-                    Button { } label: {
-                        Image(systemName: "bell")
-                            .font(.system(size: 18))
-                            .fontWeight(.medium)
-                            .foregroundStyle(Color.primary)
+                    Button {
+                        Task {
+                            if recommendedMissions.isEmpty {
+                                recommendedMissions = (try? await MissionService.shared.suggestedMissions()) ?? []
+                            }
+                            showRecommendations = true
+                        }
+                    } label: {
+                        ZStack(alignment: .topTrailing) {
+                            Image(systemName: "bell")
+                                .font(.system(size: 18))
+                                .fontWeight(.medium)
+                                .foregroundStyle(Color.primary)
+                                .padding(4)
+                            if !recommendedMissions.isEmpty {
+                                Circle()
+                                    .fill(OrbitTheme.pink)
+                                    .frame(width: 8, height: 8)
+                                    .offset(x: 2, y: 0)
+                            }
+                        }
                     }
                 }
                 ToolbarItem(placement: .navigationBarTrailing) {
@@ -166,6 +174,28 @@ struct PodsView: View {
                 onEdit: { showProfile = false },
                 onProfileUpdated: { updated in userProfile = updated }
             )
+        }
+        .sheet(isPresented: $showRecommendations) {
+            RecommendationsSheet(
+                items: recommendedMissions.map { .recommendedMission($0) },
+                onSelectMission: { mission in
+                    showRecommendations = false
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
+                        recommendedMissionForDetail = mission
+                    }
+                }
+            )
+            .presentationDetents([.medium, .large])
+        }
+        .sheet(isPresented: Binding(
+            get: { recommendedMissionForDetail != nil },
+            set: { if !$0 { recommendedMissionForDetail = nil } }
+        )) {
+            if let mission = recommendedMissionForDetail {
+                MissionDetailView(mission: mission, onJoined: {
+                    recommendedMissionForDetail = nil
+                })
+            }
         }
         .task { await loadData() }
         .onChange(of: isActive) { _, active in

@@ -24,6 +24,7 @@ struct MissionsView: View {
     @State private var openPodMode: MissionMode = .set
     @State private var showOpenPod = false
     @State private var searchText = ""
+    @State private var showRecommendations = false
 
     private let allTags = [
         "Hiking", "Gaming", "Food", "Sports", "Study", "Hangout", "Other"
@@ -183,11 +184,20 @@ struct MissionsView: View {
             .navigationBarTitleDisplayMode(.large)
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
-                    Button { } label: {
-                        Image(systemName: "bell")
-                            .font(.system(size: 18))
-                            .fontWeight(.medium)
-                            .foregroundStyle(Color.primary)
+                    Button { showRecommendations = true } label: {
+                        ZStack(alignment: .topTrailing) {
+                            Image(systemName: "bell")
+                                .font(.system(size: 18))
+                                .fontWeight(.medium)
+                                .foregroundStyle(Color.primary)
+                                .padding(4)
+                            if !viewModel.suggestedMissions.isEmpty {
+                                Circle()
+                                    .fill(OrbitTheme.pink)
+                                    .frame(width: 8, height: 8)
+                                    .offset(x: 2, y: 0)
+                            }
+                        }
                     }
                 }
                 ToolbarItem(placement: .navigationBarTrailing) {
@@ -220,6 +230,18 @@ struct MissionsView: View {
             if let podId = openPodId {
                 PodView(podId: podId, title: openPodTitle, missionMode: openPodMode)
             }
+        }
+        .sheet(isPresented: $showRecommendations) {
+            RecommendationsSheet(
+                items: viewModel.suggestedMissions.map { .recommendedMission($0) },
+                onSelectMission: { mission in
+                    showRecommendations = false
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
+                        selectedMission = mission
+                    }
+                }
+            )
+            .presentationDetents([.medium, .large])
         }
         .sheet(isPresented: $showCreate) {
             MissionCreateView(
@@ -752,6 +774,7 @@ struct MissionCreateView: View {
     @State private var creatorSlots: Set<TimeSlot> = []
 
     @State private var customTagText = ""
+    @State private var showLocationSearch = false
 
     @State private var isSubmitting = false
     @State private var errorMessage: String?
@@ -845,6 +868,9 @@ struct MissionCreateView: View {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { dismiss() }
                 }
+            }
+            .sheet(isPresented: $showLocationSearch) {
+                LocationSearchView(locationName: $location)
             }
         }
     }
@@ -1015,8 +1041,48 @@ struct MissionCreateView: View {
 
             VStack(alignment: .leading, spacing: 8) {
                 OrbitSectionHeader(title: "Location (optional)")
-                TextField("Campus Gym, Off-campus, etc.", text: $location)
-                    .textFieldStyle(.roundedBorder)
+                if location.isEmpty {
+                    Button { showLocationSearch = true } label: {
+                        HStack(spacing: 10) {
+                            Image(systemName: "mappin.and.ellipse")
+                                .foregroundStyle(OrbitTheme.gradient)
+                            Text("Add location")
+                                .foregroundColor(.secondary)
+                            Spacer()
+                            Image(systemName: "chevron.right")
+                                .font(.caption)
+                                .foregroundColor(Color(.tertiaryLabel))
+                        }
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 14)
+                        .background(Color(.systemGray6))
+                        .clipShape(RoundedRectangle(cornerRadius: 14))
+                    }
+                    .buttonStyle(.plain)
+                } else {
+                    HStack(spacing: 10) {
+                        Image(systemName: "mappin.and.ellipse")
+                            .foregroundStyle(OrbitTheme.gradient)
+                        Text(location)
+                            .foregroundColor(.primary)
+                            .lineLimit(2)
+                        Spacer()
+                        Button {
+                            location = ""
+                        } label: {
+                            Image(systemName: "xmark.circle.fill")
+                                .foregroundColor(Color(.tertiaryLabel))
+                        }
+                        .buttonStyle(.plain)
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 14)
+                    .background(Color(.systemGray6))
+                    .clipShape(RoundedRectangle(cornerRadius: 14))
+                    Button("Change location") { showLocationSearch = true }
+                        .font(.subheadline)
+                        .foregroundStyle(OrbitTheme.gradient)
+                }
             }
 
             VStack(alignment: .leading, spacing: 10) {
@@ -1112,8 +1178,48 @@ struct MissionCreateView: View {
             // Location
             VStack(alignment: .leading, spacing: 8) {
                 OrbitSectionHeader(title: "Location (optional)")
-                TextField("Campus Gym, Off-campus, etc.", text: $location)
-                    .textFieldStyle(.roundedBorder)
+                if location.isEmpty {
+                    Button { showLocationSearch = true } label: {
+                        HStack(spacing: 10) {
+                            Image(systemName: "mappin.and.ellipse")
+                                .foregroundStyle(OrbitTheme.gradient)
+                            Text("Add location")
+                                .foregroundColor(.secondary)
+                            Spacer()
+                            Image(systemName: "chevron.right")
+                                .font(.caption)
+                                .foregroundColor(Color(.tertiaryLabel))
+                        }
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 14)
+                        .background(Color(.systemGray6))
+                        .clipShape(RoundedRectangle(cornerRadius: 14))
+                    }
+                    .buttonStyle(.plain)
+                } else {
+                    HStack(spacing: 10) {
+                        Image(systemName: "mappin.and.ellipse")
+                            .foregroundStyle(OrbitTheme.gradient)
+                        Text(location)
+                            .foregroundColor(.primary)
+                            .lineLimit(2)
+                        Spacer()
+                        Button {
+                            location = ""
+                        } label: {
+                            Image(systemName: "xmark.circle.fill")
+                                .foregroundColor(Color(.tertiaryLabel))
+                        }
+                        .buttonStyle(.plain)
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 14)
+                    .background(Color(.systemGray6))
+                    .clipShape(RoundedRectangle(cornerRadius: 14))
+                    Button("Change location") { showLocationSearch = true }
+                        .font(.subheadline)
+                        .foregroundStyle(OrbitTheme.gradient)
+                }
             }
 
             // Links
