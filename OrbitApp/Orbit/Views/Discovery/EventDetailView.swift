@@ -80,15 +80,17 @@ struct FlowLayout: Layout {
 // Displays full mission info and "Join Pod" button.
 
 struct MissionDetailView: View {
-    let mission: Mission
+    @State private var mission: Mission
     let onJoined: () -> Void
     var onOpenPod: ((String) -> Void)?
+    var viewModel: MissionsViewModel?
 
     @State private var isJoining = false
     @State private var errorMessage: String?
     @State private var showSignedUp = false
     @State private var localToast = false
     @State private var joinedPodId: String?
+    @State private var showEditSheet = false
 
     // Member profiles
     @State private var podMembers: [PodMember] = []
@@ -96,6 +98,21 @@ struct MissionDetailView: View {
     @State private var selectedMember: (profile: Profile, userId: Int)?
 
     @Environment(\.dismiss) private var dismiss
+
+    private var isCreator: Bool {
+        let uid = UserDefaults.standard.integer(forKey: "orbit_user_id")
+        guard uid != 0, mission.creatorId == uid else { return false }
+        // Only allow editing for user-created missions (not seeded or AI-suggested)
+        if let type = mission.creatorType, type != "user" { return false }
+        return true
+    }
+
+    init(mission: Mission, viewModel: MissionsViewModel? = nil, onJoined: @escaping () -> Void, onOpenPod: ((String) -> Void)? = nil) {
+        self._mission = State(initialValue: mission)
+        self.viewModel = viewModel
+        self.onJoined = onJoined
+        self.onOpenPod = onOpenPod
+    }
 
     var body: some View {
         NavigationStack {
@@ -129,9 +146,27 @@ struct MissionDetailView: View {
             .animation(.spring(duration: 0.3), value: localToast)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    if isCreator, let vm = viewModel {
+                        Button("Edit") {
+                            showEditSheet = true
+                        }
+                    }
+                }
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button("Done") { dismiss() }
                 }
+            }
+        }
+        .sheet(isPresented: $showEditSheet) {
+            if let vm = viewModel {
+                MissionCreateView(
+                    viewModel: vm,
+                    editingMission: mission,
+                    onUpdated: { updated in
+                        mission = updated
+                    }
+                )
             }
         }
         .sheet(item: $selectedMemberForPreview) { member in

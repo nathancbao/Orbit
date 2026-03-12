@@ -939,7 +939,7 @@ struct DiscoveryView: View {
                     showDiscPod = true
                 }
             }) { mission in
-                MissionDetailView(mission: mission, onJoined: {
+                MissionDetailView(mission: mission, viewModel: missionsVM, onJoined: {
                     selectedMission = nil
                 }, onOpenPod: { podId in
                     discOpenPodId = podId

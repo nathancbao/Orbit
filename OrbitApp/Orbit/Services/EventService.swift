@@ -52,6 +52,31 @@ class MissionService {
         )
     }
 
+    func updateMission(
+        id: String,
+        title: String,
+        description: String,
+        tags: [String],
+        location: String,
+        date: String,
+        startTime: String? = nil,
+        endTime: String? = nil,
+        maxPodSize: Int = 4
+    ) async throws -> Mission {
+        var body: [String: Any] = [
+            "title": title, "description": description,
+            "tags": tags, "location": location,
+            "date": date, "max_pod_size": maxPodSize,
+            "utc_offset": TimeZone.current.secondsFromGMT(),
+        ]
+        if let startTime { body["start_time"] = startTime }
+        if let endTime { body["end_time"] = endTime }
+        return try await APIService.shared.request(
+            endpoint: Constants.API.Endpoints.mission(id),
+            method: "PUT", body: body, authenticated: true
+        )
+    }
+
     func joinMission(id: String) async throws -> Pod {
         return try await APIService.shared.request(
             endpoint: Constants.API.Endpoints.joinMission(id),
@@ -146,6 +171,64 @@ class MissionService {
         let signal: Signal = try await APIService.shared.request(
             endpoint: Constants.API.Endpoints.signals,
             method: "POST", body: body, authenticated: true
+        )
+        var mission = Mission.fromSignal(signal)
+        mission.tags = tags
+        return mission
+    }
+
+    func updateFlexMission(
+        id: String,
+        title: String = "",
+        minGroupSize: Int,
+        maxGroupSize: Int,
+        availability: [AvailabilitySlot],
+        description: String,
+        links: [String] = [],
+        tags: [String] = [],
+        timeRangeStart: Int = 9,
+        timeRangeEnd: Int = 21
+    ) async throws -> Mission {
+        let dateFormatter = DateFormatter()
+        dateFormatter.dateFormat = "yyyy-MM-dd"
+        dateFormatter.locale = Locale(identifier: "en_US_POSIX")
+
+        let slotsPayload: [[String: Any]] = availability.map { slot in
+            if !slot.hours.isEmpty {
+                return [
+                    "date": dateFormatter.string(from: slot.date),
+                    "hours": slot.hours,
+                ]
+            } else {
+                return [
+                    "date": dateFormatter.string(from: slot.date),
+                    "time_blocks": slot.timeBlocks.map(\.rawValue),
+                ]
+            }
+        }
+
+        let resolvedTitle: String
+        if !title.trimmingCharacters(in: .whitespaces).isEmpty {
+            resolvedTitle = title.trimmingCharacters(in: .whitespaces)
+        } else {
+            resolvedTitle = "Flex Mission"
+        }
+
+        var body: [String: Any] = [
+            "title": resolvedTitle,
+            "min_group_size": minGroupSize,
+            "max_group_size": maxGroupSize,
+            "availability": slotsPayload,
+            "description": description,
+            "time_range_start": timeRangeStart,
+            "time_range_end": timeRangeEnd,
+        ]
+        if !links.isEmpty { body["links"] = links }
+        if !tags.isEmpty { body["tags"] = tags }
+
+        let signal: Signal = try await APIService.shared.request(
+            endpoint: Constants.API.Endpoints.signal(id),
+            method: "PUT", body: body, authenticated: true
         )
         var mission = Mission.fromSignal(signal)
         mission.tags = tags

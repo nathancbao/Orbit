@@ -214,7 +214,7 @@ struct MissionsView: View {
                 showOpenPod = true
             }
         }) { mission in
-            MissionDetailView(mission: mission, onJoined: {
+            MissionDetailView(mission: mission, viewModel: viewModel, onJoined: {
                 selectedMission = nil
             }, onOpenPod: { podId in
                 openPodId = podId
@@ -781,13 +781,60 @@ struct MissionCreateView: View {
 
     var onCreated: ((Mission) -> Void)?
 
+    // Edit mode
+    var editingMission: Mission?
+    var onUpdated: ((Mission) -> Void)?
+
+    private var isEditing: Bool { editingMission != nil }
+
     private let maxDayOffset = 1
 
-    init(viewModel: MissionsViewModel, prefillTitle: String = "", prefillTags: [String] = [], onCreated: ((Mission) -> Void)? = nil) {
+    init(
+        viewModel: MissionsViewModel,
+        prefillTitle: String = "",
+        prefillTags: [String] = [],
+        editingMission: Mission? = nil,
+        onCreated: ((Mission) -> Void)? = nil,
+        onUpdated: ((Mission) -> Void)? = nil
+    ) {
         self.viewModel = viewModel
-        _title = State(initialValue: prefillTitle)
-        _tags = State(initialValue: prefillTags)
+        self.editingMission = editingMission
         self.onCreated = onCreated
+        self.onUpdated = onUpdated
+
+        if let m = editingMission {
+            _mode = State(initialValue: m.mode)
+            _title = State(initialValue: m.title)
+            _description = State(initialValue: m.description)
+            _location = State(initialValue: m.location)
+            _tags = State(initialValue: m.tags)
+            _maxPodSize = State(initialValue: m.maxPodSize)
+
+            // Set mode fields
+            let dateFmt = DateFormatter()
+            dateFmt.dateFormat = "yyyy-MM-dd"
+            _date = State(initialValue: dateFmt.date(from: m.date) ?? Date().addingTimeInterval(86400))
+
+            let timeFmt = DateFormatter()
+            timeFmt.dateFormat = "HH:mm"
+            _startTime = State(initialValue: m.startTime.flatMap { timeFmt.date(from: $0) }
+                ?? Calendar.current.date(from: DateComponents(hour: 12, minute: 0))!)
+            _endTime = State(initialValue: m.endTime.flatMap { timeFmt.date(from: $0) }
+                ?? Calendar.current.date(from: DateComponents(hour: 13, minute: 0))!)
+
+            // Flex mode fields
+            _minGroupSize = State(initialValue: m.minGroupSize ?? 3)
+            _maxGroupSize = State(initialValue: m.maxPodSize)
+            _timeRangeStart = State(initialValue: m.timeRangeStart ?? 9)
+            _timeRangeEnd = State(initialValue: m.timeRangeEnd ?? 21)
+
+            let links = m.links ?? []
+            _link1 = State(initialValue: links.count > 0 ? links[0] : "")
+            _link2 = State(initialValue: links.count > 1 ? links[1] : "")
+        } else {
+            _title = State(initialValue: prefillTitle)
+            _tags = State(initialValue: prefillTags)
+        }
     }
 
     // MARK: - Validation
@@ -806,7 +853,7 @@ struct MissionCreateView: View {
         if mode == .set {
             return !title.trimmingCharacters(in: .whitespaces).isEmpty
         } else {
-            if creatorSlots.isEmpty { return false }
+            if !isEditing && creatorSlots.isEmpty { return false }
             return true
         }
     }
@@ -836,6 +883,7 @@ struct MissionCreateView: View {
                         Text("Flex").tag(MissionMode.flex)
                     }
                     .pickerStyle(.segmented)
+                    .disabled(isEditing)
 
                     Text(mode == .set
                          ? "Plan an event with a set date, time, and place."
@@ -862,7 +910,7 @@ struct MissionCreateView: View {
                 .padding(.vertical, 20)
             }
             .background(Color(.systemBackground))
-            .navigationTitle("New Mission")
+            .navigationTitle(isEditing ? "Edit Mission" : "New Mission")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
@@ -1498,7 +1546,7 @@ struct MissionCreateView: View {
                 if isSubmitting || viewModel.isSubmitting {
                     ProgressView().tint(.white)
                 } else {
-                    Text("Create Mission")
+                    Text(isEditing ? "Save Changes" : "Create Mission")
                         .font(.headline)
                         .fontWeight(.semibold)
                 }
@@ -1532,8 +1580,10 @@ struct MissionCreateView: View {
         let endTimeString = timeFormatter.string(from: endTime)
 
         Task {
-            do {
-                var created = try await MissionService.shared.createMission(
+            if let editing = editingMission {
+                // Update existing mission
+                if let updated = await viewModel.updateSetMission(
+                    id: editing.id,
                     title: title.trimmingCharacters(in: .whitespaces),
                     description: description.trimmingCharacters(in: .whitespaces),
                     tags: tags,
@@ -1542,20 +1592,45 @@ struct MissionCreateView: View {
                     startTime: startTimeString,
                     endTime: endTimeString,
                     maxPodSize: maxPodSize
-                )
-                if let pod = try? await MissionService.shared.joinMission(id: created.id) {
-                    created.userPodStatus = "in_pod"
-                    created.userPodId = pod.id
+                ) {
+                    await MainActor.run {
+                        isSubmitting = false
+                        onUpdated?(updated)
+                        dismiss()
+                    }
+                } else {
+                    await MainActor.run {
+                        isSubmitting = false
+                        errorMessage = viewModel.errorMessage ?? "Update failed."
+                    }
                 }
-                await MainActor.run {
-                    isSubmitting = false
-                    onCreated?(created)
-                    dismiss()
-                }
-            } catch {
-                await MainActor.run {
-                    isSubmitting = false
-                    errorMessage = error.localizedDescription
+            } else {
+                // Create new mission
+                do {
+                    var created = try await MissionService.shared.createMission(
+                        title: title.trimmingCharacters(in: .whitespaces),
+                        description: description.trimmingCharacters(in: .whitespaces),
+                        tags: tags,
+                        location: location.trimmingCharacters(in: .whitespaces),
+                        date: dateString,
+                        startTime: startTimeString,
+                        endTime: endTimeString,
+                        maxPodSize: maxPodSize
+                    )
+                    if let pod = try? await MissionService.shared.joinMission(id: created.id) {
+                        created.userPodStatus = "in_pod"
+                        created.userPodId = pod.id
+                    }
+                    await MainActor.run {
+                        isSubmitting = false
+                        onCreated?(created)
+                        dismiss()
+                    }
+                } catch {
+                    await MainActor.run {
+                        isSubmitting = false
+                        errorMessage = error.localizedDescription
+                    }
                 }
             }
         }
@@ -1572,31 +1647,53 @@ struct MissionCreateView: View {
         )
         let slotsToSave = creatorSlots
         Task {
-            if let created = await viewModel.createFlexMission(
-                title: title.trimmingCharacters(in: .whitespaces),
-                minGroupSize: minGroupSize,
-                maxGroupSize: maxGroupSize,
-                availability: [defaultSlot],
-                description: description.trimmingCharacters(in: .whitespaces),
-                links: linksArray,
-                tags: tags
-            ) {
-                // Save creator availability to ScheduleService so PodView loads it pre-populated
-                if let podId = created.podId, !slotsToSave.isEmpty {
-                    let userId = UserDefaults.standard.integer(forKey: "orbit_user_id")
-                    let userName = UserDefaults.standard.string(forKey: "orbit_user_name") ?? "You"
-                    ScheduleService.shared.saveAvailability(
-                        podId: podId,
-                        userId: userId,
-                        name: userName,
-                        joinIndex: 0,
-                        slots: slotsToSave
-                    )
+            if let editing = editingMission {
+                // Update existing flex mission
+                if let updated = await viewModel.updateFlexMission(
+                    id: editing.id,
+                    title: title.trimmingCharacters(in: .whitespaces),
+                    minGroupSize: minGroupSize,
+                    maxGroupSize: maxGroupSize,
+                    availability: [defaultSlot],
+                    description: description.trimmingCharacters(in: .whitespaces),
+                    links: linksArray,
+                    tags: tags,
+                    timeRangeStart: timeRangeStart,
+                    timeRangeEnd: timeRangeEnd
+                ) {
+                    onUpdated?(updated)
+                    dismiss()
+                } else {
+                    errorMessage = viewModel.errorMessage ?? "Update failed."
                 }
-                onCreated?(created)
-                dismiss()
             } else {
-                errorMessage = viewModel.errorMessage ?? "Something went wrong. Try again."
+                // Create new flex mission
+                if let created = await viewModel.createFlexMission(
+                    title: title.trimmingCharacters(in: .whitespaces),
+                    minGroupSize: minGroupSize,
+                    maxGroupSize: maxGroupSize,
+                    availability: [defaultSlot],
+                    description: description.trimmingCharacters(in: .whitespaces),
+                    links: linksArray,
+                    tags: tags
+                ) {
+                    // Save creator availability to ScheduleService so PodView loads it pre-populated
+                    if let podId = created.podId, !slotsToSave.isEmpty {
+                        let userId = UserDefaults.standard.integer(forKey: "orbit_user_id")
+                        let userName = UserDefaults.standard.string(forKey: "orbit_user_name") ?? "You"
+                        ScheduleService.shared.saveAvailability(
+                            podId: podId,
+                            userId: userId,
+                            name: userName,
+                            joinIndex: 0,
+                            slots: slotsToSave
+                        )
+                    }
+                    onCreated?(created)
+                    dismiss()
+                } else {
+                    errorMessage = viewModel.errorMessage ?? "Something went wrong. Try again."
+                }
             }
         }
     }

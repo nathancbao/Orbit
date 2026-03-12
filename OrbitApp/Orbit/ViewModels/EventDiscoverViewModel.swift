@@ -248,6 +248,85 @@ class MissionsViewModel: ObservableObject {
         }
     }
 
+    // MARK: - Update
+
+    func updateSetMission(
+        id: String,
+        title: String,
+        description: String,
+        tags: [String],
+        location: String,
+        date: String,
+        startTime: String?,
+        endTime: String?,
+        maxPodSize: Int
+    ) async -> Mission? {
+        isSubmitting = true
+        errorMessage = nil
+        defer { isSubmitting = false }
+
+        do {
+            let updated = try await MissionService.shared.updateMission(
+                id: id, title: title, description: description,
+                tags: tags, location: location, date: date,
+                startTime: startTime, endTime: endTime,
+                maxPodSize: maxPodSize
+            )
+            replaceInFeed(updated)
+            showToastMessage("Mission updated!")
+            return updated
+        } catch {
+            errorMessage = error.localizedDescription
+            return nil
+        }
+    }
+
+    func updateFlexMission(
+        id: String,
+        title: String,
+        minGroupSize: Int,
+        maxGroupSize: Int,
+        availability: [AvailabilitySlot],
+        description: String,
+        links: [String],
+        tags: [String],
+        timeRangeStart: Int,
+        timeRangeEnd: Int
+    ) async -> Mission? {
+        isSubmitting = true
+        errorMessage = nil
+        defer { isSubmitting = false }
+
+        do {
+            var updated = try await MissionService.shared.updateFlexMission(
+                id: id, title: title,
+                minGroupSize: minGroupSize, maxGroupSize: maxGroupSize,
+                availability: availability, description: description,
+                links: links, tags: tags,
+                timeRangeStart: timeRangeStart, timeRangeEnd: timeRangeEnd
+            )
+            updated.tags = tags
+            replaceInFeed(updated)
+            showToastMessage("Mission updated!")
+            return updated
+        } catch {
+            errorMessage = error.localizedDescription
+            return nil
+        }
+    }
+
+    private func replaceInFeed(_ mission: Mission) {
+        if mission.mode == .flex {
+            if let idx = allFlexMissions.firstIndex(where: { $0.id == mission.id }) {
+                allFlexMissions[idx] = mission
+            }
+        } else {
+            if let idx = allMissions.firstIndex(where: { $0.id == mission.id }) {
+                allMissions[idx] = mission
+            }
+        }
+    }
+
     // MARK: - Toast
 
     func showToastMessage(_ message: String) {
