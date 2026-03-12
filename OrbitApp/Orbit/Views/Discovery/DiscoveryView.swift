@@ -785,11 +785,11 @@ struct DiscoveryView: View {
         ))
     }
 
-    // Priority ring radii as fraction of half the screen's larger dimension
+    // Priority ring radii as fraction of half the screen's smaller dimension
     private let ringRadii: [Int: CGFloat] = [
-        0: 0.35,  // hosted — inner ring
-        1: 0.58,  // joined — second ring
-        2: 0.80,  // recommended — third ring
+        0: 0.55,  // hosted — inner ring
+        1: 0.72,  // joined — second ring
+        2: 0.85,  // recommended — third ring
         3: 0.96   // discoverable/templates — outer ring
     ]
 
@@ -1073,9 +1073,15 @@ struct DiscoveryView: View {
     private let maxPlanets = 7
 
     /// Minimum pixel distance between any two planet centers to prevent overlap.
-    private let minPlanetDistance: CGFloat = 120
+    private let minPlanetDistance: CGFloat = 150
 
-    /// Check if a candidate position is valid: no overlap and within screen bounds.
+    /// Minimum distance from the screen center so planets don't overlap the user profile node.
+    private let minCenterDistance: CGFloat = 100
+
+    /// Vertical stretch factor to create an oval layout that uses the taller screen dimension.
+    private let verticalStretch: CGFloat = 1.4
+
+    /// Check if a candidate position is valid: no overlap, clear of center profile, and within screen bounds.
     private func isValidPosition(x: CGFloat, y: CGFloat, placed: [(x: CGFloat, y: CGFloat)],
                                   screenSize: CGSize, center: CGPoint) -> Bool {
         // Planet radius (half of 52pt size) plus padding
@@ -1086,6 +1092,10 @@ struct DiscoveryView: View {
               screenX <= screenSize.width - margin,
               screenY >= margin,
               screenY <= screenSize.height - margin else {
+            return false
+        }
+        // Ensure planet doesn't overlap center profile node
+        guard hypot(x, y) >= minCenterDistance else {
             return false
         }
         return !placed.contains { hypot(x - $0.x, y - $0.y) < minPlanetDistance }
@@ -1118,7 +1128,7 @@ struct DiscoveryView: View {
                 // Phase 1: nudge angle on the same ring
                 for _ in 0..<40 {
                     let x = radius * cos(angle)
-                    let y = radius * sin(angle)
+                    let y = radius * sin(angle) * verticalStretch
                     if isValidPosition(x: x, y: y, placed: placed, screenSize: screenSize, center: center) {
                         foundSpot = true
                         break
@@ -1134,7 +1144,7 @@ struct DiscoveryView: View {
                         for step in 0..<20 {
                             let tryAngle = angle + Double(step) * 0.3
                             let x = tryRadius * cos(tryAngle)
-                            let y = tryRadius * sin(tryAngle)
+                            let y = tryRadius * sin(tryAngle) * verticalStretch
                             if isValidPosition(x: x, y: y, placed: placed, screenSize: screenSize, center: center) {
                                 angle = tryAngle
                                 radius = tryRadius
@@ -1148,14 +1158,14 @@ struct DiscoveryView: View {
 
                 // Phase 3: exhaustive sweep as last resort
                 if !foundSpot {
-                    let minR = 0.20 * halfScreen
+                    let minR = minCenterDistance
                     let maxR = 0.98 * halfScreen
                     let rStep: CGFloat = 20
                     let aStep = 0.25
                     outerLoop: for r in stride(from: minR, through: maxR, by: rStep) {
                         for a in stride(from: 0.0, to: Double.pi * 2, by: aStep) {
                             let x = r * cos(a)
-                            let y = r * sin(a)
+                            let y = r * sin(a) * verticalStretch
                             if isValidPosition(x: x, y: y, placed: placed, screenSize: screenSize, center: center) {
                                 angle = a
                                 radius = r
@@ -1167,7 +1177,7 @@ struct DiscoveryView: View {
                 }
 
                 let px = radius * cos(angle)
-                let py = radius * sin(angle)
+                let py = radius * sin(angle) * verticalStretch
                 placed.append((x: px, y: py))
 
                 let (type, color) = planetTypeAndColor(for: item, index: index)
@@ -1202,7 +1212,7 @@ struct DiscoveryView: View {
     private func calculatePlanetPosition(planet: PlanetNode, center: CGPoint, halfScreen: CGFloat) -> CGPoint {
         let radius = planet.radius * halfScreen
         let x = center.x + radius * cos(planet.angle)
-        let y = center.y + radius * sin(planet.angle)
+        let y = center.y + radius * sin(planet.angle) * verticalStretch
         return CGPoint(x: x, y: y)
     }
 }
