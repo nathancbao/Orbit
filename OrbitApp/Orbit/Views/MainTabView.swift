@@ -32,36 +32,21 @@ struct MainTabView: View {
             }
         }
 
-        var blankIcon: String? {
-            switch self {
-            case .discovery: return "discoveryNavBlank"
-            case .missions:  return "missionNavBlank"
-            case .pods:      return "podsNavBlank"
-            case .friends:   return nil
-            }
-        }
-
-        var colorIcon: String? {
-            switch self {
-            case .discovery: return "discoveryNavColor"
-            case .missions:  return "missionNavColor"
-            case .pods:      return "podsNavColor"
-            case .friends:   return nil
-            }
-        }
-
-        /// SF Symbol fallback for tabs without custom assets.
         var sfSymbol: String {
             switch self {
-            case .friends: return "person.2"
-            default: return ""
+            case .discovery: return "safari"
+            case .missions:  return "flag"
+            case .pods:      return "hexagon"
+            case .friends:   return "person.2"
             }
         }
 
         var sfSymbolFilled: String {
             switch self {
-            case .friends: return "person.2.fill"
-            default: return ""
+            case .discovery: return "safari.fill"
+            case .missions:  return "flag.fill"
+            case .pods:      return "hexagon.fill"
+            case .friends:   return "person.2.fill"
             }
         }
     }
@@ -99,20 +84,11 @@ struct MainTabView: View {
                     } label: {
                         VStack(spacing: 4) {
                             ZStack(alignment: .topTrailing) {
-                                Group {
-                                    if let icon = selectedTab == tab ? tab.colorIcon : tab.blankIcon {
-                                        Image(icon)
-                                            .renderingMode(.original)
-                                            .resizable()
-                                            .aspectRatio(contentMode: .fit)
-                                    } else {
-                                        Image(systemName: selectedTab == tab ? tab.sfSymbolFilled : tab.sfSymbol)
-                                            .resizable()
-                                            .aspectRatio(contentMode: .fit)
-                                            .foregroundColor(selectedTab == tab ? OrbitTheme.purple : .black)
-                                    }
-                                }
-                                .frame(width: 24, height: 24)
+                                Image(systemName: selectedTab == tab ? tab.sfSymbolFilled : tab.sfSymbol)
+                                    .resizable()
+                                    .aspectRatio(contentMode: .fit)
+                                    .foregroundColor(selectedTab == tab ? OrbitTheme.purple : Color(.systemGray2))
+                                    .frame(width: 24, height: 24)
 
                                 if tab == .friends && unreadDMCount > 0 {
                                     Text(unreadDMCount > 9 ? "9+" : "\(unreadDMCount)")
