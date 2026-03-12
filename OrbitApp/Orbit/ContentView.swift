@@ -56,13 +56,26 @@ struct ContentView: View {
                     )
                 } else {
                     // No profile loaded — send to setup instead of dead screen
-                    QuickProfileSetupView(
-                        onComplete: { profile, _ in
-                            currentProfile = profile
-                            appState = .home
-                        },
-                        onCancel: nil
-                    )
+                    VStack(spacing: 0) {
+                        HStack(spacing: 8) {
+                            Image(systemName: "exclamationmark.triangle.fill")
+                                .foregroundColor(.orange)
+                            Text("You have no profile. Please set one up to continue.")
+                                .font(.subheadline)
+                                .fontWeight(.medium)
+                        }
+                        .padding()
+                        .frame(maxWidth: .infinity)
+                        .background(Color.orange.opacity(0.12))
+
+                        QuickProfileSetupView(
+                            onComplete: { profile, _ in
+                                currentProfile = profile
+                                appState = .home
+                            },
+                            onCancel: nil
+                        )
+                    }
                 }
             }
         }
