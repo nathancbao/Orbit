@@ -18,6 +18,7 @@ struct Pod: Codable, Identifiable {
     var surveyCompletedBy: [Int]
     var hasPendingSurvey: Bool
     var missionTags: [String]
+    var mode: String?           // "set" or "flex" — enriched by backend
 
     // ── Local-only schedule fields (not from API — TODO: migrate to backend) ──
     var confirmedTime: Date?
@@ -48,6 +49,7 @@ struct Pod: Codable, Identifiable {
         case surveyCompletedBy = "survey_completed_by"
         case hasPendingSurvey = "has_pending_survey"
         case missionTags = "mission_tags"
+        case mode
     }
 
     init(from decoder: Decoder) throws {
@@ -81,12 +83,16 @@ struct Pod: Codable, Identifiable {
         surveyCompletedBy = (try? container.decode([Int].self, forKey: .surveyCompletedBy)) ?? []
         hasPendingSurvey = (try? container.decode(Bool.self, forKey: .hasPendingSurvey)) ?? false
         missionTags = (try? container.decode([String].self, forKey: .missionTags)) ?? []
+        mode = try? container.decodeIfPresent(String.self, forKey: .mode)
 
         // Local-only fields — not decoded from API
         confirmedTime = nil
         scheduleDeadline = nil
         leaderPickDeadline = nil
     }
+
+    /// Whether this pod belongs to a flex/signal mission.
+    var isFlexPod: Bool { mode == "flex" }
 
     /// The leader of the pod (first member in join order).
     var leaderId: Int? { memberIds.first }

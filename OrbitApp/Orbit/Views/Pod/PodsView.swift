@@ -22,8 +22,10 @@ struct PodsView: View {
     @State private var recommendedMissionForDetail: Mission? = nil
 
     /// Set pods sorted by scheduled time (soonest first), filtered by search.
+    /// Excludes flex pods so they only appear in the Flex tab.
     private var sortedPods: [Pod] {
-        let sorted = pods.sorted { a, b in
+        let setPods = pods.filter { !$0.isFlexPod }
+        let sorted = setPods.sorted { a, b in
             let dateA = a.parsedScheduledTime ?? .distantFuture
             let dateB = b.parsedScheduledTime ?? .distantFuture
             return dateA < dateB

@@ -739,13 +739,22 @@ def get_user_pods(user_id, limit=100):
 
     for pod in pods:
         mission_id = pod.get('mission_id')
-        if mission_id is not None:
+        signal_id = pod.get('signal_id')
+        if signal_id:
+            # Flex pod — look up the linked Signal for title/tags
+            signal = get_signal(signal_id)
+            pod['mission_title'] = signal.get('title', 'Untitled') if signal else 'Untitled'
+            pod['mission_tags'] = signal.get('tags', []) if signal else []
+            pod['mode'] = 'flex'
+        elif mission_id is not None:
             mission = get_mission(int(mission_id))
             pod['mission_title'] = mission.get('title', 'Untitled') if mission else 'Untitled'
             pod['mission_tags'] = mission.get('tags', []) if mission else []
+            pod['mode'] = 'set'
         else:
             pod['mission_title'] = 'Untitled'
             pod['mission_tags'] = []
+            pod['mode'] = 'set'
 
         # Survey eligibility: completed pod, user hasn't submitted, within 7-day window
         survey_completed_by = pod.get('survey_completed_by') or []
