@@ -740,7 +740,7 @@ struct MissionCreateView: View {
 
     // Flex mode fields
     @State private var minGroupSize = 3
-    @State private var maxGroupSize = 8
+    @State private var maxGroupSize = 10
     @State private var selectedDays: Set<Int> = []
     @State private var selectedHours: Set<HourSlotKey> = []
     @State private var timeRangeStart: Int = 9
@@ -1349,7 +1349,7 @@ struct MissionCreateView: View {
                     Text("Max")
                         .font(.caption)
                         .foregroundColor(.secondary)
-                    Stepper("\(maxGroupSize)", value: $maxGroupSize, in: minGroupSize...8)
+                    Stepper("\(maxGroupSize)", value: $maxGroupSize, in: minGroupSize...10)
                         .font(.subheadline)
                 }
             }

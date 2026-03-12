@@ -517,7 +517,7 @@ def get_history_entry(user_id, mission_id):
 # Fields: id (UUID string), creator_id, title, description,
 #         activity_category (matches Swift ActivityCategory raw values),
 #         custom_activity_name (string or None),
-#         min_group_size (3+), max_group_size (<=8),
+#         min_group_size (3+), max_group_size (<=10),
 #         availability [{"date": "<ISO8601>", "time_blocks": ["morning", ...]}],
 #         links (list of URL strings, max 2),
 #         pod_ids (list of pod UUID strings, max 2, assigned on RSVP),

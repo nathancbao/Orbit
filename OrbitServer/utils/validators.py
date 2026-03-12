@@ -244,8 +244,8 @@ def validate_signal_data(data):
         max_gs = int(data['max_group_size'])
         if min_gs < 3:
             errors.append("min_group_size must be at least 3")
-        if max_gs > 8:
-            errors.append("max_group_size must be at most 8")
+        if max_gs > 10:
+            errors.append("max_group_size must be at most 10")
         if min_gs > max_gs:
             errors.append("min_group_size cannot exceed max_group_size")
     except (KeyError, TypeError, ValueError):
