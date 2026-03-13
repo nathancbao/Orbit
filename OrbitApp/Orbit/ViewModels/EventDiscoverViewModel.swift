@@ -101,7 +101,7 @@ class MissionsViewModel: ObservableObject {
             if a.isFlexMode != b.isFlexMode { return !a.isFlexMode }
             return a.sortDate < b.sortDate
         }
-        return mine.sorted(by: sortByTime) + rest.sorted(by: sortByTime)
+        return rest.sorted(by: sortByTime)
     }
 
     private var hasLoaded = false

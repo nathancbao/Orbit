@@ -778,6 +778,7 @@ struct MissionCreateView: View {
 
     @State private var isSubmitting = false
     @State private var errorMessage: String?
+    @State private var showCreatedSuccess = false
 
     var onCreated: ((Mission) -> Void)?
 
@@ -898,6 +899,26 @@ struct MissionCreateView: View {
                         flexModeForm
                     }
 
+                    if showCreatedSuccess {
+                        HStack(spacing: 8) {
+                            Image(systemName: "checkmark.circle.fill")
+                                .foregroundColor(.green)
+                            Text("Mission created!")
+                                .font(.subheadline)
+                                .fontWeight(.medium)
+                        }
+                        .padding(12)
+                        .frame(maxWidth: .infinity)
+                        .background(Color.green.opacity(0.1))
+                        .clipShape(RoundedRectangle(cornerRadius: 10))
+                        .onAppear {
+                            Task {
+                                try? await Task.sleep(for: .seconds(3))
+                                showCreatedSuccess = false
+                            }
+                        }
+                    }
+
                     if let error = errorMessage {
                         Text(error)
                             .font(.caption)
@@ -927,18 +948,27 @@ struct MissionCreateView: View {
 
     private let availableTags = ["Hiking", "Gaming", "Food", "Sports", "Study", "Hangout", "Other"]
 
+    private let maxTagCount = 3
+
     private var tagPickerSection: some View {
         VStack(alignment: .leading, spacing: 10) {
-            OrbitSectionHeader(title: "Tags")
+            HStack {
+                OrbitSectionHeader(title: "Tags")
+                Spacer()
+                Text("\(tags.count)/\(maxTagCount)")
+                    .font(.caption2)
+                    .foregroundColor(tags.count >= maxTagCount ? .orange : .secondary)
+            }
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 8) {
                     ForEach(availableTags, id: \.self) { tag in
                         let isSelected = tags.contains(tag)
+                        let isDisabled = !isSelected && tags.count >= maxTagCount
                         Button {
                             UIImpactFeedbackGenerator(style: .light).impactOccurred()
                             if isSelected {
                                 tags.removeAll { $0 == tag }
-                            } else {
+                            } else if tags.count < maxTagCount {
                                 tags.append(tag)
                             }
                         } label: {
@@ -963,8 +993,10 @@ struct MissionCreateView: View {
                                 )
                                 .clipShape(Capsule())
                                 .foregroundColor(isSelected ? .primary : .secondary)
+                                .opacity(isDisabled ? 0.4 : 1.0)
                         }
                         .buttonStyle(.plain)
+                        .disabled(isDisabled)
                     }
                 }
             }
@@ -998,12 +1030,13 @@ struct MissionCreateView: View {
                         .textFieldStyle(.roundedBorder)
                         .submitLabel(.done)
                         .onSubmit { addCustomTag() }
+                        .disabled(tags.count >= maxTagCount)
                     Button(action: addCustomTag) {
                         Image(systemName: "plus.circle.fill")
                             .font(.title3)
                             .foregroundStyle(OrbitTheme.gradient)
                     }
-                    .disabled(customTagText.trimmingCharacters(in: .whitespaces).isEmpty)
+                    .disabled(customTagText.trimmingCharacters(in: .whitespaces).isEmpty || tags.count >= maxTagCount)
                 }
 
                 let customTags = tags.filter { !availableTags.contains($0) }
@@ -1190,12 +1223,13 @@ struct MissionCreateView: View {
                         .textFieldStyle(.roundedBorder)
                         .submitLabel(.done)
                         .onSubmit { addCustomTag() }
+                        .disabled(tags.count >= maxTagCount)
                     Button(action: addCustomTag) {
                         Image(systemName: "plus.circle.fill")
                             .font(.title3)
                             .foregroundStyle(OrbitTheme.gradient)
                     }
-                    .disabled(customTagText.trimmingCharacters(in: .whitespaces).isEmpty)
+                    .disabled(customTagText.trimmingCharacters(in: .whitespaces).isEmpty || tags.count >= maxTagCount)
                 }
 
                 let customTags = tags.filter { !availableTags.contains($0) }
@@ -1624,7 +1658,8 @@ struct MissionCreateView: View {
                     await MainActor.run {
                         isSubmitting = false
                         onCreated?(created)
-                        dismiss()
+                        resetForm()
+                        showCreatedSuccess = true
                     }
                 } catch {
                     await MainActor.run {
@@ -1690,7 +1725,8 @@ struct MissionCreateView: View {
                         )
                     }
                     onCreated?(created)
-                    dismiss()
+                    resetForm()
+                    showCreatedSuccess = true
                 } else {
                     errorMessage = viewModel.errorMessage ?? "Something went wrong. Try again."
                 }
@@ -1702,9 +1738,30 @@ struct MissionCreateView: View {
 
     private func addCustomTag() {
         let tag = customTagText.trimmingCharacters(in: .whitespaces)
-        guard !tag.isEmpty, !tags.contains(tag) else { return }
+        guard !tag.isEmpty, !tags.contains(tag), tags.count < 3 else { return }
         tags.append(tag)
         customTagText = ""
+    }
+
+    private func resetForm() {
+        title = ""
+        description = ""
+        location = ""
+        tags = []
+        date = Date().addingTimeInterval(86400)
+        startTime = Calendar.current.date(from: DateComponents(hour: 12, minute: 0))!
+        endTime = Calendar.current.date(from: DateComponents(hour: 13, minute: 0))!
+        maxPodSize = 4
+        minGroupSize = 3
+        maxGroupSize = 10
+        creatorSlots = []
+        selectedDays = []
+        selectedHours = []
+        link1 = ""
+        link2 = ""
+        customTagText = ""
+        errorMessage = nil
+        showCreatedSuccess = false
     }
 
     private func hourString(_ hour: Int) -> String {
