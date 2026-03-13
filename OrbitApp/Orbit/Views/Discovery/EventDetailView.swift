@@ -1098,16 +1098,21 @@ struct MissionPodStatusSection: View {
 
             if let pods = mission.pods, !pods.isEmpty {
                 ForEach(pods, id: \.podId) { pod in
+                    // Use the mission's configured max as source of truth —
+                    // pod.maxSize may default to 4 if the backend omits max_size.
+                    let effectiveMaxSize = max(pod.maxSize, mission.maxPodSize)
+                    let effectiveSpotsLeft = max(0, effectiveMaxSize - pod.memberCount)
+                    let isOpen = pod.status == "open" && effectiveSpotsLeft > 0
                     HStack {
-                        Image(systemName: pod.status == "open" ? "circle.dotted" : "circle.fill")
-                            .foregroundColor(pod.status == "open" ? .green : .secondary)
+                        Image(systemName: isOpen ? "circle.dotted" : "circle.fill")
+                            .foregroundColor(isOpen ? .green : .secondary)
                             .font(.caption)
-                        Text("Pod · \(pod.memberCount)/\(pod.maxSize) members")
+                        Text("Pod · \(pod.memberCount)/\(effectiveMaxSize) members")
                             .font(.subheadline)
                         Spacer()
-                        Text(pod.status == "open" ? "\(pod.spotsLeft) spots left" : "full")
+                        Text(isOpen ? "\(effectiveSpotsLeft) spots left" : "full")
                             .font(.caption)
-                            .foregroundColor(pod.status == "open" ? .green : .secondary)
+                            .foregroundColor(isOpen ? .green : .secondary)
                     }
                     .padding(12)
                     .background(Color(.systemGray6))

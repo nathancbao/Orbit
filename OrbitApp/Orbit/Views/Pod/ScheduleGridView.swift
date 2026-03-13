@@ -40,7 +40,7 @@ struct ScheduleGridView: View {
                         Circle()
                             .fill(entry.memberColor.color)
                             .frame(width: 10, height: 10)
-                        Text(entry.displayName)
+                        Text(legendName(for: entry))
                             .font(.caption)
                             .foregroundColor(.primary)
                         if entry.hasSubmitted {
@@ -297,6 +297,18 @@ struct ScheduleGridView: View {
         if hour < 12 { return "\(hour) AM" }
         if hour == 12 { return "12 PM" }
         return "\(hour - 12) PM"
+    }
+
+    /// Legend display name: "You" for the current user, real name for others.
+    private func legendName(for entry: ScheduleEntry) -> String {
+        if entry.userId == viewModel.currentUserId {
+            return "You"
+        }
+        // Cross-reference pod.members for the real name
+        if let member = pod.members?.first(where: { $0.userId == entry.userId }) {
+            return member.name
+        }
+        return entry.displayName
     }
 
     /// Current user's assigned color (from their entry, or default pink).

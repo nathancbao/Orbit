@@ -523,48 +523,67 @@ struct MissionListCard: View {
 
     // MARK: - Member Avatars Row
 
+    // MARK: - Pod Member Display (user's pod, compact, right-aligned)
+
+    /// The pod to display: user's pod if joined, otherwise first open pod.
+    private var displayPod: PodSummary? {
+        guard let pods = mission.pods, !pods.isEmpty else { return nil }
+        if let userPodId = mission.userPodId,
+           let userPod = pods.first(where: { $0.podId == userPodId }) {
+            return userPod
+        }
+        return pods.first(where: { $0.status == "open" }) ?? pods.first
+    }
+
+    private var podPreviews: [MemberPreview] {
+        displayPod?.memberPreviews ?? []
+    }
+
+    private var podMemberCount: Int {
+        displayPod?.memberCount ?? 0
+    }
+
+    private var podMaxSize: Int {
+        max(displayPod?.maxSize ?? 0, mission.maxPodSize)
+    }
+
     private var memberAvatarsRow: some View {
-        let previews = allMemberPreviews
-        let memberCount = totalMemberCount
-        let maxSize = mission.maxPodSize
-
-        return Group {
-            if memberCount > 0 {
-                HStack(spacing: 4) {
-                    // Overlapping avatar stack
-                    HStack(spacing: -8) {
-                        ForEach(Array(previews.prefix(5).enumerated()), id: \.element.id) { index, member in
-                            ProfileAvatarView(photo: member.photo, size: 24)
-                                .zIndex(Double(5 - index))
+        Group {
+            if podMemberCount > 0 {
+                HStack(spacing: 0) {
+                    Spacer()
+                    HStack(spacing: 4) {
+                        // Overlapping avatar stack (small: 20pt, max 3)
+                        HStack(spacing: -6) {
+                            if !podPreviews.isEmpty {
+                                ForEach(Array(podPreviews.prefix(3).enumerated()), id: \.element.id) { index, member in
+                                    ProfileAvatarView(photo: member.photo, size: 20)
+                                        .zIndex(Double(3 - index))
+                                }
+                            } else {
+                                // Placeholder circles when previews aren't available
+                                ForEach(0..<min(podMemberCount, 3), id: \.self) { index in
+                                    Circle()
+                                        .fill(Color(.systemGray4))
+                                        .frame(width: 20, height: 20)
+                                        .overlay(
+                                            Image(systemName: "person.fill")
+                                                .font(.system(size: 9))
+                                                .foregroundColor(.white)
+                                        )
+                                        .zIndex(Double(3 - index))
+                                }
+                            }
                         }
-                    }
 
-                    if previews.count > 5 {
-                        Text("+\(previews.count - 5)")
+                        Text("\(podMemberCount)/\(podMaxSize)")
                             .font(.caption2)
+                            .fontWeight(.medium)
                             .foregroundColor(mission.isFlexMode ? .white.opacity(0.6) : .secondary)
                     }
-
-                    Text("\(memberCount)/\(maxSize) members")
-                        .font(.caption)
-                        .foregroundColor(mission.isFlexMode ? .white.opacity(0.6) : .secondary)
                 }
             }
         }
-    }
-
-    private var allMemberPreviews: [MemberPreview] {
-        if let pods = mission.pods {
-            return pods.compactMap(\.memberPreviews).flatMap { $0 }
-        }
-        return []
-    }
-
-    private var totalMemberCount: Int {
-        if let pods = mission.pods {
-            return pods.reduce(0) { $0 + $1.memberCount }
-        }
-        return 0
     }
 }
 
@@ -778,7 +797,6 @@ struct MissionCreateView: View {
 
     @State private var isSubmitting = false
     @State private var errorMessage: String?
-    @State private var showCreatedSuccess = false
 
     var onCreated: ((Mission) -> Void)?
 
@@ -897,26 +915,6 @@ struct MissionCreateView: View {
                         setModeForm
                     } else {
                         flexModeForm
-                    }
-
-                    if showCreatedSuccess {
-                        HStack(spacing: 8) {
-                            Image(systemName: "checkmark.circle.fill")
-                                .foregroundColor(.green)
-                            Text("Mission created!")
-                                .font(.subheadline)
-                                .fontWeight(.medium)
-                        }
-                        .padding(12)
-                        .frame(maxWidth: .infinity)
-                        .background(Color.green.opacity(0.1))
-                        .clipShape(RoundedRectangle(cornerRadius: 10))
-                        .onAppear {
-                            Task {
-                                try? await Task.sleep(for: .seconds(3))
-                                showCreatedSuccess = false
-                            }
-                        }
                     }
 
                     if let error = errorMessage {
@@ -1658,8 +1656,7 @@ struct MissionCreateView: View {
                     await MainActor.run {
                         isSubmitting = false
                         onCreated?(created)
-                        resetForm()
-                        showCreatedSuccess = true
+                        dismiss()
                     }
                 } catch {
                     await MainActor.run {
@@ -1725,8 +1722,7 @@ struct MissionCreateView: View {
                         )
                     }
                     onCreated?(created)
-                    resetForm()
-                    showCreatedSuccess = true
+                    dismiss()
                 } else {
                     errorMessage = viewModel.errorMessage ?? "Something went wrong. Try again."
                 }
@@ -1761,7 +1757,6 @@ struct MissionCreateView: View {
         link2 = ""
         customTagText = ""
         errorMessage = nil
-        showCreatedSuccess = false
     }
 
     private func hourString(_ hour: Int) -> String {

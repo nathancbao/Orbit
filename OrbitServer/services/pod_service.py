@@ -38,7 +38,7 @@ def _find_best_pod_for_user(mission_id: int, user_interests: set, max_pod_size: 
     """
     open_pods = [
         p for p in list_pods(mission_id)
-        if p.get('status') == 'open'
+        if p.get('status') in ('open', 'meeting_confirmed')
         and len(p.get('member_ids') or []) < max_pod_size
     ]
     if not open_pods:
