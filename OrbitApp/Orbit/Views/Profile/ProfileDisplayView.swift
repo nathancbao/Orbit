@@ -5,7 +5,7 @@ extension Notification.Name {
 }
 
 struct ProfileDisplayView: View {
-    let profile: Profile
+    @State private var profile: Profile
     var onEdit: (() -> Void)? = nil
     var onProfileUpdated: ((Profile) -> Void)? = nil
     var otherUserId: Int? = nil
@@ -16,6 +16,14 @@ struct ProfileDisplayView: View {
     @State private var friendStatus: FriendStatus?
     @State private var isSendingRequest = false
     @State private var showLogoutConfirm = false
+
+    init(profile: Profile, onEdit: (() -> Void)? = nil,
+         onProfileUpdated: ((Profile) -> Void)? = nil, otherUserId: Int? = nil) {
+        self._profile = State(initialValue: profile)
+        self.onEdit = onEdit
+        self.onProfileUpdated = onProfileUpdated
+        self.otherUserId = otherUserId
+    }
 
     private var isOwnProfile: Bool { otherUserId == nil && onProfileUpdated != nil }
 
@@ -292,7 +300,12 @@ struct ProfileDisplayView: View {
             }
             .task {
                 if let targetId = otherUserId {
-                    friendStatus = try? await FriendService.shared.checkFriendStatus(userId: targetId)
+                    async let statusFetch: FriendStatus? = try? FriendService.shared.checkFriendStatus(userId: targetId)
+                    async let profileFetch: Profile? = try? ProfileService.shared.getUserProfile(id: targetId)
+                    friendStatus = await statusFetch
+                    if let full = await profileFetch {
+                        profile = full
+                    }
                 }
             }
             .navigationDestination(isPresented: $showEdit) {

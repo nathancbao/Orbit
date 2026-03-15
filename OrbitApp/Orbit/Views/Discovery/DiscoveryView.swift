@@ -70,7 +70,7 @@ struct PlanetNode: Identifiable {
 
     var subtitle: String {
         switch type {
-        case .mission(let m): return m.isFlexMode ? (m.activityCategory?.displayName ?? "") : m.displayDate
+        case .mission(let m): return m.isFlexMode ? "flex mission" : m.displayDate
         case .template(let t):      return t.interest
         }
     }
