@@ -82,7 +82,6 @@ struct FlowLayout: Layout {
 struct MissionDetailView: View {
     @State private var mission: Mission
     let onJoined: () -> Void
-    var onOpenPod: ((String) -> Void)?
     var viewModel: MissionsViewModel?
 
     @State private var isJoining = false
@@ -92,6 +91,8 @@ struct MissionDetailView: View {
     @State private var joinedPodId: String?
     @State private var showEditSheet = false
     @State private var showDeleteAlert = false
+    @State private var showPodSheet = false
+    @State private var selectedPodId: String?
 
     // Member profiles
     @State private var podMembers: [PodMember] = []
@@ -108,11 +109,10 @@ struct MissionDetailView: View {
         return true
     }
 
-    init(mission: Mission, viewModel: MissionsViewModel? = nil, onJoined: @escaping () -> Void, onOpenPod: ((String) -> Void)? = nil) {
+    init(mission: Mission, viewModel: MissionsViewModel? = nil, onJoined: @escaping () -> Void) {
         self._mission = State(initialValue: mission)
         self.viewModel = viewModel
         self.onJoined = onJoined
-        self.onOpenPod = onOpenPod
     }
 
     var body: some View {
@@ -229,6 +229,11 @@ struct MissionDetailView: View {
                 }
             }
         }
+        .sheet(isPresented: $showPodSheet) {
+            if let podId = mission.userPodId ?? joinedPodId {
+                PodView(podId: podId, title: mission.isFlexMode ? mission.displayTitle : mission.title, missionMode: mission.mode)
+            }
+        }
     }
 
     // MARK: - Set Mode Content (unchanged)
@@ -307,7 +312,11 @@ struct MissionDetailView: View {
 
                 Divider()
 
-                MissionPodStatusSection(mission: mission)
+                MissionPodStatusSection(
+                    mission: mission,
+                    selectedPodId: $selectedPodId,
+                    selectable: mission.userPodStatus != "in_pod" && !mission.isCompleted
+                )
 
                 if !podMembers.isEmpty {
                     MissionMemberSection(
@@ -590,11 +599,11 @@ struct MissionDetailView: View {
         errorMessage = nil
         Task {
             do {
-                let pod = try await MissionService.shared.joinMission(id: mission.id)
+                let pod = try await MissionService.shared.joinMission(id: mission.id, podId: selectedPodId)
                 await MainActor.run {
                     isJoining = false
-                    dismiss()
-                    onOpenPod?(pod.id)
+                    mission.userPodStatus = "in_pod"
+                    mission.userPodId = pod.id
                 }
             } catch {
                 await MainActor.run {
@@ -656,18 +665,16 @@ struct MissionDetailView: View {
 
     /// Open the flex pod — resolves pod_id first if needed.
     private func openFlexPod() {
-        if let podId = joinedPodId {
-            dismiss()
-            onOpenPod?(podId)
+        if joinedPodId != nil {
+            showPodSheet = true
             return
         }
         // pod_id missing — fetch it, then open
         Task {
             await resolvePodId()
             await MainActor.run {
-                if let podId = joinedPodId {
-                    dismiss()
-                    onOpenPod?(podId)
+                if joinedPodId != nil {
+                    showPodSheet = true
                 } else {
                     errorMessage = "Could not find your pod. Try again."
                 }
@@ -676,8 +683,7 @@ struct MissionDetailView: View {
     }
 
     private func openPod(podId: String) {
-        dismiss()
-        onOpenPod?(podId)
+        showPodSheet = true
     }
 
     // MARK: - Member Fetching
@@ -1090,33 +1096,57 @@ struct SignalDetailView: View {
 
 struct MissionPodStatusSection: View {
     let mission: Mission
+    @Binding var selectedPodId: String?
+    let selectable: Bool
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             Text("pods")
                 .font(.headline)
 
+            if selectable && (mission.pods?.count ?? 0) > 1 {
+                Text("tap a pod to choose where to join")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
+
             if let pods = mission.pods, !pods.isEmpty {
                 ForEach(pods, id: \.podId) { pod in
-                    // Use the mission's configured max as source of truth —
-                    // pod.maxSize may default to 4 if the backend omits max_size.
                     let effectiveMaxSize = max(pod.maxSize, mission.maxPodSize)
                     let effectiveSpotsLeft = max(0, effectiveMaxSize - pod.memberCount)
                     let isOpen = pod.status == "open" && effectiveSpotsLeft > 0
+                    let isSelected = selectedPodId == pod.podId
+
                     HStack {
                         Image(systemName: isOpen ? "circle.dotted" : "circle.fill")
-                            .foregroundColor(isOpen ? .green : .secondary)
+                            .foregroundColor(isSelected ? OrbitTheme.purple : (isOpen ? .green : .secondary))
                             .font(.caption)
                         Text("Pod · \(pod.memberCount)/\(effectiveMaxSize) members")
                             .font(.subheadline)
                         Spacer()
+                        if isSelected {
+                            Image(systemName: "checkmark.circle.fill")
+                                .foregroundStyle(OrbitTheme.gradient)
+                                .font(.subheadline)
+                        }
                         Text(isOpen ? "\(effectiveSpotsLeft) spots left" : "full")
                             .font(.caption)
                             .foregroundColor(isOpen ? .green : .secondary)
                     }
                     .padding(12)
-                    .background(Color(.systemGray6))
+                    .background(isSelected ? OrbitTheme.purple.opacity(0.08) : Color(.systemGray6))
                     .cornerRadius(12)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 12)
+                            .stroke(isSelected ? OrbitTheme.purple : Color.clear, lineWidth: 1.5)
+                    )
+                    .onTapGesture {
+                        guard selectable && isOpen else { return }
+                        withAnimation(.easeInOut(duration: 0.15)) {
+                            selectedPodId = isSelected ? nil : pod.podId
+                        }
+                    }
+                    .opacity(selectable && !isOpen ? 0.5 : 1)
                 }
             } else {
                 Text("no pods yet — be the first to join!")

@@ -19,10 +19,6 @@ struct MissionsView: View {
     @State private var showProfile = false
     @State private var createdFlexPodId: String? = nil
     @State private var showCreatedFlexPod = false
-    @State private var openPodId: String? = nil
-    @State private var openPodTitle: String = ""
-    @State private var openPodMode: MissionMode = .set
-    @State private var showOpenPod = false
     @State private var searchText = ""
     @State private var showRecommendations = false
 
@@ -209,27 +205,10 @@ struct MissionsView: View {
         }
         .sheet(item: $selectedMission, onDismiss: {
             Task { await viewModel.reload() }
-            // If a pod was queued to open, show it now that the sheet is fully gone
-            if openPodId != nil {
-                showOpenPod = true
-            }
         }) { mission in
             MissionDetailView(mission: mission, viewModel: viewModel, onJoined: {
                 selectedMission = nil
-            }, onOpenPod: { podId in
-                openPodId = podId
-                openPodTitle = mission.isFlexMode ? mission.displayTitle : mission.title
-                openPodMode = mission.mode
-                selectedMission = nil
             })
-        }
-        .sheet(isPresented: $showOpenPod, onDismiss: {
-            openPodId = nil
-            Task { await viewModel.reload() }
-        }) {
-            if let podId = openPodId {
-                PodView(podId: podId, title: openPodTitle, missionMode: openPodMode)
-            }
         }
         .sheet(isPresented: $showRecommendations) {
             RecommendationsSheet(

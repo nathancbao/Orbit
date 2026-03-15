@@ -77,10 +77,14 @@ class MissionService {
         )
     }
 
-    func joinMission(id: String) async throws -> Pod {
+    func joinMission(id: String, podId: String? = nil) async throws -> Pod {
+        var body: [String: Any]? = nil
+        if let podId = podId {
+            body = ["pod_id": podId]
+        }
         return try await APIService.shared.request(
             endpoint: Constants.API.Endpoints.joinMission(id),
-            method: "POST", authenticated: true
+            method: "POST", body: body, authenticated: true
         )
     }
 

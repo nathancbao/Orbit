@@ -31,13 +31,19 @@ class PodViewModel: ObservableObject {
         missionMode == .flex && pod?.status != "meeting_confirmed" && pod?.status != "cancelled"
     }
 
-    func load() async {
+    func load(retryCount: Int = 0) async {
         isLoading = true
 
         // Each request is independent — one failure must not block the others.
         do { pod = try await PodService.shared.getPod(id: podId) }
         catch {
             let msg = error.localizedDescription.lowercased()
+            // Pod may not be ready yet right after joining — retry once.
+            if retryCount < 2 {
+                try? await Task.sleep(nanoseconds: 1_500_000_000) // 1.5s
+                await load(retryCount: retryCount + 1)
+                return
+            }
             // Pod doesn't exist on backend — signal auto-dismiss
             if msg.contains("not found") || msg.contains("expired") {
                 podNotFound = true

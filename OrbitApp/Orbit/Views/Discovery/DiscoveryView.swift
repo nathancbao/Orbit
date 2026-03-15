@@ -262,16 +262,17 @@ struct RecommendationBellView: View {
     var body: some View {
         Button(action: onTap) {
             ZStack(alignment: .topTrailing) {
-                Image(systemName: "bell.fill")
+                Image(systemName: "bell")
                     .font(.system(size: 20))
-                    .foregroundColor(DiscoveryTheme.textPrimary)
-                    .padding(10)
+                    .fontWeight(.medium)
+                    .foregroundStyle(Color.primary)
+                    .frame(width: 34, height: 34)
 
                 if showBadge {
                     Circle()
-                        .fill(DiscoveryTheme.accentPink)
-                        .frame(width: 10, height: 10)
-                        .offset(x: -6, y: 8)
+                        .fill(OrbitTheme.pink)
+                        .frame(width: 8, height: 8)
+                        .offset(x: 2, y: 0)
                         .transition(.scale.combined(with: .opacity))
                 }
             }
@@ -743,10 +744,6 @@ struct DiscoveryView: View {
     @State private var selectedPlanetId: UUID? = nil
     @State private var planetPositions: [UUID: CGPoint] = [:]
     @State private var selectedMission: Mission? = nil
-    @State private var discOpenPodId: String? = nil
-    @State private var discOpenPodTitle: String = ""
-    @State private var discOpenPodMode: MissionMode = .set
-    @State private var showDiscPod = false
     @State private var showCreateMission = false
     @State private var createPrefillTitle = ""
     @State private var createPrefillTags: [String] = []
@@ -866,7 +863,7 @@ struct DiscoveryView: View {
             }
             .overlay(alignment: .top) {
                 VStack(spacing: 8) {
-                    // Top bar: bell (left) + legend (center) + profile (right)
+                    // Top bar: bell (left) + profile (right)
                     HStack {
                         RecommendationBellView(
                             showBadge: viewModel.showRecommendationBadge,
@@ -884,7 +881,7 @@ struct DiscoveryView: View {
                         }
                     }
                     .padding(.horizontal, 16)
-                    .padding(.top, 8)
+                    .padding(.top, 4)
 
                     // Motivational banner
                     MotivationalBannerView()
@@ -934,26 +931,10 @@ struct DiscoveryView: View {
                     }
                 }
             }
-            .sheet(item: $selectedMission, onDismiss: {
-                if discOpenPodId != nil {
-                    showDiscPod = true
-                }
-            }) { mission in
+            .sheet(item: $selectedMission) { mission in
                 MissionDetailView(mission: mission, viewModel: missionsVM, onJoined: {
                     selectedMission = nil
-                }, onOpenPod: { podId in
-                    discOpenPodId = podId
-                    discOpenPodTitle = mission.isFlexMode ? mission.displayTitle : mission.title
-                    discOpenPodMode = mission.mode
-                    selectedMission = nil
                 })
-            }
-            .sheet(isPresented: $showDiscPod, onDismiss: {
-                discOpenPodId = nil
-            }) {
-                if let podId = discOpenPodId {
-                    PodView(podId: podId, title: discOpenPodTitle, missionMode: discOpenPodMode)
-                }
             }
             .sheet(isPresented: $showCreateMission) {
                 MissionCreateView(

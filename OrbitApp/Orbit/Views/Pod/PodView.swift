@@ -225,7 +225,11 @@ struct PodView: View {
     private var mainContent: some View {
         ZStack {
             Color(.systemGroupedBackground).ignoresSafeArea()
-            existingChatContent
+            if viewModel.isLoading && viewModel.pod == nil {
+                ProgressView()
+            } else {
+                existingChatContent
+            }
         }
     }
 

@@ -138,12 +138,13 @@ def _set_mission_time_info(mission):
     return result
 
 
-def join_mission(mission_id, user_id):
+def join_mission(mission_id, user_id, preferred_pod_id=None):
     """
     Assign a user to the next open pod for a mission.
     Creates a new pod if none are open.
     Uses a Datastore transaction to prevent race conditions.
     Returns (pod_dict, error_string).
+    If preferred_pod_id is given, attempt to join that specific pod.
     """
     mission = get_mission(mission_id)
     if not mission:
@@ -158,12 +159,22 @@ def join_mission(mission_id, user_id):
 
     max_pod_size = mission.get('max_pod_size', 4)
 
-    # Fetch user interests for compatibility-based pod selection
-    user = get_user(user_id) or {}
-    user_interests = set(user.get('interests') or [])
+    # If caller requested a specific pod, try to use it
+    if preferred_pod_id:
+        pod = get_pod(preferred_pod_id)
+        if not pod:
+            return None, "Pod not found"
+        if str(pod.get('mission_id')) != str(mission_id):
+            return None, "Pod does not belong to this mission"
+        if len(pod.get('member_ids') or []) >= max_pod_size:
+            return None, "That pod is full"
+    else:
+        # Fetch user interests for compatibility-based pod selection
+        user = get_user(user_id) or {}
+        user_interests = set(user.get('interests') or [])
 
-    # Find the best-fit open pod (most interest overlap), or create a new one
-    pod = _find_best_pod_for_user(mission_id, user_interests, max_pod_size)
+        # Find the best-fit open pod (most interest overlap), or create a new one
+        pod = _find_best_pod_for_user(mission_id, user_interests, max_pod_size)
     uid = _safe_int(user_id)
     if uid is None:
         return None, "Invalid user ID"

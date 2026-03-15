@@ -226,7 +226,9 @@ def delete(mission_id):
 @missions_bp.route('/<mission_id>/join', methods=['POST'])
 @require_auth
 def join(mission_id):
-    pod, err = join_mission(mission_id, g.user_id)
+    data = request.get_json(silent=True) or {}
+    preferred_pod_id = data.get('pod_id')
+    pod, err = join_mission(mission_id, g.user_id, preferred_pod_id=preferred_pod_id)
     if err:
         return error(err, 400)
     return success(pod, 201)
