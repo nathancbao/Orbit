@@ -74,7 +74,7 @@ struct FriendInboxView: View {
                             Image(systemName: "tray")
                                 .font(.system(size: 36))
                                 .foregroundColor(.secondary)
-                            Text("no notifications")
+                            Text("No Notifications")
                                 .font(.headline)
                                 .foregroundColor(.secondary)
                         }

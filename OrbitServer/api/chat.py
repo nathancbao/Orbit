@@ -5,7 +5,7 @@ from OrbitServer.utils.auth import require_auth
 from OrbitServer.utils.rate_limit import limiter
 from OrbitServer.utils.validators import validate_message_data, validate_vote_data
 from OrbitServer.services.chat_service import (
-    get_messages, send_message, create_poll, respond_to_vote, get_votes_for_pod,
+    get_messages, send_message, create_poll, respond_to_vote, remove_vote, get_votes_for_pod,
 )
 
 chat_bp = Blueprint('chat', __name__, url_prefix='/api/pods')
@@ -73,6 +73,15 @@ def respond(pod_id, vote_id):
         return error("option_index must be an integer", 400)
 
     vote, err = respond_to_vote(pod_id, vote_id, g.user_id, option_index)
+    if err:
+        return error(err, 400)
+    return success(vote)
+
+
+@chat_bp.route('/<pod_id>/votes/<vote_id>/respond', methods=['DELETE'])
+@require_auth
+def remove_vote_endpoint(pod_id, vote_id):
+    vote, err = remove_vote(pod_id, vote_id, g.user_id)
     if err:
         return error(err, 400)
     return success(vote)

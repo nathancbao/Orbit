@@ -82,9 +82,9 @@ struct PodsView: View {
                                 Image(systemName: segment == .set ? "calendar" : "antenna.radiowaves.left.and.right")
                                     .font(.system(size: 36))
                                     .foregroundStyle(OrbitTheme.gradient)
-                                Text(segment == .set ? "no set pods yet" : "no flex pods yet")
+                                Text(segment == .set ? "No Set Pods Yet" : "No Flex Pods Yet")
                                     .font(.headline)
-                                Text("join a mission to form a pod")
+                                Text("Join a Mission to form a Pod")
                                     .font(.subheadline)
                                     .foregroundColor(.secondary)
                                     .multilineTextAlignment(.center)
@@ -97,7 +97,7 @@ struct PodsView: View {
                                 VStack(spacing: 14) {
                                     if segment == .set {
                                         if sortedPods.isEmpty {
-                                            Text("no matches")
+                                            Text("No Matches")
                                                 .font(.subheadline)
                                                 .foregroundColor(.secondary)
                                                 .padding(.top, 40)
@@ -113,7 +113,7 @@ struct PodsView: View {
                                         }
                                     } else {
                                         if filteredFlexMissions.isEmpty {
-                                            Text("no matches")
+                                            Text("No Matches")
                                                 .font(.subheadline)
                                                 .foregroundColor(.secondary)
                                                 .padding(.top, 40)

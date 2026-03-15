@@ -60,25 +60,25 @@ struct MissionsView: View {
                                 // Filters: type + topic (single row)
                                 ScrollView(.horizontal, showsIndicators: false) {
                                     HStack(spacing: 8) {
-                                        TagFilterChip(label: "all", isSelected: viewModel.filterTag == nil && !viewModel.showMyYearOnly && viewModel.filterMode == nil) {
+                                        TagFilterChip(label: "All", isSelected: viewModel.filterTag == nil && !viewModel.showMyYearOnly && viewModel.filterMode == nil) {
                                             Task {
                                                 viewModel.applyModeFilter(nil)
                                                 if viewModel.showMyYearOnly { await viewModel.toggleYearFilter() }
                                                 await viewModel.applyTag(nil)
                                             }
                                         }
-                                        TagFilterChip(label: "set", isSelected: viewModel.filterMode == .set) {
+                                        TagFilterChip(label: "Set", isSelected: viewModel.filterMode == .set) {
                                             viewModel.applyModeFilter(viewModel.filterMode == .set ? nil : .set)
                                         }
-                                        TagFilterChip(label: "flex", isSelected: viewModel.filterMode == .flex) {
+                                        TagFilterChip(label: "Flex", isSelected: viewModel.filterMode == .flex) {
                                             viewModel.applyModeFilter(viewModel.filterMode == .flex ? nil : .flex)
                                         }
-                                        TagFilterChip(label: "my year", isSelected: viewModel.showMyYearOnly) {
+                                        TagFilterChip(label: "My Year", isSelected: viewModel.showMyYearOnly) {
                                             Task { await viewModel.toggleYearFilter() }
                                         }
                                         ForEach(allTags, id: \.self) { tag in
                                             TagFilterChip(
-                                                label: tag.lowercased(),
+                                                label: tag,
                                                 isSelected: viewModel.filterTag == tag
                                             ) {
                                                 Task { await viewModel.applyTag(viewModel.filterTag == tag ? nil : tag) }
@@ -412,7 +412,7 @@ struct MissionListCard: View {
                             ScrollView(.horizontal, showsIndicators: false) {
                                 HStack(spacing: 6) {
                                     ForEach(mission.tags.prefix(4), id: \.self) { tag in
-                                        Text(tag)
+                                        Text(tag.capitalized)
                                             .font(.caption2)
                                             .padding(.horizontal, 8)
                                             .padding(.vertical, 3)
@@ -461,7 +461,7 @@ struct MissionListCard: View {
                             ScrollView(.horizontal, showsIndicators: false) {
                                 HStack(spacing: 6) {
                                     ForEach(mission.tags.prefix(4), id: \.self) { tag in
-                                        Text(tag)
+                                        Text(tag.capitalized)
                                             .font(.caption2)
                                             .padding(.horizontal, 8)
                                             .padding(.vertical, 3)
@@ -631,7 +631,7 @@ struct MissionSpotsLabel: View {
             } else {
                 switch mission.userPodStatus {
                 case "in_pod":
-                    Label("you're in!", systemImage: "checkmark.circle.fill")
+                    Label("You're In!", systemImage: "checkmark.circle.fill")
                         .foregroundColor(.green)
                 default:
                     if let pods = mission.pods, !pods.isEmpty {
@@ -643,11 +643,11 @@ struct MissionSpotsLabel: View {
                             )
                             .foregroundStyle(OrbitTheme.gradient)
                         } else {
-                            Label("join waitlist", systemImage: "person.badge.clock")
+                            Label("Join Waitlist", systemImage: "person.badge.clock")
                                 .foregroundColor(.secondary)
                         }
                     } else {
-                        Label("be the first to join", systemImage: "star")
+                        Label("Be the first to join", systemImage: "star")
                             .foregroundStyle(OrbitTheme.gradient)
                     }
                 }
@@ -946,7 +946,7 @@ struct MissionCreateView: View {
                                 tags.append(tag)
                             }
                         } label: {
-                            Text(tag.lowercased())
+                            Text(tag.capitalized)
                                 .font(.caption)
                                 .fontWeight(isSelected ? .semibold : .regular)
                                 .padding(.horizontal, 12)
@@ -1293,7 +1293,6 @@ struct MissionCreateView: View {
                     startDate: Date(),
                     memberColor: MemberColor.pink.color
                 )
-                .frame(height: 520)
 
                 HStack {
                     Text("\(creatorSlots.count) hour\(creatorSlots.count == 1 ? "" : "s") selected")

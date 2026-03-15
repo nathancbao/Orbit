@@ -511,6 +511,8 @@ struct PodView: View {
                     ForEach(viewModel.votes) { vote in
                         VoteCardView(vote: vote, currentUserId: currentUserId) { voteId, optionIndex in
                             Task { await viewModel.castVote(voteId: voteId, optionIndex: optionIndex) }
+                        } onRemoveVote: { voteId in
+                            Task { await viewModel.removeVote(voteId: voteId) }
                         }
                         .padding(.horizontal, 16)
                         .padding(.vertical, 4)

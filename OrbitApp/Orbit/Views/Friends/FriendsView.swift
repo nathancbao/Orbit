@@ -26,9 +26,9 @@ struct FriendsView: View {
                         Image(systemName: "person.2")
                             .font(.system(size: 48))
                             .foregroundStyle(OrbitTheme.gradient)
-                        Text("no friends yet")
+                        Text("No Friends Yet")
                             .font(.headline)
-                        Text("search by email or name to add friends")
+                        Text("Search by email or name to add friends")
                             .font(.subheadline)
                             .foregroundColor(.secondary)
                             .multilineTextAlignment(.center)
@@ -73,7 +73,7 @@ struct FriendsView: View {
                             }
 
                             if viewModel.filteredFriends.isEmpty && !viewModel.searchText.isEmpty {
-                                Text("no matches")
+                                Text("No Matches")
                                     .font(.subheadline)
                                     .foregroundColor(.secondary)
                                     .frame(maxWidth: .infinity)

@@ -51,7 +51,7 @@ struct AuthFlowView: View {
                 GraduationCapIcon()
 
                 // Title text
-                Text("type in your student email!")
+                Text("Type in your student email!")
                     .font(.system(size: 18, weight: .medium, design: .monospaced))
                     .foregroundColor(.black)
 
@@ -122,7 +122,7 @@ struct AuthFlowView: View {
                     .frame(width: 120, height: 120)
 
                 // Title text
-                Text("check your inbox!")
+                Text("Check your inbox!")
                     .font(.system(size: 18, weight: .medium, design: .monospaced))
                     .foregroundColor(.black)
 
@@ -156,7 +156,7 @@ struct AuthFlowView: View {
                 Button(action: {
                     viewModel.resetToEmailEntry()
                 }) {
-                    Text("change email")
+                    Text("Change Email")
                         .font(.system(size: 14, design: .monospaced))
                         .foregroundColor(.gray)
                         .padding(.horizontal, 20)

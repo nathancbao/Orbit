@@ -137,7 +137,7 @@ struct ProfileDisplayView: View {
                         // Interests
                         if !profile.interests.isEmpty {
                             VStack(alignment: .leading, spacing: 12) {
-                                Text("interests")
+                                Text("Interests")
                                     .font(.headline)
                                     .frame(maxWidth: .infinity, alignment: .leading)
 
@@ -160,7 +160,7 @@ struct ProfileDisplayView: View {
                         if !profile.galleryPhotos.isEmpty {
                             VStack(alignment: .leading, spacing: 12) {
                                 HStack {
-                                    Text("gallery")
+                                    Text("Gallery")
                                         .font(.headline)
                                     Spacer()
                                     Text("\(galleryIndex + 1)/\(profile.galleryPhotos.count)")
@@ -191,7 +191,7 @@ struct ProfileDisplayView: View {
                         // Links
                         if !profile.links.isEmpty {
                             VStack(alignment: .leading, spacing: 8) {
-                                Text("links")
+                                Text("Links")
                                     .font(.headline)
                                     .frame(maxWidth: .infinity, alignment: .leading)
 
@@ -349,7 +349,7 @@ struct TrustScoreView: View {
                     .font(.caption)
                     .foregroundColor(.secondary)
             }
-            Text("trust score")
+            Text("Trust Score")
                 .font(.caption2)
                 .foregroundColor(.secondary)
         }

@@ -624,7 +624,7 @@ struct PlanetNodeView: View {
                     }
 
                     if planet.isTemplate {
-                        Text("tap to create")
+                        Text("Tap To Create")
                             .font(.caption2)
                             .foregroundColor(DiscoveryTheme.templateColor)
                             .italic()

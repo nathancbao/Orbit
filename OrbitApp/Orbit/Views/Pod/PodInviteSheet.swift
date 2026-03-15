@@ -31,10 +31,10 @@ struct PodInviteSheet: View {
                         Image(systemName: "person.crop.circle.badge.questionmark")
                             .font(.system(size: 36))
                             .foregroundColor(.secondary)
-                        Text("no friends to invite")
+                        Text("No friends to invite")
                             .font(.headline)
                             .foregroundColor(.secondary)
-                        Text("all your friends are already in this pod, or you haven't added any friends yet")
+                        Text("All your friends are already in this Pod, or you haven't added any friends yet")
                             .font(.caption)
                             .foregroundColor(.secondary)
                             .multilineTextAlignment(.center)
@@ -98,7 +98,7 @@ struct PodInviteSheet: View {
             Spacer()
 
             if alreadySent {
-                Text("sent")
+                Text("Sent")
                     .font(.caption2)
                     .fontWeight(.semibold)
                     .padding(.horizontal, 10)

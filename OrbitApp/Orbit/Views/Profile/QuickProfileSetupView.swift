@@ -126,7 +126,7 @@ struct QuickProfileSetupView: View {
                                                 Image(systemName: "camera")
                                                     .font(.title3)
                                                     .foregroundStyle(OrbitTheme.gradient)
-                                                Text("optional")
+                                                Text("Optional")
                                                     .font(.caption2)
                                                     .foregroundColor(.secondary)
                                             }
@@ -139,10 +139,10 @@ struct QuickProfileSetupView: View {
 
                     // Name
                     VStack(alignment: .leading, spacing: 8) {
-                        Text("your name")
+                        Text("Your Name")
                             .font(.subheadline)
                             .foregroundColor(.secondary)
-                        TextField("what should people call you?", text: $name)
+                        TextField("What should people call you?", text: $name)
                             .padding(.horizontal, 16)
                             .padding(.vertical, 12)
                             .background(Color(.systemGray6))
@@ -151,7 +151,7 @@ struct QuickProfileSetupView: View {
 
                     // College Year
                     VStack(alignment: .leading, spacing: 10) {
-                        Text("college year")
+                        Text("College Year")
                             .font(.subheadline)
                             .foregroundColor(.secondary)
                         HStack(spacing: 8) {
@@ -168,7 +168,7 @@ struct QuickProfileSetupView: View {
                     // Interests
                     VStack(alignment: .leading, spacing: 10) {
                         HStack {
-                            Text("interests")
+                            Text("Interests")
                                 .font(.subheadline)
                                 .foregroundColor(.secondary)
                             Spacer()
@@ -182,7 +182,7 @@ struct QuickProfileSetupView: View {
 
                         // Custom interest input
                         HStack {
-                            TextField("add your own...", text: $customInterestText)
+                            TextField("Add your own...", text: $customInterestText)
                                 .padding(.horizontal, 14)
                                 .padding(.vertical, 10)
                                 .background(Color(.systemGray6))
@@ -206,7 +206,7 @@ struct QuickProfileSetupView: View {
                     // Bio
                     VStack(alignment: .leading, spacing: 8) {
                         HStack {
-                            Text("bio")
+                            Text("Bio")
                                 .font(.subheadline)
                                 .foregroundColor(.secondary)
                             Spacer()
@@ -216,7 +216,7 @@ struct QuickProfileSetupView: View {
                                     bio.count > Constants.Validation.maxBioLength ? .red : .secondary
                                 )
                         }
-                        TextField("tell people about yourself...", text: $bio, axis: .vertical)
+                        TextField("Tell people about yourself...", text: $bio, axis: .vertical)
                             .lineLimit(3...6)
                             .padding(.horizontal, 16)
                             .padding(.vertical, 12)
@@ -231,7 +231,7 @@ struct QuickProfileSetupView: View {
 
                     // Gender
                     VStack(alignment: .leading, spacing: 10) {
-                        Text("gender")
+                        Text("Gender")
                             .font(.subheadline)
                             .foregroundColor(.secondary)
                         HStack(spacing: 8) {
@@ -250,12 +250,12 @@ struct QuickProfileSetupView: View {
                     // MBTI
                     VStack(alignment: .leading, spacing: 10) {
                         HStack {
-                            Text("mbti")
+                            Text("MBTI")
                                 .font(.subheadline)
                                 .foregroundColor(.secondary)
                             Spacer()
                             if !selectedMBTI.isEmpty {
-                                Button("clear") {
+                                Button("Clear") {
                                     selectedMBTI = ""
                                 }
                                 .font(.caption)
@@ -284,7 +284,7 @@ struct QuickProfileSetupView: View {
 
                     // Links
                     VStack(alignment: .leading, spacing: 8) {
-                        Text("links")
+                        Text("Links")
                             .font(.subheadline)
                             .foregroundColor(.secondary)
                         ForEach(0..<3, id: \.self) { index in
@@ -303,7 +303,7 @@ struct QuickProfileSetupView: View {
                     // Gallery Photos
                     VStack(alignment: .leading, spacing: 10) {
                         HStack {
-                            Text("gallery photos")
+                            Text("Gallery Photos")
                                 .font(.subheadline)
                                 .foregroundColor(.secondary)
                             Spacer()
@@ -403,7 +403,7 @@ struct QuickProfileSetupView: View {
                                 ProgressView()
                                     .tint(.white)
                             } else {
-                                Text(initialProfile != nil ? "save changes" : "let's go →")
+                                Text(initialProfile != nil ? "Save Changes" : "Let's Go →")
                                     .font(.system(size: 16, weight: .semibold))
                                     .tracking(1)
                             }
@@ -427,7 +427,7 @@ struct QuickProfileSetupView: View {
                         } label: {
                             HStack {
                                 Image(systemName: "trash")
-                                Text(isDeleting ? "deleting..." : "delete account")
+                                Text(isDeleting ? "Deleting..." : "Delete Account")
                             }
                             .font(.system(size: 14, weight: .medium))
                             .foregroundColor(.red)

@@ -112,6 +112,33 @@ def respond_to_vote(pod_id, vote_id, user_id, option_index):
     return vote, None
 
 
+def remove_vote(pod_id, vote_id, user_id):
+    pod = get_pod(pod_id)
+    if not pod:
+        return None, "Pod not found"
+    member_ids = pod.get('member_ids') or []
+    if int(user_id) not in member_ids:
+        return None, "You are not a member of this pod"
+
+    vote = get_vote(vote_id)
+    if not vote or vote['pod_id'] != str(pod_id):
+        return None, "Vote not found"
+    if vote['status'] == 'closed':
+        return None, "This vote is already closed"
+
+    uid_key = str(user_id)
+    if uid_key not in (vote.get('votes') or {}):
+        return None, "You have not voted yet"
+
+    def _remove(entity):
+        votes_map = dict(entity.get('votes') or {})
+        votes_map.pop(uid_key, None)
+        entity['votes'] = votes_map
+
+    _, vote = transactional_vote_update(vote_id, _remove)
+    return vote, None
+
+
 def _tally_votes(votes_map, options):
     """Return (winning_option_string, winning_index) by plurality.
     Returns (None, -1) if no valid votes or empty options.

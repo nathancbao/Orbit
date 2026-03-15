@@ -7,6 +7,7 @@ struct VoteCardView: View {
     let vote: Vote
     let currentUserId: Int
     let onVote: (String, Int) -> Void  // (voteId, optionIndex)
+    let onRemoveVote: (String) -> Void  // (voteId)
 
     private var userVote: Int? {
         vote.votes[String(currentUserId)]
@@ -96,6 +97,17 @@ struct VoteCardView: View {
                         .buttonStyle(.plain)
                         .disabled(vote.status == "closed")
                     }
+                }
+
+                if userVote != nil && vote.status == "open" {
+                    Button {
+                        onRemoveVote(vote.id)
+                    } label: {
+                        Text("Remove vote")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                    .buttonStyle(.plain)
                 }
             }
         }

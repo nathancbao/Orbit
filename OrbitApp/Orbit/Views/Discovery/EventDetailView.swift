@@ -349,7 +349,7 @@ struct MissionDetailView: View {
         if mission.isCompleted {
             if let podId = mission.userPodId {
                 Button(action: { openPod(podId: podId) }) {
-                    Label("open your pod", systemImage: "person.3.fill")
+                    Label("Open Pod", systemImage: "person.3.fill")
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 16)
                         .background(OrbitTheme.gradientFill)
@@ -360,7 +360,7 @@ struct MissionDetailView: View {
         } else if mission.userPodStatus == "in_pod" {
             if let podId = mission.userPodId {
                 Button(action: { openPod(podId: podId) }) {
-                    Label("open your pod", systemImage: "person.3.fill")
+                    Label("Open Pod", systemImage: "person.3.fill")
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 16)
                         .background(OrbitTheme.gradientFill)
@@ -374,7 +374,7 @@ struct MissionDetailView: View {
                     if isJoining {
                         ProgressView().tint(.white)
                     } else {
-                        Text("join a pod \u{2192}")
+                        Text("Join Pod \u{2192}")
                             .font(.system(size: 16, weight: .semibold))
                             .tracking(0.5)
                     }
@@ -393,7 +393,7 @@ struct MissionDetailView: View {
     private var flexActionButton: some View {
         if showSignedUp {
             Button(action: { openFlexPod() }) {
-                Label("open your pod", systemImage: "person.3.fill")
+                Label("Open Pod", systemImage: "person.3.fill")
                     .font(.system(size: 16, weight: .semibold))
                     .tracking(0.5)
                     .frame(maxWidth: .infinity)
@@ -413,7 +413,7 @@ struct MissionDetailView: View {
                     if isJoining {
                         ProgressView().tint(.white)
                     } else {
-                        Text("join a pod \u{2192}")
+                        Text("Join Pod \u{2192}")
                             .font(.system(size: 16, weight: .semibold))
                             .tracking(0.5)
                     }
@@ -511,7 +511,7 @@ struct MissionDetailView: View {
                     // Availability Section
                     if let slots = mission.availability, !slots.isEmpty {
                         VStack(alignment: .leading, spacing: 12) {
-                            Text("availability")
+                            Text("Availability")
                                 .font(.headline)
 
                             if let summary = mission.flexAvailabilitySummary {
@@ -751,7 +751,7 @@ struct MissionMemberSection: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
-                Text("members")
+                Text("Members")
                     .font(.headline)
                 Spacer()
                 Text("\(members.count)")
@@ -935,7 +935,7 @@ struct SignalDetailView: View {
                             // Availability Section
                             if let slots = mission.availability, !slots.isEmpty {
                                 VStack(alignment: .leading, spacing: 12) {
-                                    Text("availability")
+                                    Text("Availability")
                                         .font(.headline)
 
                                     if let summary = mission.flexAvailabilitySummary {
@@ -997,7 +997,7 @@ struct SignalDetailView: View {
                     // Action button area
                     if showSignedUp, joinedPodId != nil {
                         Button(action: { showPod = true }) {
-                            Label("open your pod", systemImage: "person.3.fill")
+                            Label("Open Pod", systemImage: "person.3.fill")
                                 .font(.system(size: 16, weight: .semibold))
                                 .tracking(0.5)
                                 .frame(maxWidth: .infinity)
@@ -1025,7 +1025,7 @@ struct SignalDetailView: View {
                                 if isRsvping {
                                     ProgressView().tint(.white)
                                 } else {
-                                    Text("join a pod \u{2192}")
+                                    Text("Join Pod \u{2192}")
                                         .font(.system(size: 16, weight: .semibold))
                                         .tracking(0.5)
                                 }
@@ -1125,11 +1125,11 @@ struct MissionPodStatusSection: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("pods")
+            Text("Pods")
                 .font(.headline)
 
             if selectable && (mission.pods?.count ?? 0) > 1 {
-                Text("tap a pod to choose where to join")
+                Text("Tap a Pod to choose where to join")
                     .font(.caption)
                     .foregroundColor(.secondary)
             }
@@ -1173,7 +1173,7 @@ struct MissionPodStatusSection: View {
                     .opacity(selectable && !isOpen ? 0.5 : 1)
                 }
             } else {
-                Text("no pods yet — be the first to join!")
+                Text("No Pods yet — be the first to join!")
                     .font(.subheadline)
                     .foregroundColor(.secondary)
             }

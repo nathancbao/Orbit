@@ -48,6 +48,14 @@ class ChatService {
         )
     }
 
+    func removeVote(podId: String, voteId: String) async throws -> Vote {
+        return try await APIService.shared.request(
+            endpoint: Constants.API.Endpoints.podVoteRespond(podId, voteId),
+            method: "DELETE",
+            authenticated: true
+        )
+    }
+
     // MARK: - DMs
 
     func getDMMessages(friendId: Int) async throws -> [ChatMessage] {

@@ -379,21 +379,19 @@ struct CreatorAvailabilityGridView: View {
     }
 
     var body: some View {
-        ScrollView(.vertical, showsIndicators: true) {
-            VStack(spacing: 0) {
-                dayHeaders
-                ForEach(Array(ScheduleGrid.hourRange), id: \.self) { hour in
-                    hourRow(hour: hour)
-                }
+        VStack(spacing: 0) {
+            dayHeaders
+            ForEach(Array(ScheduleGrid.hourRange), id: \.self) { hour in
+                hourRow(hour: hour)
             }
-            .padding(8)
-            .background(Color(.systemGray6).opacity(0.5))
-            .clipShape(RoundedRectangle(cornerRadius: 12))
-            .contentShape(Rectangle())
-            .gesture(dragGesture)
-            .onPreferenceChange(CellFramePreferenceKey.self) { frames in
-                cellFrames = frames
-            }
+        }
+        .padding(8)
+        .background(Color(.systemGray6).opacity(0.5))
+        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .contentShape(Rectangle())
+        .gesture(dragGesture)
+        .onPreferenceChange(CellFramePreferenceKey.self) { frames in
+            cellFrames = frames
         }
     }
 

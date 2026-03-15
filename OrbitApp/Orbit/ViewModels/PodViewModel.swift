@@ -128,6 +128,19 @@ class PodViewModel: ObservableObject {
         }
     }
 
+    func removeVote(voteId: String) async {
+        do {
+            let updated = try await ChatService.shared.removeVote(
+                podId: podId, voteId: voteId
+            )
+            if let idx = votes.firstIndex(where: { $0.id == voteId }) {
+                votes[idx] = updated
+            }
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
     func leavePod() async {
         isLeaving = true
         do {
