@@ -147,6 +147,8 @@ struct Pod: Codable, Identifiable {
     /// Display string including end time, e.g. "Mon, Mar 9 · 3:00 PM – 4:00 PM".
     var displayTime: String? {
         guard let base = scheduledTime, !base.isEmpty else { return nil }
+        // If the base string already contains a time range (–), don't append end time again
+        if base.contains("–") { return base }
         guard let endDate = parsedEndTime else { return base }
         let f = DateFormatter()
         f.dateFormat = "h:mm a"
