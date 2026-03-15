@@ -220,6 +220,9 @@ struct MissionDetailView: View {
             }
         }
         .task {
+            // Fetch full mission detail so pods are always populated
+            // (list endpoints don't include pod summaries).
+            await fetchFullMissionDetail()
             await fetchPodMembers()
             // For flex missions where user RSVP'd but pod_id was lost, resolve it
             if mission.isFlexMode && !showSignedUp {
@@ -684,6 +687,32 @@ struct MissionDetailView: View {
 
     private func openPod(podId: String) {
         showPodSheet = true
+    }
+
+    // MARK: - Full Detail Fetch
+
+    private func fetchFullMissionDetail() async {
+        do {
+            let detailed: Mission
+            if mission.isFlexMode {
+                detailed = try await MissionService.shared.getFlexMission(id: mission.id)
+            } else {
+                detailed = try await MissionService.shared.getMission(id: mission.id)
+            }
+            // Merge pods and pod-status fields into local state
+            if let pods = detailed.pods, !pods.isEmpty {
+                mission.pods = pods
+            }
+            if let status = detailed.userPodStatus {
+                mission.userPodStatus = status
+            }
+            if let podId = detailed.userPodId {
+                mission.userPodId = podId
+            }
+        } catch {
+            // Non-fatal – the view still works with whatever data it already has.
+            print("[MissionDetail] Failed to fetch full detail: \(error)")
+        }
     }
 
     // MARK: - Member Fetching
