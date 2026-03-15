@@ -17,3 +17,9 @@
 __pycache__/
 # Ignored by the build system
 /setup.cfg
+
+# iOS app — not needed on App Engine
+OrbitApp/
+*.xcodeproj/
+*.xcworkspace/
+*.xcuserstate

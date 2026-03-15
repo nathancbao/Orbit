@@ -136,12 +136,12 @@ def remove_gallery_photo(user_id, index):
 def delete_user_account(user_id):
     """Permanently delete a user and all associated data."""
     from OrbitServer.models.models import (
-        get_user_pods, delete_pod, delete_mission, delete_signal,
+        get_user_pods, delete_mission, delete_signal,
         list_friendships, delete_friendship,
         list_incoming_friend_requests, list_outgoing_friend_requests,
         delete_friend_request, list_signals_for_user,
     )
-    from OrbitServer.services.pod_service import transactional_pod_update
+    from OrbitServer.services.pod_service import leave_pod
 
     user = get_user(user_id)
     if not user:
@@ -149,21 +149,11 @@ def delete_user_account(user_id):
 
     uid = int(user_id)
 
-    # 1. Remove user from all pods they belong to
+    # 1. Leave all pods (handles member removal, confirmed_attendees, signal RSVPs)
     try:
         pods = get_user_pods(uid)
         for pod in pods:
-            pod_id = pod['id']
-            member_ids = pod.get('member_ids') or []
-            remaining = [m for m in member_ids if m != uid]
-            if not remaining:
-                delete_pod(pod_id)
-            else:
-                def _remove(entity, _uid=uid):
-                    entity['member_ids'] = [m for m in (entity.get('member_ids') or []) if m != _uid]
-                    if len(entity['member_ids']) < entity.get('max_size', 4):
-                        entity['status'] = 'open'
-                transactional_pod_update(pod_id, _remove)
+            leave_pod(pod['id'], uid)
     except Exception:
         logger.exception("Error cleaning up pods for user %s", user_id)
 
