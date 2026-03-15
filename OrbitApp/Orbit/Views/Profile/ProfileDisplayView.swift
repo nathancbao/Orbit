@@ -109,11 +109,6 @@ struct ProfileDisplayView: View {
                                 .padding(.horizontal, 32)
                         }
 
-                        // Trust score (only show once they have real ratings)
-                        if let score = profile.trustScore, score > 0 {
-                            TrustScoreView(score: score)
-                        }
-
                         // Add Friend button (only when viewing someone else's profile)
                         if let targetId = otherUserId {
                             FriendActionButton(
