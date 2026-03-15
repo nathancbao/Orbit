@@ -127,6 +127,10 @@ struct PodsView: View {
                                         ForEach(filteredFlexMissions) { mission in
                                             FlexMissionRsvpCard(
                                                 mission: mission,
+                                                hasUnread: {
+                                                    if let podId = mission.podId { return unreadPodIds.contains(podId) }
+                                                    return false
+                                                }(),
                                                 onDismiss: { Task { await loadData() } },
                                                 onPodNotFound: { rsvpedFlexMissions.removeAll { $0.id == mission.id } }
                                             )
@@ -356,6 +360,7 @@ struct PodRowCard: View {
 
 struct FlexMissionRsvpCard: View {
     let mission: Mission
+    var hasUnread: Bool = false
     var onDismiss: (() -> Void)? = nil
     var onPodNotFound: (() -> Void)? = nil
     @State private var showSheet = false
@@ -419,8 +424,16 @@ struct FlexMissionRsvpCard: View {
 
                 Spacer()
 
-                Image(systemName: mission.podId != nil ? "message.fill" : "antenna.radiowaves.left.and.right")
-                    .foregroundColor(.white.opacity(0.5))
+                ZStack(alignment: .topTrailing) {
+                    Image(systemName: mission.podId != nil ? "message.fill" : "antenna.radiowaves.left.and.right")
+                        .foregroundColor(.white.opacity(0.5))
+                    if hasUnread {
+                        Circle()
+                            .fill(Color.red)
+                            .frame(width: 10, height: 10)
+                            .offset(x: 3, y: -3)
+                    }
+                }
             }
             .padding(16)
             .background(Color(red: 0.1, green: 0.1, blue: 0.14))
