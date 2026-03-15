@@ -48,12 +48,8 @@ def _annotate_pod_status(mission, user_id):
             mission['user_pod_id'] = user_pod['id']
             return
 
-        pods = list_pods(mission_id)
-        has_room = not pods or any(
-            p['status'] == 'open' and len(p.get('member_ids') or []) < p.get('max_size', 4)
-            for p in pods
-        )
-        mission['user_pod_status'] = 'not_joined' if has_room else 'pod_full'
+        # Always allow joining — the backend creates a new pod when all are full.
+        mission['user_pod_status'] = 'not_joined'
         mission['user_pod_id'] = None
     except Exception:
         logger.exception("Failed to annotate pod status for mission %s", mission.get('id'))

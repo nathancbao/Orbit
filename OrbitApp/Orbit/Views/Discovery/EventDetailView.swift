@@ -368,11 +368,6 @@ struct MissionDetailView: View {
                         .clipShape(Capsule())
                 }
             }
-        } else if mission.userPodStatus == "pod_full" {
-            Text("all pods are currently full")
-                .frame(maxWidth: .infinity, alignment: .center)
-                .foregroundColor(.secondary)
-                .font(.subheadline)
         } else {
             Button(action: joinSetMission) {
                 ZStack {

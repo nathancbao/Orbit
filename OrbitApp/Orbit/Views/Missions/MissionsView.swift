@@ -633,9 +633,6 @@ struct MissionSpotsLabel: View {
                 case "in_pod":
                     Label("you're in!", systemImage: "checkmark.circle.fill")
                         .foregroundColor(.green)
-                case "pod_full":
-                    Label("pods full", systemImage: "person.fill.xmark")
-                        .foregroundColor(.secondary)
                 default:
                     if let pods = mission.pods, !pods.isEmpty {
                         let open = pods.filter { $0.status == "open" }
