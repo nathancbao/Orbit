@@ -1,5 +1,9 @@
-from OrbitServer.models.models import get_user, update_user, COLLEGE_YEARS
+import logging
+
+from OrbitServer.models.models import get_user, update_user, delete_user, COLLEGE_YEARS
 from OrbitServer.services.storage_service import upload_file
+
+logger = logging.getLogger(__name__)
 
 
 PROFILE_FIELDS = [
@@ -127,3 +131,84 @@ def remove_gallery_photo(user_id, index):
         'profile': profile,
         'profile_complete': _is_profile_complete(profile),
     }, None
+
+
+def delete_user_account(user_id):
+    """Permanently delete a user and all associated data."""
+    from OrbitServer.models.models import (
+        get_user_pods, delete_pod, delete_mission, delete_signal,
+        list_friendships, delete_friendship,
+        list_incoming_friend_requests, list_outgoing_friend_requests,
+        delete_friend_request, list_signals_for_user,
+    )
+    from OrbitServer.services.pod_service import transactional_pod_update
+
+    user = get_user(user_id)
+    if not user:
+        return None, "User not found"
+
+    uid = int(user_id)
+
+    # 1. Remove user from all pods they belong to
+    try:
+        pods = get_user_pods(uid)
+        for pod in pods:
+            pod_id = pod['id']
+            member_ids = pod.get('member_ids') or []
+            remaining = [m for m in member_ids if m != uid]
+            if not remaining:
+                delete_pod(pod_id)
+            else:
+                def _remove(entity, _uid=uid):
+                    entity['member_ids'] = [m for m in (entity.get('member_ids') or []) if m != _uid]
+                    if len(entity['member_ids']) < entity.get('max_size', 4):
+                        entity['status'] = 'open'
+                transactional_pod_update(pod_id, _remove)
+    except Exception:
+        logger.exception("Error cleaning up pods for user %s", user_id)
+
+    # 2. Delete all friendships (both directions) and friend requests
+    try:
+        from OrbitServer.models.models import client as ds_client
+        from google.cloud.datastore.query import PropertyFilter
+
+        # Delete friendships where user is user_id
+        for fs in list_friendships(uid):
+            delete_friendship(fs['id'])
+        # Delete reverse friendships where user is friend_id
+        reverse_query = ds_client.query(kind='Friendship')
+        reverse_query.add_filter(filter=PropertyFilter('friend_id', '=', uid))
+        for entity in reverse_query.fetch(limit=500):
+            ds_client.delete(entity.key)
+        # Delete all friend requests involving user
+        for req in list_incoming_friend_requests(uid):
+            delete_friend_request(req['id'])
+        for req in list_outgoing_friend_requests(uid):
+            delete_friend_request(req['id'])
+    except Exception:
+        logger.exception("Error cleaning up friends for user %s", user_id)
+
+    # 3. Delete signals (flex missions) created by this user
+    try:
+        for signal in list_signals_for_user(uid):
+            delete_signal(signal['id'])
+    except Exception:
+        logger.exception("Error cleaning up signals for user %s", user_id)
+
+    # 4. Delete set missions created by this user
+    try:
+        from OrbitServer.models.models import client, _entity_to_dict
+        from google.cloud.datastore.query import PropertyFilter
+        query = client.query(kind='Mission')
+        query.add_filter(filter=PropertyFilter('creator_id', '=', uid))
+        for entity in query.fetch(limit=500):
+            mission = _entity_to_dict(entity)
+            if mission:
+                delete_mission(mission['id'])
+    except Exception:
+        logger.exception("Error cleaning up missions for user %s", user_id)
+
+    # 5. Delete the user entity itself
+    delete_user(uid)
+
+    return True, None

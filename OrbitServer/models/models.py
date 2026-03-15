@@ -105,6 +105,13 @@ def adjust_trust_score(user_id, delta):
     user_cache.invalidate(int(user_id))
 
 
+def delete_user(user_id):
+    """Delete a User entity from the datastore."""
+    key = client.key('User', int(user_id))
+    client.delete(key)
+    user_cache.invalidate(int(user_id))
+
+
 def list_all_users(limit=10000):
     """Fetch all User records for model training."""
     query = client.query(kind='User')

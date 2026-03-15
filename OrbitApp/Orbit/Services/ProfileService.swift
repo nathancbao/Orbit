@@ -41,6 +41,14 @@ class ProfileService {
         return response.profile
     }
 
+    func deleteAccount() async throws {
+        let _: EmptyResponse = try await APIService.shared.request(
+            endpoint: Constants.API.Endpoints.me,
+            method: "DELETE",
+            authenticated: true
+        )
+    }
+
     /// Downscale an image so its longest side is at most `maxDimension` points.
     private func downscaled(_ image: UIImage, maxDimension: CGFloat = 512) -> UIImage {
         let size = image.size

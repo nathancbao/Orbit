@@ -5,7 +5,7 @@ from OrbitServer.utils.auth import require_auth
 from OrbitServer.utils.validators import validate_profile_data
 from OrbitServer.services.user_service import (
     get_user_profile, update_user_profile, upload_photo,
-    upload_gallery_photo, remove_gallery_photo,
+    upload_gallery_photo, remove_gallery_photo, delete_user_account,
 )
 from OrbitServer.services.signal_service import get_rsvped_signals
 from OrbitServer.models.models import get_user_pods
@@ -37,6 +37,15 @@ def update_me():
     if err:
         return error(err, 500)
     return success(profile)
+
+
+@users_bp.route('/me', methods=['DELETE'])
+@require_auth
+def delete_me():
+    result, err = delete_user_account(g.user_id)
+    if err:
+        return error(err, 400)
+    return success({"message": "Account deleted successfully"})
 
 
 @users_bp.route('/me/photo', methods=['POST'])

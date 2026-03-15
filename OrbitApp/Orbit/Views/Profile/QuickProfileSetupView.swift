@@ -34,6 +34,9 @@ struct QuickProfileSetupView: View {
     @State private var showGalleryPicker = false
     @State private var galleryIndicesToRemove: Set<Int> = []
     @State private var newGalleryImages: [UIImage] = []
+    @State private var showDeleteAccountAlert = false
+    @State private var isDeleting = false
+    @Environment(\.dismiss) private var dismiss
 
     init(onComplete: @escaping (Profile, UIImage?) -> Void,
          onCancel: (() -> Void)? = nil,
@@ -417,11 +420,57 @@ struct QuickProfileSetupView: View {
                     }
                     .disabled(!isValid || isSaving)
 
+                    // Delete Account button (only when editing existing profile)
+                    if initialProfile != nil {
+                        Button {
+                            showDeleteAccountAlert = true
+                        } label: {
+                            HStack {
+                                Image(systemName: "trash")
+                                Text(isDeleting ? "deleting..." : "delete account")
+                            }
+                            .font(.system(size: 14, weight: .medium))
+                            .foregroundColor(.red)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 14)
+                            .background(Color.red.opacity(0.08))
+                            .clipShape(Capsule())
+                        }
+                        .disabled(isDeleting)
+                        .padding(.top, 8)
+                    }
+
                     Spacer(minLength: 40)
                 }
                 .padding(.horizontal, 24)
                 .padding(.top, 20)
             }
+        }
+        .alert("Delete Account?", isPresented: $showDeleteAccountAlert) {
+            Button("Delete", role: .destructive) {
+                isDeleting = true
+                Task {
+                    do {
+                        try await ProfileService.shared.deleteAccount()
+                        await MainActor.run {
+                            KeychainHelper.shared.delete(forKey: Constants.Keychain.accessToken)
+                            KeychainHelper.shared.delete(forKey: Constants.Keychain.refreshToken)
+                            UserDefaults.standard.removeObject(forKey: "orbit_user_id")
+                            UserDefaults.standard.removeObject(forKey: "orbit_user_name")
+                            dismiss()
+                            NotificationCenter.default.post(name: .didLogout, object: nil)
+                        }
+                    } catch {
+                        await MainActor.run {
+                            isDeleting = false
+                            errorMessage = "Failed to delete account. Please try again."
+                        }
+                    }
+                }
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("This will permanently delete your account, pods, missions, and all associated data. This action cannot be undone.")
         }
         .sheet(isPresented: $showPhotoPicker, onDismiss: {
             if profilePhoto != nil { photoWasChanged = true }
