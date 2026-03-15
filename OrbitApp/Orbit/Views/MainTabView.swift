@@ -10,6 +10,7 @@ struct MainTabView: View {
     @State private var deepLinkUserId: Int?
     @State private var showDeepLinkProfile = false
     @State private var unreadDMCount: Int = 0
+    @State private var unreadPodCount: Int = 0
 
     init(profile: Profile, onEditProfile: @escaping () -> Void, deepLinkFriendId: Binding<Int?>) {
         _profile = State(initialValue: profile)
@@ -81,6 +82,7 @@ struct MainTabView: View {
                             selectedTab = tab
                         }
                         if tab == .friends { unreadDMCount = 0 }
+                        if tab == .pods { unreadPodCount = 0 }
                     } label: {
                         VStack(spacing: 4) {
                             ZStack(alignment: .topTrailing) {
@@ -92,6 +94,17 @@ struct MainTabView: View {
 
                                 if tab == .friends && unreadDMCount > 0 {
                                     Text(unreadDMCount > 9 ? "9+" : "\(unreadDMCount)")
+                                        .font(.system(size: 9, weight: .bold))
+                                        .foregroundColor(.white)
+                                        .padding(.horizontal, 4)
+                                        .padding(.vertical, 2)
+                                        .background(Color.red)
+                                        .clipShape(Capsule())
+                                        .offset(x: 8, y: -4)
+                                }
+
+                                if tab == .pods && unreadPodCount > 0 {
+                                    Text(unreadPodCount > 9 ? "9+" : "\(unreadPodCount)")
                                         .font(.system(size: 9, weight: .bold))
                                         .foregroundColor(.white)
                                         .padding(.horizontal, 4)
@@ -127,6 +140,11 @@ struct MainTabView: View {
         .onChange(of: deepLinkFriendId) { _, friendId in resolveDeepLink(friendId) }
         .onReceive(NotificationCenter.default.publisher(for: .unreadDMCountChanged)) { notification in
             unreadDMCount = notification.userInfo?["count"] as? Int ?? 0
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .unreadPodCountChanged)) { notification in
+            if selectedTab != .pods {
+                unreadPodCount = notification.userInfo?["count"] as? Int ?? 0
+            }
         }
         .sheet(isPresented: $showDeepLinkProfile) {
             if let friendProfile = deepLinkProfile, let userId = deepLinkUserId {

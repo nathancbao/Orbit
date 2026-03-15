@@ -70,6 +70,7 @@ enum Constants {
             static let friendSearch = "/friends/search"
 
             // Chat
+            static let podConversations = "/pods/conversations"
             static func podMessages(_ id: String) -> String { "/pods/\(id)/messages" }
             static func podVotes(_ id: String) -> String { "/pods/\(id)/votes" }
             static func podVoteRespond(_ podId: String, _ voteId: String) -> String {

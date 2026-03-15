@@ -351,11 +351,7 @@ struct PodView: View {
                         addToCalendar(time: time, place: viewModel.pod?.scheduledPlace)
                     }
                 }
-                if shouldShowConfirmButton {
-                    ActionChip(icon: "checkmark.seal", label: "I showed up!") {
-                        Task { await viewModel.confirmAttendance() }
-                    }
-                }
+
                 ActionChip(icon: "person.badge.plus", label: "Invite") {
                     showInviteSheet = true
                 }
@@ -367,13 +363,6 @@ struct PodView: View {
             .padding(.vertical, 10)
         }
         .background(Color(.systemBackground))
-    }
-
-    private var shouldShowConfirmButton: Bool {
-        guard let pod = viewModel.pod else { return false }
-        let hasTime = pod.scheduledTime != nil
-        let notConfirmed = !(pod.confirmedAttendees.contains(currentUserId))
-        return hasTime && notConfirmed
     }
 
     // MARK: - Confirmed Details Banner

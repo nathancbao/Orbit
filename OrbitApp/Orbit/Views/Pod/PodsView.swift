@@ -3,6 +3,10 @@ import SwiftUI
 // MARK: - Pods View
 // Unified list of all pods the user has joined (missions + signals).
 
+extension Notification.Name {
+    static let unreadPodCountChanged = Notification.Name("unreadPodCountChanged")
+}
+
 enum PodSegment: String, CaseIterable {
     case set = "Set"
     case flex = "Flex"
@@ -20,6 +24,7 @@ struct PodsView: View {
     @State private var showRecommendations = false
     @State private var recommendedMissions: [Mission] = []
     @State private var recommendedMissionForDetail: Mission? = nil
+    @State private var unreadPodIds: Set<String> = []
 
     /// Set pods sorted by scheduled time (soonest first), filtered by search.
     /// Excludes flex pods so they only appear in the Flex tab.
@@ -106,6 +111,7 @@ struct PodsView: View {
                                             PodRowCard(
                                                 pod: pod,
                                                 title: pod.displayName,
+                                                hasUnread: unreadPodIds.contains(pod.id),
                                                 onDismiss: { Task { await loadData() } },
                                                 onPodNotFound: { pods.removeAll { $0.id == pod.id } }
                                             )
@@ -214,13 +220,41 @@ struct PodsView: View {
             authenticated: true
         )
         async let rsvpsResult: [Mission]? = try? MissionService.shared.rsvpedFlexMissions()
+        async let conversationsResult = try? ChatService.shared.getPodConversations()
         if let newPods = await podsResult {
             pods = newPods
         }
         if let newMissions = await rsvpsResult {
             rsvpedFlexMissions = newMissions
         }
+        if let conversations = await conversationsResult {
+            refreshUnread(from: conversations)
+        }
         isLoading = false
+    }
+
+    private func refreshUnread(from conversations: [PodConversation]) {
+        let currentUserId = UserDefaults.standard.integer(forKey: "orbit_user_id")
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        var unread = Set<String>()
+        for conv in conversations {
+            guard let lastSenderId = conv.lastMessageUserId, lastSenderId != currentUserId else { continue }
+            guard !conv.lastMessageAt.isEmpty else { continue }
+            let lastSeen = UserDefaults.standard.double(forKey: "pod_last_seen_\(conv.podId)")
+            let msgTime = formatter.date(from: conv.lastMessageAt)?.timeIntervalSince1970
+                ?? ISO8601DateFormatter().date(from: conv.lastMessageAt)?.timeIntervalSince1970
+                ?? 0
+            if msgTime > lastSeen {
+                unread.insert(conv.podId)
+            }
+        }
+        unreadPodIds = unread
+        NotificationCenter.default.post(
+            name: .unreadPodCountChanged,
+            object: nil,
+            userInfo: ["count": unread.count]
+        )
     }
 }
 
@@ -229,6 +263,7 @@ struct PodsView: View {
 struct PodRowCard: View {
     let pod: Pod
     let title: String
+    var hasUnread: Bool = false
     var onDismiss: (() -> Void)? = nil
     var onPodNotFound: (() -> Void)? = nil
     @State private var showPod = false
@@ -283,8 +318,16 @@ struct PodRowCard: View {
 
                 Spacer()
 
-                Image(systemName: "message.fill")
-                    .foregroundStyle(OrbitTheme.gradient)
+                ZStack(alignment: .topTrailing) {
+                    Image(systemName: "message.fill")
+                        .foregroundStyle(OrbitTheme.gradient)
+                    if hasUnread {
+                        Circle()
+                            .fill(Color.red)
+                            .frame(width: 10, height: 10)
+                            .offset(x: 3, y: -3)
+                    }
+                }
             }
             .padding(16)
             .background(

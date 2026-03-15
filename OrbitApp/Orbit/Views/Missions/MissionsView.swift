@@ -646,9 +646,6 @@ struct MissionSpotsLabel: View {
                             Label("Join Waitlist", systemImage: "person.badge.clock")
                                 .foregroundColor(.secondary)
                         }
-                    } else {
-                        Label("Be the first to join", systemImage: "star")
-                            .foregroundStyle(OrbitTheme.gradient)
                     }
                 }
             }

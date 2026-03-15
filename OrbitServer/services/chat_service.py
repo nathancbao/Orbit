@@ -5,6 +5,7 @@ from OrbitServer.models.models import (
     create_vote, get_vote, update_vote, list_votes_for_pod,
     update_pod, transactional_vote_update,
     dm_conversation_id, list_dm_conversations, get_user,
+    get_user_pods,
 )
 from OrbitServer.models.models import find_friendship
 from OrbitServer.utils.profanity import filter_message
@@ -213,5 +214,24 @@ def get_dm_conversations(user_id):
             'last_message_user_id': msg.get('user_id'),
         })
     # Sort by most recent message first
+    result.sort(key=lambda x: x['last_message_at'], reverse=True)
+    return result, None
+
+
+def get_pod_conversations(user_id):
+    """Return a summary of each pod the user belongs to, with last message info."""
+    pods = get_user_pods(user_id)
+    result = []
+    for pod in pods:
+        pod_id = pod.get('id', '')
+        all_msgs = list_chat_messages(pod_id, limit=200)
+        last_msg = all_msgs[-1] if all_msgs else None
+        result.append({
+            'pod_id': pod_id,
+            'pod_name': pod.get('name') or pod.get('mission_title') or '',
+            'last_message': last_msg.get('content', '') if last_msg else '',
+            'last_message_at': last_msg.get('created_at', '') if last_msg else '',
+            'last_message_user_id': last_msg.get('user_id') if last_msg else None,
+        })
     result.sort(key=lambda x: x['last_message_at'], reverse=True)
     return result, None

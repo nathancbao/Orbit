@@ -6,9 +6,19 @@ from OrbitServer.utils.rate_limit import limiter
 from OrbitServer.utils.validators import validate_message_data, validate_vote_data
 from OrbitServer.services.chat_service import (
     get_messages, send_message, create_poll, respond_to_vote, remove_vote, get_votes_for_pod,
+    get_pod_conversations,
 )
 
 chat_bp = Blueprint('chat', __name__, url_prefix='/api/pods')
+
+
+@chat_bp.route('/conversations', methods=['GET'])
+@require_auth
+def pod_conversations():
+    data, err = get_pod_conversations(g.user_id)
+    if err:
+        return error(err, 500)
+    return success(data)
 
 
 @chat_bp.route('/<pod_id>/messages', methods=['GET'])

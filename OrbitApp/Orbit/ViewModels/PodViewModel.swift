@@ -81,6 +81,9 @@ class PodViewModel: ObservableObject {
         do { votes = try await ChatService.shared.getVotes(podId: podId) }
         catch { /* empty votes is fine for a new pod */ }
 
+        // Mark this pod's chat as read
+        UserDefaults.standard.set(Date().timeIntervalSince1970, forKey: "pod_last_seen_\(podId)")
+
         isLoading = false
     }
 

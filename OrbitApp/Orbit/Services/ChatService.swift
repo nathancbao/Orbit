@@ -56,6 +56,15 @@ class ChatService {
         )
     }
 
+    // MARK: - Pod Conversations
+
+    func getPodConversations() async throws -> [PodConversation] {
+        return try await APIService.shared.request(
+            endpoint: Constants.API.Endpoints.podConversations,
+            authenticated: true
+        )
+    }
+
     // MARK: - DMs
 
     func getDMMessages(friendId: Int) async throws -> [ChatMessage] {
@@ -113,6 +122,36 @@ struct DMConversation: Codable, Identifiable {
             ?? Int((try? c.decode(String.self, forKey: .friendId)) ?? "") ?? 0
         friendName = (try? c.decode(String.self, forKey: .friendName)) ?? ""
         friendPhoto = try? c.decodeIfPresent(String.self, forKey: .friendPhoto)
+        lastMessage = (try? c.decode(String.self, forKey: .lastMessage)) ?? ""
+        lastMessageAt = (try? c.decode(String.self, forKey: .lastMessageAt)) ?? ""
+        lastMessageUserId = (try? c.decode(Int.self, forKey: .lastMessageUserId))
+            ?? Int((try? c.decode(String.self, forKey: .lastMessageUserId)) ?? "")
+    }
+}
+
+// MARK: - Pod Conversation Model
+
+struct PodConversation: Codable, Identifiable {
+    var podId: String
+    var podName: String
+    var lastMessage: String
+    var lastMessageAt: String
+    var lastMessageUserId: Int?
+
+    var id: String { podId }
+
+    enum CodingKeys: String, CodingKey {
+        case podId = "pod_id"
+        case podName = "pod_name"
+        case lastMessage = "last_message"
+        case lastMessageAt = "last_message_at"
+        case lastMessageUserId = "last_message_user_id"
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        podId = (try? c.decode(String.self, forKey: .podId)) ?? ""
+        podName = (try? c.decode(String.self, forKey: .podName)) ?? ""
         lastMessage = (try? c.decode(String.self, forKey: .lastMessage)) ?? ""
         lastMessageAt = (try? c.decode(String.self, forKey: .lastMessageAt)) ?? ""
         lastMessageUserId = (try? c.decode(Int.self, forKey: .lastMessageUserId))
