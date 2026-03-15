@@ -635,7 +635,7 @@ struct MissionSpotsLabel: View {
                         .foregroundColor(.green)
                 default:
                     if let pods = mission.pods, !pods.isEmpty {
-                        let open = pods.filter { $0.status == "open" }
+                        let open = pods.filter { $0.status != "full" && $0.spotsLeft > 0 }
                         if let first = open.first {
                             Label(
                                 "\(first.spotsLeft) spot\(first.spotsLeft == 1 ? "" : "s") left",

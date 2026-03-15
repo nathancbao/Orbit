@@ -1138,7 +1138,7 @@ struct MissionPodStatusSection: View {
                 ForEach(pods, id: \.podId) { pod in
                     let effectiveMaxSize = max(pod.maxSize, mission.maxPodSize)
                     let effectiveSpotsLeft = max(0, effectiveMaxSize - pod.memberCount)
-                    let isOpen = pod.status == "open" && effectiveSpotsLeft > 0
+                    let isOpen = pod.status != "full" && effectiveSpotsLeft > 0
                     let isSelected = selectedPodId == pod.podId
 
                     HStack {
