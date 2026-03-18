@@ -233,10 +233,12 @@ def validate_signal_data(data, is_update=False):
         elif len(tags) > 6:
             errors.append("Maximum 6 tags allowed")
         else:
-            valid_tags = {'Hiking', 'Gaming', 'Food', 'Sports', 'Study', 'Other'}
             for tag in tags:
-                if not isinstance(tag, str) or tag not in valid_tags:
-                    errors.append(f"Each tag must be one of: {', '.join(sorted(valid_tags))}")
+                if not isinstance(tag, str):
+                    errors.append("Each tag must be a string")
+                    break
+                if contains_profanity(tag):
+                    errors.append("Tags contain prohibited content")
                     break
 
     if 'min_group_size' in data or 'max_group_size' in data or not is_update:

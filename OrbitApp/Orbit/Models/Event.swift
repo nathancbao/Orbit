@@ -358,7 +358,7 @@ struct Mission: Codable, Identifiable {
             id: signal.id,
             title: signal.title,
             description: signal.description,
-            tags: [],
+            tags: signal.tags ?? [],
             location: "",
             date: "",
             creatorId: signal.creatorId,

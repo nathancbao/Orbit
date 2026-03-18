@@ -195,6 +195,7 @@ struct Signal: Codable, Identifiable {
     let createdAt: String?
     let podId: String?
     let scheduledTime: String?
+    let tags: [String]?
     let links: [String]?
     let timeRangeStart: Int?
     let timeRangeEnd: Int?
@@ -202,7 +203,7 @@ struct Signal: Codable, Identifiable {
     let suggestionReason: String?
 
     enum CodingKeys: String, CodingKey {
-        case id, title, description, availability, status, links
+        case id, title, description, availability, status, links, tags
         case activityCategory  = "activity_category"
         case customActivityName = "custom_activity_name"
         case minGroupSize      = "min_group_size"
