@@ -36,7 +36,7 @@ struct LaunchView: View {
                 HStack {
                     Spacer()
                     BlackStarsView()
-                        .padding(.top, 55)
+                        .padding(.top, 48)
                         .padding(.trailing, 40)
                 }
                 Spacer()
@@ -157,18 +157,18 @@ struct BlackStarsView: View {
         ZStack {
             Image("blackStar")
                 .resizable()
-                .frame(width: 18, height: 18)
-                .offset(x: -10, y: -5)
+                .frame(width: 22, height: 22)
+                .offset(x: -14, y: -6)
             Image("blackStar")
                 .resizable()
-                .frame(width: 10, height: 10)
-                .offset(x: 15, y: -15)
+                .frame(width: 13, height: 13)
+                .offset(x: 20, y: -20)
             Image("blackStar")
                 .resizable()
-                .frame(width: 12, height: 12)
-                .offset(x: 5, y: 15)
+                .frame(width: 15, height: 15)
+                .offset(x: 8, y: 20)
         }
-        .frame(width: 60, height: 50)
+        .frame(width: 70, height: 60)
     }
 }
 

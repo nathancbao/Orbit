@@ -45,7 +45,8 @@
       "Bash(git -C /Users/jonathan/Desktop/ECS_191/Orbit status)",
       "Bash(mdfind:*)",
       "Bash(sudo xcode-select:*)",
-      "Bash(curl:*)"
+      "Bash(curl:*)",
+      "Bash(swift build:*)"
     ]
   }
 }
