@@ -31,11 +31,11 @@ struct LaunchView: View {
             }
             .ignoresSafeArea()
 
-            // Sparkles near top right (close to the lines)
+            // Stars near top right (close to the lines)
             VStack {
                 HStack {
                     Spacer()
-                    SparklesView()
+                    BlackStarsView()
                         .padding(.top, 55)
                         .padding(.trailing, 40)
                 }
@@ -64,7 +64,7 @@ struct LaunchView: View {
                         .padding(.vertical, 14)
                         .overlay(
                             RoundedRectangle(cornerRadius: 25)
-                                .stroke(Color.gray.opacity(0.4), lineWidth: 1)
+                                .stroke(Color.black, lineWidth: 1)
                         )
                 }
 
@@ -150,31 +150,25 @@ struct BottomWavyLines: View {
 }
 
 
-// MARK: - Sparkles
+// MARK: - Black Stars
 
-struct SparklesView: View {
+struct BlackStarsView: View {
     var body: some View {
-        Canvas { context, size in
-            // Draw 3 four-pointed stars
-            drawStar(context: context, center: CGPoint(x: 20, y: 15), size: 18)
-            drawStar(context: context, center: CGPoint(x: 45, y: 5), size: 10)
-            drawStar(context: context, center: CGPoint(x: 35, y: 35), size: 12)
+        ZStack {
+            Image("blackStar")
+                .resizable()
+                .frame(width: 18, height: 18)
+                .offset(x: -10, y: -5)
+            Image("blackStar")
+                .resizable()
+                .frame(width: 10, height: 10)
+                .offset(x: 15, y: -15)
+            Image("blackStar")
+                .resizable()
+                .frame(width: 12, height: 12)
+                .offset(x: 5, y: 15)
         }
         .frame(width: 60, height: 50)
-    }
-
-    private func drawStar(context: GraphicsContext, center: CGPoint, size: CGFloat) {
-        var path = Path()
-
-        // Vertical line
-        path.move(to: CGPoint(x: center.x, y: center.y - size/2))
-        path.addLine(to: CGPoint(x: center.x, y: center.y + size/2))
-
-        // Horizontal line
-        path.move(to: CGPoint(x: center.x - size/2, y: center.y))
-        path.addLine(to: CGPoint(x: center.x + size/2, y: center.y))
-
-        context.stroke(path, with: .color(OrbitTheme.purple), lineWidth: 1.5)
     }
 }
 

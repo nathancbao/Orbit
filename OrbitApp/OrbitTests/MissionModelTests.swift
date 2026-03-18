@@ -288,9 +288,12 @@ final class MissionModelTests: XCTestCase {
             createdAt: "2026-03-01",
             podId: nil,
             scheduledTime: nil,
+            tags: ["Sports"],
             links: ["https://example.com"],
             timeRangeStart: 9,
-            timeRangeEnd: 17
+            timeRangeEnd: 17,
+            matchScore: nil,
+            suggestionReason: nil
         )
 
         let mission = Mission.fromSignal(signal)
@@ -304,7 +307,7 @@ final class MissionModelTests: XCTestCase {
         XCTAssertEqual(mission.status, "pending")
         XCTAssertEqual(mission.creatorId, 42)
         XCTAssertEqual(mission.date, "")
-        XCTAssertTrue(mission.tags.isEmpty)
+        XCTAssertEqual(mission.tags, ["Sports"])
         XCTAssertEqual(mission.links, ["https://example.com"])
         XCTAssertEqual(mission.timeRangeStart, 9)
         XCTAssertEqual(mission.timeRangeEnd, 17)
