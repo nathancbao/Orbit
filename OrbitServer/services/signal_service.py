@@ -1,5 +1,5 @@
 from OrbitServer.models.models import (
-    create_signal, get_signal, delete_signal,
+    create_signal, get_signal, delete_signal, update_signal,
     list_signals_for_user, list_all_signals,
     transactional_signal_rsvp, list_rsvped_signals,
     create_signal_pod, get_pod, transactional_pod_update,
@@ -76,6 +76,20 @@ def remove_signal(signal_id, user_id):
         return False, "Only the creator can delete this signal", 403
     delete_signal(signal_id)
     return True, None, None
+
+
+def edit_signal(signal_id, data, user_id):
+    """
+    Edit a signal. Returns (signal, error_message, status_code).
+    status_code is None on success.
+    """
+    signal = get_signal(signal_id)
+    if not signal:
+        return None, "Signal not found", 404
+    if signal.get('creator_id') != int(user_id):
+        return None, "Only the creator can edit this signal", 403
+    updated = update_signal(signal_id, data)
+    return updated, None, None
 
 
 def rsvp_signal(signal_id, user_id):

@@ -193,7 +193,7 @@ _ACTIVITY_CATEGORIES = {
 _TIME_BLOCKS = {'morning', 'afternoon', 'evening'}
 
 
-def validate_signal_data(data):
+def validate_signal_data(data, is_update=False):
     errors = []
 
     category = data.get('activity_category')
@@ -239,17 +239,19 @@ def validate_signal_data(data):
                     errors.append(f"Each tag must be one of: {', '.join(sorted(valid_tags))}")
                     break
 
-    try:
-        min_gs = int(data['min_group_size'])
-        max_gs = int(data['max_group_size'])
-        if min_gs < 3:
-            errors.append("min_group_size must be at least 3")
-        if max_gs > 10:
-            errors.append("max_group_size must be at most 10")
-        if min_gs > max_gs:
-            errors.append("min_group_size cannot exceed max_group_size")
-    except (KeyError, TypeError, ValueError):
-        errors.append("min_group_size and max_group_size must be integers")
+    if 'min_group_size' in data or 'max_group_size' in data or not is_update:
+        try:
+            min_gs = int(data['min_group_size'])
+            max_gs = int(data['max_group_size'])
+            if min_gs < 3:
+                errors.append("min_group_size must be at least 3")
+            if max_gs > 10:
+                errors.append("max_group_size must be at most 10")
+            if min_gs > max_gs:
+                errors.append("min_group_size cannot exceed max_group_size")
+        except (KeyError, TypeError, ValueError):
+            if not is_update:
+                errors.append("min_group_size and max_group_size must be integers")
 
     # Optional time range for hourly scheduling (default 9-21)
     for field in ('time_range_start', 'time_range_end'):
@@ -267,9 +269,9 @@ def validate_signal_data(data):
         availability = []
     if not isinstance(availability, list):
         errors.append("availability must be a list of slots")
-    elif len(availability) == 0:
+    elif len(availability) == 0 and not is_update:
         errors.append("availability cannot be empty")
-    else:
+    elif len(availability) > 0:
         for slot in availability:
             if not isinstance(slot, dict):
                 errors.append("Each availability slot must be an object")

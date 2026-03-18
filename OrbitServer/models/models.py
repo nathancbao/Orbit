@@ -633,6 +633,25 @@ def update_signal_status(signal_id, status):
     return _entity_to_dict(entity)
 
 
+def update_signal(signal_id, data):
+    """Update editable fields on a Signal entity. Returns the updated dict or None."""
+    key = client.key('Signal', str(signal_id))
+    entity = client.get(key)
+    if not entity:
+        return None
+    allowed = [
+        'title', 'description', 'activity_category', 'custom_activity_name',
+        'min_group_size', 'max_group_size', 'availability', 'tags', 'links',
+        'time_range_start', 'time_range_end',
+    ]
+    for field in allowed:
+        if field in data:
+            entity[field] = data[field]
+    entity['updated_at'] = datetime.datetime.utcnow()
+    client.put(entity)
+    return _entity_to_dict(entity)
+
+
 def transactional_signal_rsvp(signal_id, user_id):
     """Atomically add a user to a signal's rsvps list.
 

@@ -6,7 +6,7 @@ from OrbitServer.utils.rate_limit import limiter
 from OrbitServer.utils.validators import validate_signal_data
 from OrbitServer.services.signal_service import (
     create_new_signal, get_user_signals, get_all_signals,
-    fetch_signal, remove_signal, rsvp_signal,
+    fetch_signal, remove_signal, edit_signal, rsvp_signal,
 )
 
 signals_bp = Blueprint('signals', __name__, url_prefix='/api/signals')
@@ -78,6 +78,21 @@ def get_signal_by_id(signal_id):
     signal, err = fetch_signal(signal_id, g.user_id)
     if err:
         return error(err, 404)
+    return success(signal)
+
+
+@signals_bp.route('/<signal_id>', methods=['PUT'])
+@require_auth
+def update(signal_id):
+    data = request.get_json(silent=True) or {}
+
+    valid, errors = validate_signal_data(data, is_update=True)
+    if not valid:
+        return error(errors, 400)
+
+    signal, err, status_code = edit_signal(signal_id, data, g.user_id)
+    if err:
+        return error(err, status_code)
     return success(signal)
 
 
