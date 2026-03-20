@@ -46,7 +46,8 @@
       "Bash(mdfind:*)",
       "Bash(sudo xcode-select:*)",
       "Bash(curl:*)",
-      "Bash(swift build:*)"
+      "Bash(swift build:*)",
+      "Bash(git log:*)"
     ]
   }
 }
