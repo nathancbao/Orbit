@@ -4,15 +4,21 @@ A social activity discovery platform for college students. Orbit connects studen
 
 ## Features
 
-### Discovery (Galaxy View)
-The home screen presents activities as planets orbiting around the user in a visual galaxy layout. Activities are arranged in concentric priority rings:
+### AI-Recommended Activities
+The core discovery experience is powered by a hybrid AI recommendation engine. Each mission is scored against the user's profile using five signals — keyword matching, semantic similarity, collaborative filtering, behavioral history, and creator trust — producing a personalized match score displayed as a percentage badge. A recommendation bell on the home screen surfaces the highest-scored activities with explanations of why each was suggested (e.g. "Matches your interests: Hiking, Outdoors"). When the backend has no recommendations yet, a client-side fallback scores available missions by tag overlap with the user's interests.
 
-- **Ring 0** — Activities you host (missions you created)
-- **Ring 1** — Activities you've joined
-- **Ring 2** — AI-recommended activities based on your interests
-- **Ring 3** — Discoverable activities and templates generated from your interests
+### Voyage Mode (Infinite Exploration)
+Voyage is a fullscreen, infinite 2D space that users can pan and pinch through to discover activities beyond their immediate feed. Activities are grouped into solar-system clusters scattered across a tile-based grid — each cluster has a glowing sun at its center with missions and flex missions orbiting as planets. The backend deterministically assigns activities to tiles using seeded shuffling so every user sees the same layout for a given coordinate.
 
-Each node is styled by type: set missions appear as Saturn-like planets with rings, flex missions pulse with radiating rings, and templates show dashed outlines inviting creation. The view includes animated twinkling stars, a floating comet, and a recommendation bell that surfaces AI-curated suggestions.
+Users can:
+
+- Pan freely in any direction through an infinite star field with parallax scrolling, shooting stars, and drifting ships
+- Tap a solar system cluster to zoom in and see its individual activities
+- Tap an activity planet to open its detail sheet and join
+- Pinch to zoom in or out of the tile grid
+- Follow a home-direction indicator to navigate back to the origin
+
+Tiles load dynamically as the user pans, with a 5x5 region fetched around the current position and distant tiles evicted to stay under memory limits. A heartbeat pings the server every 10 seconds with the user's current tile position.
 
 ### Set Missions (Scheduled Events)
 Fixed-date community events like club meetings, concerts, hikes, or study sessions. Users can:
