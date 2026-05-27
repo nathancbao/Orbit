@@ -47,7 +47,13 @@
       "Bash(sudo xcode-select:*)",
       "Bash(curl:*)",
       "Bash(swift build:*)",
-      "Bash(git log:*)"
+      "Bash(git log:*)",
+      "Bash(git check-ignore *)",
+      "Bash(cat index.yaml)",
+      "Bash(find . -name \"index.yaml\" -not -path \"*/node_modules/*\")",
+      "Bash(ls requirements*.txt)",
+      "Bash(ls -d venv .venv env)",
+      "Bash(grep -i \"profanity\\\\|pytest\" requirements*.txt)"
     ]
   }
 }

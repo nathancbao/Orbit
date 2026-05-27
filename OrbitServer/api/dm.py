@@ -21,7 +21,7 @@ def conversations():
 @dm_bp.route('/<int:friend_id>/messages', methods=['GET'])
 @require_auth
 def messages(friend_id):
-    data, err = get_dm_messages(g.user_id, friend_id)
+    data, err = get_dm_messages(g.user_id, friend_id, since=request.args.get('since'))
     if err:
         return error(err, 403)
     return success(data)

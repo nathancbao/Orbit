@@ -24,7 +24,7 @@ def pod_conversations():
 @chat_bp.route('/<pod_id>/messages', methods=['GET'])
 @require_auth
 def messages(pod_id):
-    msgs, err = get_messages(pod_id, g.user_id)
+    msgs, err = get_messages(pod_id, g.user_id, since=request.args.get('since'))
     if err:
         status = 403 if "not a member" in err.lower() else 404
         return error(err, status)

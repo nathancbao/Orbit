@@ -382,9 +382,16 @@ def create_chat_message(pod_id, user_id, content, message_type='text'):
     return _entity_to_dict(entity)
 
 
-def list_chat_messages(pod_id, limit=100):
+def list_chat_messages(pod_id, limit=100, since=None):
+    """List messages in a conversation, oldest first.
+
+    `since` (a naive UTC datetime) returns only messages strictly newer than it,
+    so pollers fetch just the delta instead of re-reading the whole history.
+    """
     query = client.query(kind='ChatMessage')
     query.add_filter(filter=PropertyFilter('pod_id', '=', str(pod_id)))
+    if since is not None:
+        query.add_filter(filter=PropertyFilter('created_at', '>', since))
     query.order = ['created_at']
     results = list(query.fetch(limit=limit))
     return [_entity_to_dict(e) for e in results]

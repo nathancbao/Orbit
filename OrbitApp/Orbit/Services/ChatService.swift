@@ -4,9 +4,19 @@ class ChatService {
     static let shared = ChatService()
     private init() {}
 
-    func getMessages(podId: String) async throws -> [ChatMessage] {
+    /// Append a URL-encoded `?since=` cursor to a messages endpoint, if present.
+    private static func appendSince(_ endpoint: String, _ since: String?) -> String {
+        guard let since, !since.isEmpty,
+              let encoded = since.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed)
+        else { return endpoint }
+        return "\(endpoint)?since=\(encoded)"
+    }
+
+    /// Fetch pod messages. Pass `since` (a message's `createdAt`) to fetch only
+    /// newer messages — pollers should always pass it to avoid re-reading history.
+    func getMessages(podId: String, since: String? = nil) async throws -> [ChatMessage] {
         return try await APIService.shared.request(
-            endpoint: Constants.API.Endpoints.podMessages(podId),
+            endpoint: Self.appendSince(Constants.API.Endpoints.podMessages(podId), since),
             authenticated: true
         )
     }
@@ -67,9 +77,11 @@ class ChatService {
 
     // MARK: - DMs
 
-    func getDMMessages(friendId: Int) async throws -> [ChatMessage] {
+    /// Fetch DM messages. Pass `since` (a message's `createdAt`) to fetch only
+    /// newer messages — pollers should always pass it to avoid re-reading history.
+    func getDMMessages(friendId: Int, since: String? = nil) async throws -> [ChatMessage] {
         return try await APIService.shared.request(
-            endpoint: Constants.API.Endpoints.dmMessages(friendId),
+            endpoint: Self.appendSince(Constants.API.Endpoints.dmMessages(friendId), since),
             authenticated: true
         )
     }

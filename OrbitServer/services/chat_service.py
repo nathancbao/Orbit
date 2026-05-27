@@ -11,13 +11,31 @@ from OrbitServer.models.models import find_friendship
 from OrbitServer.utils.profanity import filter_message
 
 
-def get_messages(pod_id, requesting_user_id):
+def _parse_since(raw):
+    """Parse an ISO-8601 'since' cursor (as emitted in created_at, e.g.
+    '2026-05-26T12:34:56.789012Z') into a naive UTC datetime, or None if absent
+    or malformed. Malformed values fall back to a full fetch rather than erroring.
+    """
+    if not raw:
+        return None
+    s = raw.strip()
+    if s.endswith('Z'):
+        s = s[:-1]
+    try:
+        dt = datetime.datetime.fromisoformat(s)
+    except ValueError:
+        return None
+    # Match the naive-UTC form created_at is stored in.
+    return dt.replace(tzinfo=None)
+
+
+def get_messages(pod_id, requesting_user_id, since=None):
     pod = get_pod(pod_id)
     if not pod:
         return None, "Pod not found"
     if int(requesting_user_id) not in (pod.get('member_ids') or []):
         return None, "You are not a member of this pod"
-    messages = list_chat_messages(pod_id)
+    messages = list_chat_messages(pod_id, since=_parse_since(since))
     return messages, None
 
 
@@ -169,12 +187,12 @@ def get_votes_for_pod(pod_id, requesting_user_id):
 
 # ── DM Functions ─────────────────────────────────────────────────────────────
 
-def get_dm_messages(current_user_id, friend_id):
+def get_dm_messages(current_user_id, friend_id, since=None):
     """Return messages in a DM conversation. Both users must be friends."""
     if not find_friendship(current_user_id, friend_id):
         return None, "You are not friends with this user"
     conv_id = dm_conversation_id(current_user_id, friend_id)
-    messages = list_chat_messages(conv_id)
+    messages = list_chat_messages(conv_id, since=_parse_since(since))
     return messages, None
 
 
