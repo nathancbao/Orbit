@@ -16,6 +16,7 @@ struct ProfileDisplayView: View {
     @State private var friendStatus: FriendStatus?
     @State private var isSendingRequest = false
     @State private var showLogoutConfirm = false
+    @State private var showComingSoon = false
 
     init(profile: Profile, onEdit: (() -> Void)? = nil,
          onProfileUpdated: ((Profile) -> Void)? = nil, otherUserId: Int? = nil) {
@@ -30,84 +31,63 @@ struct ProfileDisplayView: View {
     var body: some View {
         NavigationStack {
             ScrollView {
-                VStack(spacing: 0) {
+                VStack(spacing: 24) {
 
-                    // Hero profile photo (large, Tinder-style)
-                    GeometryReader { geo in
-                        if let photoURL = profile.photo, let url = URL(string: photoURL) {
-                            AsyncImage(url: url) { image in
-                                image.resizable().scaledToFill()
-                            } placeholder: {
-                                heroPlaceholder
-                            }
-                            .frame(width: geo.size.width, height: geo.size.width * 1.15)
-                            .clipped()
-                        } else {
-                            heroPlaceholder
-                                .frame(width: geo.size.width, height: geo.size.width * 1.15)
+                    // Name + gender
+                    VStack(spacing: 4) {
+                        Text(profile.name)
+                            .font(.title)
+                            .fontWeight(.bold)
+
+                        if !profile.gender.isEmpty {
+                            Text(Profile.displayGender(profile.gender))
+                                .font(.subheadline)
+                                .fontWeight(.medium)
+                                .foregroundStyle(OrbitTheme.gradient)
                         }
                     }
-                    .aspectRatio(1 / 1.15, contentMode: .fit)
+                    .padding(.top, 12)
 
-                    // Content below the hero photo
+                    // Circular avatar with astral mascot badge (mascot = future feature)
+                    ZStack(alignment: .bottomLeading) {
+                        Group {
+                            if let photoURL = profile.photo, let url = URL(string: photoURL) {
+                                AsyncImage(url: url) { image in
+                                    image.resizable().scaledToFill()
+                                } placeholder: {
+                                    circlePlaceholder
+                                }
+                            } else {
+                                circlePlaceholder
+                            }
+                        }
+                        .frame(width: 150, height: 150)
+                        .clipShape(Circle())
+                        .overlay(Circle().stroke(Color.black.opacity(0.12), lineWidth: 1.5))
+
+                        Image("coloredStar")
+                            .resizable()
+                            .scaledToFit()
+                            .frame(width: 34, height: 34)
+                            .padding(8)
+                            .background(Color.white)
+                            .clipShape(Circle())
+                            .overlay(Circle().stroke(Color.black.opacity(0.1), lineWidth: 1))
+                            .offset(x: -2, y: -2)
+                    }
+
+                    // Grade level + age (age is a placeholder — no birthdate field yet)
+                    VStack(spacing: 2) {
+                        Text(Profile.displayYear(profile.collegeYear))
+                            .font(.headline)
+                            .foregroundStyle(OrbitTheme.gradient)
+
+                        Text("{Age} Years Old")
+                            .font(.subheadline)
+                            .foregroundColor(.secondary)
+                    }
+
                     VStack(spacing: 24) {
-
-                        // Name + year
-                        VStack(spacing: 6) {
-                            Text(profile.name)
-                                .font(.title)
-                                .fontWeight(.bold)
-
-                            HStack(spacing: 8) {
-                                Text(Profile.displayYear(profile.collegeYear))
-                                    .font(.subheadline)
-                                    .foregroundColor(.secondary)
-
-                                if let email = profile.email {
-                                    Text("·")
-                                        .foregroundColor(.secondary)
-                                    Text(email)
-                                        .font(.caption)
-                                        .foregroundColor(.secondary)
-                                }
-                            }
-                        }
-                        .padding(.top, 20)
-
-                        // Gender + MBTI badges
-                        if !profile.gender.isEmpty || !profile.mbti.isEmpty {
-                            HStack(spacing: 8) {
-                                if !profile.gender.isEmpty {
-                                    Text(Profile.displayGender(profile.gender))
-                                        .font(.caption)
-                                        .fontWeight(.medium)
-                                        .padding(.horizontal, 12)
-                                        .padding(.vertical, 6)
-                                        .background(OrbitTheme.gradient.opacity(0.15))
-                                        .foregroundStyle(OrbitTheme.gradient)
-                                        .clipShape(Capsule())
-                                }
-                                if !profile.mbti.isEmpty {
-                                    Text(profile.mbti)
-                                        .font(.caption)
-                                        .fontWeight(.medium)
-                                        .padding(.horizontal, 12)
-                                        .padding(.vertical, 6)
-                                        .background(OrbitTheme.gradient.opacity(0.15))
-                                        .foregroundStyle(OrbitTheme.gradient)
-                                        .clipShape(Capsule())
-                                }
-                            }
-                        }
-
-                        // Bio
-                        if !profile.bio.isEmpty {
-                            Text(profile.bio)
-                                .font(.body)
-                                .foregroundColor(.primary)
-                                .multilineTextAlignment(.center)
-                                .padding(.horizontal, 32)
-                        }
 
                         // Add Friend button (only when viewing someone else's profile)
                         if let targetId = otherUserId {
@@ -132,12 +112,20 @@ struct ProfileDisplayView: View {
                             )
                         }
 
-                        Divider().padding(.horizontal, 32)
+                        // Bio
+                        if !profile.bio.isEmpty {
+                            Text(profile.bio)
+                                .font(.body)
+                                .fontWeight(.semibold)
+                                .foregroundColor(.primary)
+                                .multilineTextAlignment(.center)
+                                .padding(.horizontal, 32)
+                        }
 
                         // Interests
                         if !profile.interests.isEmpty {
                             VStack(alignment: .leading, spacing: 12) {
-                                Text("Interests")
+                                Text("interests")
                                     .font(.headline)
                                     .frame(maxWidth: .infinity, alignment: .leading)
 
@@ -145,22 +133,28 @@ struct ProfileDisplayView: View {
                                     ForEach(profile.interests, id: \.self) { interest in
                                         Text(interest)
                                             .font(.subheadline)
-                                            .padding(.horizontal, 12)
+                                            .foregroundColor(.primary)
+                                            .padding(.horizontal, 14)
                                             .padding(.vertical, 8)
-                                            .background(OrbitTheme.blue.opacity(0.12))
-                                            .foregroundColor(OrbitTheme.blue)
-                                            .clipShape(Capsule())
+                                            .background(
+                                                Capsule().stroke(Color.black.opacity(0.2), lineWidth: 1)
+                                            )
                                     }
                                 }
                             }
                             .padding(.horizontal, 28)
                         }
 
+                        // Habits sentence (template — feature in progress, no data yet)
+                        habitsSentence
+                            .padding(.horizontal, 28)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+
                         // Gallery photos (swipeable carousel)
                         if !profile.galleryPhotos.isEmpty {
                             VStack(alignment: .leading, spacing: 12) {
                                 HStack {
-                                    Text("Gallery")
+                                    Text("gallery")
                                         .font(.headline)
                                     Spacer()
                                     Text("\(galleryIndex + 1)/\(profile.galleryPhotos.count)")
@@ -191,7 +185,7 @@ struct ProfileDisplayView: View {
                         // Links
                         if !profile.links.isEmpty {
                             VStack(alignment: .leading, spacing: 8) {
-                                Text("Links")
+                                Text("links")
                                     .font(.headline)
                                     .frame(maxWidth: .infinity, alignment: .leading)
 
@@ -256,7 +250,11 @@ struct ProfileDisplayView: View {
                 .frame(maxWidth: .infinity)
             }
             .background(Color.white)
-            .ignoresSafeArea(edges: .top)
+            .alert("Coming Soon", isPresented: $showComingSoon) {
+                Button("OK", role: .cancel) {}
+            } message: {
+                Text("This feature isn't available yet.")
+            }
             .alert("Log Out", isPresented: $showLogoutConfirm) {
                 Button("Log Out", role: .destructive) {
                     Task {
@@ -291,6 +289,25 @@ struct ProfileDisplayView: View {
                         .fontWeight(.semibold)
                         .foregroundColor(.black)
                     }
+                } else if otherUserId != nil {
+                    ToolbarItem(placement: .navigationBarTrailing) {
+                        Menu {
+                            Button(role: .destructive) {
+                                showComingSoon = true
+                            } label: {
+                                Label("Block", systemImage: "hand.raised")
+                            }
+                            Button {
+                                showComingSoon = true
+                            } label: {
+                                Label("Report", systemImage: "exclamationmark.bubble")
+                            }
+                        } label: {
+                            Image(systemName: "ellipsis")
+                                .font(.title3)
+                                .foregroundColor(.black)
+                        }
+                    }
                 }
             }
             .task {
@@ -316,13 +333,23 @@ struct ProfileDisplayView: View {
         }
     }
 
-    private var heroPlaceholder: some View {
+    private var circlePlaceholder: some View {
         ZStack {
             OrbitTheme.gradientFill
             Text(String(profile.name.prefix(1)).uppercased())
-                .font(.system(size: 72, weight: .bold))
+                .font(.system(size: 56, weight: .bold))
                 .foregroundColor(.white)
         }
+    }
+
+    // Template sentence — habits feature is in progress, no real data yet.
+    private var habitsSentence: Text {
+        let firstName = profile.name.split(separator: " ").first.map(String.init) ?? profile.name
+        return (Text(firstName + " prefers ").italic()
+                + Text("larger group settings").italic().foregroundColor(OrbitTheme.blue)
+                + Text(", in the ").italic()
+                + Text("morning").italic().foregroundColor(OrbitTheme.pink))
+            .font(.subheadline)
     }
 }
 

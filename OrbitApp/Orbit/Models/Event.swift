@@ -49,7 +49,7 @@ struct Mission: Codable, Identifiable {
 
     // ── Flex mode fields (optional, only populated when mode == .flex) ──
 
-    var activityCategory: ActivityCategory?
+    var logo: String?              // SF Symbol name chosen by the creator (replaces activity_category)
     var customActivityName: String?
     var minGroupSize: Int?
     var availability: [AvailabilitySlot]?
@@ -76,7 +76,7 @@ struct Mission: Codable, Identifiable {
         case userPodStatus      = "user_pod_status"
         case userPodId          = "user_pod_id"
         case pods
-        case activityCategory   = "activity_category"
+        case logo
         case customActivityName = "custom_activity_name"
         case minGroupSize       = "min_group_size"
         case availability
@@ -117,7 +117,7 @@ struct Mission: Codable, Identifiable {
         mode            = (try? c.decode(MissionMode.self, forKey: .mode)) ?? .set
 
         // Flex mode fields
-        activityCategory  = try? c.decode(ActivityCategory.self, forKey: .activityCategory)
+        logo              = try? c.decode(String.self, forKey: .logo)
         customActivityName = try? c.decode(String.self, forKey: .customActivityName)
         minGroupSize      = try? c.decode(Int.self, forKey: .minGroupSize)
         availability      = try? c.decode([AvailabilitySlot].self, forKey: .availability)
@@ -152,7 +152,7 @@ struct Mission: Codable, Identifiable {
         userPodId: String? = nil,
         pods: [PodSummary]? = nil,
         mode: MissionMode = .set,
-        activityCategory: ActivityCategory? = nil,
+        logo: String? = nil,
         customActivityName: String? = nil,
         minGroupSize: Int? = nil,
         availability: [AvailabilitySlot]? = nil,
@@ -183,7 +183,7 @@ struct Mission: Codable, Identifiable {
         self.userPodId = userPodId
         self.pods = pods
         self.mode = mode
-        self.activityCategory = activityCategory
+        self.logo = logo
         self.customActivityName = customActivityName
         self.minGroupSize = minGroupSize
         self.availability = availability
@@ -287,13 +287,9 @@ struct Mission: Codable, Identifiable {
 
     /// Display title — flex mode uses category/custom name, set mode uses title.
     var displayTitle: String {
-        if mode == .flex {
-            if activityCategory == .custom, let name = customActivityName, !name.isEmpty {
-                return name
-            }
-            if let cat = activityCategory {
-                return title.isEmpty ? cat.displayName : title
-            }
+        if mode == .flex, title.isEmpty {
+            if let name = customActivityName, !name.isEmpty { return name }
+            return "Hangout"
         }
         return title
     }
@@ -365,7 +361,7 @@ struct Mission: Codable, Identifiable {
             maxPodSize: signal.maxGroupSize,
             status: signal.status.rawValue,
             mode: .flex,
-            activityCategory: signal.activityCategory,
+            logo: signal.activityCategory.icon,
             customActivityName: signal.customActivityName,
             minGroupSize: signal.minGroupSize,
             availability: signal.availability,

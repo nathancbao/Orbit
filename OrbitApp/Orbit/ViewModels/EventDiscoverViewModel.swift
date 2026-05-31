@@ -11,7 +11,6 @@ import SwiftUI
 
 enum MissionSegment: String, CaseIterable {
     case discover = "Explore"
-    case mine = "My Missions"
 }
 
 @MainActor
@@ -58,7 +57,6 @@ class MissionsViewModel: ObservableObject {
         if let tag = filterTag {
             all = all.filter {
                 $0.tags.contains(tag)
-                || $0.activityCategory?.displayName == tag
             }
         }
         return all
@@ -200,7 +198,8 @@ class MissionsViewModel: ObservableObject {
         links: [String] = [],
         tags: [String] = [],
         timeRangeStart: Int = 9,
-        timeRangeEnd: Int = 21
+        timeRangeEnd: Int = 21,
+        logo: String? = nil
     ) async -> Mission? {
         isSubmitting = true
         errorMessage = nil
@@ -216,7 +215,8 @@ class MissionsViewModel: ObservableObject {
                 links: links,
                 tags: tags,
                 timeRangeStart: timeRangeStart,
-                timeRangeEnd: timeRangeEnd
+                timeRangeEnd: timeRangeEnd,
+                logo: logo
             )
             // Auto-RSVP the creator so they're in a pod from the start.
             // Do NOT insert here — caller's onCreated → insertCreatedMission handles it once.
@@ -269,7 +269,8 @@ class MissionsViewModel: ObservableObject {
         date: String,
         startTime: String?,
         endTime: String?,
-        maxPodSize: Int
+        maxPodSize: Int,
+        logo: String? = nil
     ) async -> Mission? {
         isSubmitting = true
         errorMessage = nil
@@ -280,7 +281,7 @@ class MissionsViewModel: ObservableObject {
                 id: id, title: title, description: description,
                 tags: tags, location: location, date: date,
                 startTime: startTime, endTime: endTime,
-                maxPodSize: maxPodSize
+                maxPodSize: maxPodSize, logo: logo
             )
             replaceInFeed(updated)
             showToastMessage("Mission updated!")
@@ -301,7 +302,8 @@ class MissionsViewModel: ObservableObject {
         links: [String],
         tags: [String],
         timeRangeStart: Int,
-        timeRangeEnd: Int
+        timeRangeEnd: Int,
+        logo: String? = nil
     ) async -> Mission? {
         isSubmitting = true
         errorMessage = nil
@@ -313,7 +315,8 @@ class MissionsViewModel: ObservableObject {
                 minGroupSize: minGroupSize, maxGroupSize: maxGroupSize,
                 availability: availability, description: description,
                 links: links, tags: tags,
-                timeRangeStart: timeRangeStart, timeRangeEnd: timeRangeEnd
+                timeRangeStart: timeRangeStart, timeRangeEnd: timeRangeEnd,
+                logo: logo
             )
             updated.tags = tags
             replaceInFeed(updated)

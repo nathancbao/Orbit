@@ -37,7 +37,7 @@ class MissionService {
     func createMission(title: String, description: String, tags: [String],
                        location: String, date: String,
                        startTime: String? = nil, endTime: String? = nil,
-                       maxPodSize: Int = 4) async throws -> Mission {
+                       maxPodSize: Int = 4, logo: String? = nil) async throws -> Mission {
         var body: [String: Any] = [
             "title": title, "description": description,
             "tags": tags, "location": location,
@@ -46,6 +46,7 @@ class MissionService {
         ]
         if let startTime { body["start_time"] = startTime }
         if let endTime { body["end_time"] = endTime }
+        if let logo { body["logo"] = logo }
         return try await APIService.shared.request(
             endpoint: Constants.API.Endpoints.missions,
             method: "POST", body: body, authenticated: true
@@ -61,7 +62,8 @@ class MissionService {
         date: String,
         startTime: String? = nil,
         endTime: String? = nil,
-        maxPodSize: Int = 4
+        maxPodSize: Int = 4,
+        logo: String? = nil
     ) async throws -> Mission {
         var body: [String: Any] = [
             "title": title, "description": description,
@@ -71,6 +73,7 @@ class MissionService {
         ]
         if let startTime { body["start_time"] = startTime }
         if let endTime { body["end_time"] = endTime }
+        if let logo { body["logo"] = logo }
         return try await APIService.shared.request(
             endpoint: Constants.API.Endpoints.mission(id),
             method: "PUT", body: body, authenticated: true
@@ -136,7 +139,8 @@ class MissionService {
         links: [String] = [],
         tags: [String] = [],
         timeRangeStart: Int = 9,
-        timeRangeEnd: Int = 21
+        timeRangeEnd: Int = 21,
+        logo: String? = nil
     ) async throws -> Mission {
         let dateFormatter = DateFormatter()
         dateFormatter.dateFormat = "yyyy-MM-dd"
@@ -178,6 +182,7 @@ class MissionService {
         if !tags.isEmpty {
             body["tags"] = tags
         }
+        if let logo { body["logo"] = logo }
 
         let signal: Signal = try await APIService.shared.request(
             endpoint: Constants.API.Endpoints.signals,
@@ -185,6 +190,7 @@ class MissionService {
         )
         var mission = Mission.fromSignal(signal)
         mission.tags = tags
+        if let logo { mission.logo = logo }
         return mission
     }
 
@@ -198,7 +204,8 @@ class MissionService {
         links: [String] = [],
         tags: [String] = [],
         timeRangeStart: Int = 9,
-        timeRangeEnd: Int = 21
+        timeRangeEnd: Int = 21,
+        logo: String? = nil
     ) async throws -> Mission {
         let dateFormatter = DateFormatter()
         dateFormatter.dateFormat = "yyyy-MM-dd"
@@ -236,6 +243,7 @@ class MissionService {
         ]
         if !links.isEmpty { body["links"] = links }
         if !tags.isEmpty { body["tags"] = tags }
+        if let logo { body["logo"] = logo }
 
         let signal: Signal = try await APIService.shared.request(
             endpoint: Constants.API.Endpoints.signal(id),
@@ -243,6 +251,7 @@ class MissionService {
         )
         var mission = Mission.fromSignal(signal)
         mission.tags = tags
+        if let logo { mission.logo = logo }
         return mission
     }
 

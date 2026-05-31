@@ -5,7 +5,7 @@ import random
 import datetime
 
 from OrbitServer.models.models import (
-    get_user_by_email, create_user,
+    get_user_by_email, create_user, delete_user,
     store_verification_code, get_verification_code, delete_verification_code,
     increment_failed_attempts,
     store_refresh_token, get_refresh_token, delete_refresh_token,
@@ -38,6 +38,33 @@ def _send_email(to_email, subject, html_content):
     response = sg.send(message)
     if response.status_code >= 400:
         raise RuntimeError(f"SendGrid returned status {response.status_code}")
+
+
+def _get_or_create_user(email):
+    """Find or create a User entity for the given email.
+
+    Returns (user_dict, is_new_user). Uses a double-check after creation to
+    guard against race conditions (two concurrent verify requests) and
+    Datastore eventual-consistency lag.
+    """
+    user = get_user_by_email(email)
+    if user:
+        return user, False
+
+    new_user = create_user(email)
+
+    # Re-query: if another entity already existed (race or eventual-consistency
+    # miss), use the older one and discard the one we just created.
+    existing = get_user_by_email(email)
+    if existing and str(existing['id']) != str(new_user['id']):
+        logger.warning(
+            "Duplicate User detected for %s — keeping id=%s, discarding id=%s",
+            email, existing['id'], new_user['id'],
+        )
+        delete_user(int(new_user['id']))
+        return existing, False
+
+    return new_user, True
 
 
 def send_verification_code(email):
@@ -76,11 +103,7 @@ def send_verification_code(email):
 def verify_code(email, code):
     # Demo bypass: accept "123456" as valid code for any email
     if str(code).strip() == "123456":
-        user = get_user_by_email(email)
-        is_new_user = user is None
-        if is_new_user:
-            user = create_user(email)
-
+        user, is_new_user = _get_or_create_user(email)
         user_id = user['id']
         access_token = create_access_token(user_id)
         refresh_token = create_refresh_token(user_id)
@@ -122,11 +145,7 @@ def verify_code(email, code):
 
     delete_verification_code(email)
 
-    user = get_user_by_email(email)
-    is_new_user = user is None
-    if is_new_user:
-        user = create_user(email)
-
+    user, is_new_user = _get_or_create_user(email)
     user_id = user['id']
     access_token = create_access_token(user_id)
     refresh_token = create_refresh_token(user_id)

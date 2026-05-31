@@ -35,13 +35,11 @@ enum DiscoveryTheme {
 
 struct ImageStar: Identifiable {
     let id = UUID()
-    let position: CGPoint      // 0-1 normalized
-    let size: CGFloat           // 8-16pt
-    let isColored: Bool
+    let position: CGPoint       // initial absolute position
+    let size: CGFloat           // 14-26pt
+    let velocity: CGVector      // constant drift in pt/sec
     let twinkleSpeed: Double
     let phaseOffset: Double
-    let floatAmplitude: CGFloat // 1-3pt
-    let floatSpeed: Double
 }
 
 // MARK: - Planet Node Model
@@ -52,7 +50,7 @@ enum PlanetType {
 }
 
 struct PlanetNode: Identifiable {
-    let id = UUID()
+    let id: String          // stable — DiscoveryItem.id, so SwiftUI keeps views across refreshes
     let type: PlanetType
     let angle: Double
     let radius: CGFloat
@@ -75,22 +73,38 @@ struct PlanetNode: Identifiable {
         }
     }
 
-    var icon: String {
+    /// Icon based on the creator-chosen logo. Returns nil when no logo is set,
+    /// in which case the planet renders without an icon.
+    var activityIcon: String? {
         switch type {
         case .mission(let m):
-            return m.isFlexMode ? "antenna.radiowaves.left.and.right" : "calendar.circle.fill"
-        case .template:             return "sparkles"
+            guard let logo = m.logo, !logo.isEmpty else { return nil }
+            return logo
+        case .template:
+            return "sparkles"
         }
     }
 
-    var isMission: Bool {
-        if case .mission(let m) = type { return m.mode == .set }
-        return false
+    /// True once a concrete meeting time exists: a set mission with a date, or a
+    /// flex mission whose time has been confirmed. These get the rotating Saturn ring.
+    var hasScheduledTime: Bool {
+        switch type {
+        case .mission(let m):
+            return m.mode == .set ? !m.date.isEmpty : (m.scheduledTime != nil)
+        case .template:
+            return false
+        }
     }
 
-    var isFlexMission: Bool {
-        if case .mission(let m) = type { return m.isFlexMode }
-        return false
+    /// True while a flex mission is still being voted on / scheduled. These get the
+    /// pulsating ring.
+    var isScheduling: Bool {
+        switch type {
+        case .mission(let m):
+            return m.mode == .flex && m.scheduledTime == nil
+        case .template:
+            return false
+        }
     }
 
     var isTemplate: Bool {
@@ -108,6 +122,7 @@ struct PlanetNode: Identifiable {
 
 struct ImageStarFieldView: View {
     let stars: [ImageStar]
+    let size: CGSize
 
     var body: some View {
         TimelineView(.animation(minimumInterval: 1.0 / 30.0)) { timeline in
@@ -116,21 +131,35 @@ struct ImageStarFieldView: View {
                 ForEach(stars) { star in
                     let twinkle = (sin(time * star.twinkleSpeed + star.phaseOffset) + 1) / 2
                     let opacity = 0.3 + twinkle * 0.7
-                    let floatY = sin(time * star.floatSpeed + star.phaseOffset) * star.floatAmplitude
+                    let pos = drift(star, time: time)
 
-                    Image(star.isColored ? "coloredStar" : "blackStar")
+                    Image("blackStar")
                         .resizable()
                         .renderingMode(.original)
                         .frame(width: star.size, height: star.size)
                         .opacity(opacity)
-                        .offset(y: floatY)
-                        .position(
-                            x: star.position.x,
-                            y: star.position.y
-                        )
+                        .position(pos)
                 }
             }
         }
+    }
+
+    /// Linear drift that wraps around the screen edges (with a margin so a star
+    /// fully exits before re-entering from the opposite side).
+    private func drift(_ star: ImageStar, time: Double) -> CGPoint {
+        let margin: CGFloat = 20
+        let wrapW = size.width + margin * 2
+        let wrapH = size.height + margin * 2
+        guard wrapW > 0, wrapH > 0 else { return star.position }
+
+        let t = CGFloat(time)
+        var x = (star.position.x + margin + star.velocity.dx * t)
+            .truncatingRemainder(dividingBy: wrapW)
+        if x < 0 { x += wrapW }
+        var y = (star.position.y + margin + star.velocity.dy * t)
+            .truncatingRemainder(dividingBy: wrapH)
+        if y < 0 { y += wrapH }
+        return CGPoint(x: x - margin, y: y - margin)
     }
 }
 
@@ -149,7 +178,7 @@ struct CometView: View {
             .resizable()
             .renderingMode(.original)
             .frame(width: 60, height: 24)
-            .rotationEffect(.degrees(-30))
+            .rotationEffect(.degrees(0))
             .opacity(cometOpacity)
             .offset(x: cometOffset, y: cometOffset * 0.5)
             .onAppear {
@@ -158,7 +187,7 @@ struct CometView: View {
     }
 
     private func scheduleCometStreak() {
-        let delay = Double.random(in: 15...45)
+        let delay = Double.random(in: 12...25)
         DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
             fireCometStreak()
         }
@@ -166,7 +195,7 @@ struct CometView: View {
 
     private func fireCometStreak() {
         cometOffset = -200
-        cometOpacity = 0
+        cometOpacity = 0.3
         cometVisible = true
 
         // Fade in
@@ -232,12 +261,18 @@ struct MotivationalBannerView: View {
 
     var body: some View {
         Text(messages[currentIndex])
-            .font(.system(size: 14, weight: .medium))
-            .foregroundColor(DiscoveryTheme.textMuted)
+            .font(.system(size: 15, weight: .semibold, design: .rounded))
+            .foregroundColor(DiscoveryTheme.textPrimary)
             .multilineTextAlignment(.center)
             .id(currentIndex)
             .transition(.opacity)
-            .padding(.horizontal, 24)
+            .padding(.horizontal, 16)
+            .padding(.vertical, 8)
+            .background(
+                Capsule()
+                    .fill(DiscoveryTheme.surface.opacity(0.92))
+                    .shadow(color: Color.black.opacity(0.06), radius: 6, x: 0, y: 2)
+            )
             .onAppear {
                 startCycling()
             }
@@ -303,7 +338,7 @@ struct RecommendationsSheet: View {
                             } label: {
                                 HStack(spacing: 12) {
                                     Image(systemName: mission.isFlexMode
-                                          ? (mission.activityCategory?.icon ?? "star")
+                                          ? (mission.logo ?? "star")
                                           : "calendar.circle.fill")
                                         .font(.title2)
                                         .foregroundColor(mission.isFlexMode
@@ -318,8 +353,8 @@ struct RecommendationsSheet: View {
                                             Text(reason)
                                                 .font(.caption)
                                                 .foregroundColor(DiscoveryTheme.textMuted)
-                                        } else if mission.isFlexMode, let cat = mission.activityCategory {
-                                            Text(cat.displayName)
+                                        } else if mission.isFlexMode, !mission.tags.isEmpty {
+                                            Text(mission.tags.prefix(2).joined(separator: ", "))
                                                 .font(.caption)
                                                 .foregroundColor(DiscoveryTheme.textMuted)
                                         }
@@ -448,8 +483,8 @@ struct PlanetNodeView: View {
 
     @State private var floatOffset: CGFloat = 0
     @State private var appeared: Bool = false
-    @State private var ringRotation: Double = 0
-    @State private var flexPulse: CGFloat = 1.0
+    @State private var saturnRotation: Double = 0
+    @State private var schedulePulse: CGFloat = 1.0
 
     private var planetSize: CGFloat { isSelected ? 60 : 52 }
     private var glowSize: CGFloat { isSelected ? 100 : 80 }
@@ -475,37 +510,33 @@ struct PlanetNodeView: View {
                         .frame(width: glowSize, height: glowSize)
                 }
 
-                // Mission: Saturn-like ring
-                if planet.isMission {
+                // Time set: tilted Saturn ring that continuously rotates
+                if planet.hasScheduledTime {
                     Ellipse()
                         .stroke(
                             LinearGradient(
                                 colors: [
-                                    planet.accentColor.opacity(0.5),
-                                    planet.accentColor.opacity(0.2)
+                                    planet.accentColor.opacity(0.6),
+                                    planet.accentColor.opacity(0.15),
+                                    planet.accentColor.opacity(0.6)
                                 ],
                                 startPoint: .leading,
                                 endPoint: .trailing
                             ),
                             lineWidth: 2
                         )
-                        .frame(width: planetSize + 22, height: 11)
-                        .rotationEffect(.degrees(ringRotation))
+                        .frame(width: planetSize + 24, height: 12)
+                        .rotationEffect(.degrees(-18))
+                        .rotationEffect(.degrees(saturnRotation))
                 }
 
-                // Flex mission: Radiating pulse rings
-                if planet.isFlexMission {
+                // Scheduling: frequent, low-opacity pulse ring
+                if planet.isScheduling {
                     Circle()
-                        .stroke(planet.accentColor.opacity(0.2), lineWidth: 1)
-                        .frame(width: planetSize + 16, height: planetSize + 16)
-                        .scaleEffect(flexPulse)
-                        .opacity(Double(2.0 - flexPulse))
-
-                    Circle()
-                        .stroke(planet.accentColor.opacity(0.12), lineWidth: 1)
-                        .frame(width: planetSize + 28, height: planetSize + 28)
-                        .scaleEffect(flexPulse)
-                        .opacity(Double(2.0 - flexPulse) * 0.5)
+                        .stroke(planet.accentColor.opacity(0.35), lineWidth: 1.5)
+                        .frame(width: planetSize + 14, height: planetSize + 14)
+                        .scaleEffect(schedulePulse)
+                        .opacity(Double(1.6 - schedulePulse))
                 }
 
                 // Template: Dashed outline
@@ -599,43 +630,13 @@ struct PlanetNodeView: View {
                 }
                 .shadow(color: planet.accentColor.opacity(0.2), radius: 8, x: 0, y: 4)
 
-                // Icon overlay
-                Image(systemName: planet.icon)
-                    .font(.system(size: isSelected ? 20 : 16, weight: .medium))
-                    .foregroundColor(.white.opacity(0.9))
-                    .shadow(color: Color.black.opacity(0.3), radius: 2, x: 0, y: 1)
-            }
-
-            // Info label on selection
-            if isSelected {
-                VStack(spacing: 2) {
-                    Text(planet.title)
-                        .font(.caption)
-                        .fontWeight(.semibold)
-                        .foregroundColor(DiscoveryTheme.textPrimary)
-                        .lineLimit(1)
-
-                    Text(planet.subtitle)
-                        .font(.caption2)
-                        .foregroundColor(DiscoveryTheme.textMuted)
-
-                    if let score = planet.matchScore {
-                        MatchScoreBadge(score: score)
-                    }
-
-                    if planet.isTemplate {
-                        Text("Tap To Create")
-                            .font(.caption2)
-                            .foregroundColor(DiscoveryTheme.templateColor)
-                            .italic()
-                    }
+                // Icon overlay (only when the activity type is known)
+                if let icon = planet.activityIcon {
+                    Image(systemName: icon)
+                        .font(.system(size: isSelected ? 20 : 16, weight: .medium))
+                        .foregroundColor(.white.opacity(0.9))
+                        .shadow(color: Color.black.opacity(0.3), radius: 2, x: 0, y: 1)
                 }
-                .padding(.horizontal, 10)
-                .padding(.vertical, 6)
-                .background(DiscoveryTheme.surface)
-                .cornerRadius(8)
-                .shadow(color: Color.black.opacity(0.08), radius: 6, x: 0, y: 2)
-                .transition(.opacity.combined(with: .scale))
             }
         }
         .offset(y: floatOffset)
@@ -655,17 +656,55 @@ struct PlanetNodeView: View {
                 ) {
                     floatOffset = 6
                 }
-                if planet.isMission {
-                    withAnimation(.easeInOut(duration: 2.5).repeatForever(autoreverses: true)) {
-                        ringRotation = 10
+                if planet.hasScheduledTime {
+                    withAnimation(.linear(duration: 6).repeatForever(autoreverses: false)) {
+                        saturnRotation = 360
                     }
-                } else if planet.isFlexMission {
-                    withAnimation(.easeOut(duration: 2).repeatForever(autoreverses: false)) {
-                        flexPulse = 1.5
+                } else if planet.isScheduling {
+                    withAnimation(.easeOut(duration: 1.2).repeatForever(autoreverses: false)) {
+                        schedulePulse = 1.6
                     }
                 }
             }
         }
+    }
+}
+
+// MARK: - Planet Info Label
+
+/// Info card shown for the selected planet. Rendered as a top-level overlay so it
+/// always sits above the planets, center node, and the VOYAGE button.
+struct PlanetInfoLabel: View {
+    let planet: PlanetNode
+
+    var body: some View {
+        VStack(spacing: 2) {
+            Text(planet.title)
+                .font(.caption)
+                .fontWeight(.semibold)
+                .foregroundColor(DiscoveryTheme.textPrimary)
+                .lineLimit(1)
+
+            Text(planet.subtitle)
+                .font(.caption2)
+                .foregroundColor(DiscoveryTheme.textMuted)
+
+            if let score = planet.matchScore {
+                MatchScoreBadge(score: score)
+            }
+
+            if planet.isTemplate {
+                Text("Tap To Create")
+                    .font(.caption2)
+                    .foregroundColor(DiscoveryTheme.templateColor)
+                    .italic()
+            }
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 6)
+        .background(DiscoveryTheme.surface)
+        .cornerRadius(8)
+        .shadow(color: Color.black.opacity(0.12), radius: 8, x: 0, y: 2)
     }
 }
 
@@ -674,7 +713,7 @@ struct PlanetNodeView: View {
 struct ConnectorLinesView: View {
     let centerPoint: CGPoint
     let planets: [PlanetNode]
-    let planetPositions: [UUID: CGPoint]
+    let planetPositions: [String: CGPoint]
 
     var body: some View {
         Canvas { context, size in
@@ -686,47 +725,37 @@ struct ConnectorLinesView: View {
                 path.addLine(to: planetPos)
                 context.stroke(
                     path,
-                    with: .color(planet.accentColor.opacity(0.25)),
-                    style: StrokeStyle(lineWidth: 1, dash: dashPattern)
+                    with: .color(planet.accentColor.opacity(0.28)),
+                    style: StrokeStyle(lineWidth: 1.2, dash: dashPattern)
                 )
             }
         }
     }
 }
 
-// MARK: - Legend View
+// MARK: - Loading View
 
-struct DiscoveryLegend: View {
+/// Simple placeholder loader: a black star revolving around the center with a
+/// "Loading . . ." label. Swapped for a custom animation later.
+struct GalaxyLoadingView: View {
+    @State private var rotation: Double = 0
+
     var body: some View {
-        HStack(spacing: 16) {
-            LegendItem(color: DiscoveryTheme.accentBlue, label: "Set", icon: "calendar.circle.fill")
-            LegendItem(color: DiscoveryTheme.accentPink, label: "Flex", icon: "antenna.radiowaves.left.and.right")
+        VStack(spacing: 18) {
+            Image("blackStar")
+                .resizable()
+                .renderingMode(.original)
+                .frame(width: 40, height: 40)
+                .rotationEffect(.degrees(rotation))
+
+            Text("Loading . . .")
+                .font(.system(size: 15, weight: .medium, design: .rounded))
+                .foregroundColor(DiscoveryTheme.textMuted)
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 8)
-        .background(DiscoveryTheme.surface.opacity(0.9))
-        .cornerRadius(12)
-        .shadow(color: Color.black.opacity(0.06), radius: 8, x: 0, y: 2)
-    }
-}
-
-struct LegendItem: View {
-    let color: Color
-    let label: String
-    let icon: String
-
-    var body: some View {
-        HStack(spacing: 6) {
-            Circle()
-                .fill(color)
-                .frame(width: 10, height: 10)
-            Image(systemName: icon)
-                .font(.caption2)
-                .foregroundColor(color)
-            Text(label)
-                .font(.caption2)
-                .fontWeight(.medium)
-                .foregroundColor(DiscoveryTheme.textPrimary)
+        .onAppear {
+            withAnimation(.linear(duration: 1.4).repeatForever(autoreverses: false)) {
+                rotation = 360
+            }
         }
     }
 }
@@ -741,8 +770,8 @@ struct DiscoveryView: View {
     @StateObject private var missionsVM = MissionsViewModel()
     @State private var imageStars: [ImageStar] = []
     @State private var planets: [PlanetNode] = []
-    @State private var selectedPlanetId: UUID? = nil
-    @State private var planetPositions: [UUID: CGPoint] = [:]
+    @State private var selectedPlanetId: String? = nil
+    @State private var planetPositions: [String: CGPoint] = [:]
     @State private var selectedMission: Mission? = nil
     @State private var showCreateMission = false
     @State private var createPrefillTitle = ""
@@ -750,6 +779,8 @@ struct DiscoveryView: View {
     @State private var showRecommendationsSheet = false
     @State private var showProfile = false
     @State private var showVoyage = false
+    @State private var initialLoadDone = false
+    @State private var loadVersion = 0
 
     init(userProfile: Binding<Profile>, isActive: Bool = false) {
         _userProfile = userProfile
@@ -759,26 +790,33 @@ struct DiscoveryView: View {
         ))
     }
 
-    // Priority ring radii as fraction of half the screen's smaller dimension
+    // Priority ring radii as fraction of half the screen's smaller dimension.
+    // Tightened so the cluster sits lower and leaves more room for the banner.
     private let ringRadii: [Int: CGFloat] = [
-        0: 0.55,  // hosted — inner ring
-        1: 0.72,  // joined — second ring
-        2: 0.85,  // recommended — third ring
-        3: 0.96   // discoverable/templates — outer ring
+        0: 0.42,  // hosted — inner ring
+        1: 0.58,  // joined — second ring
+        2: 0.70,  // recommended — third ring
+        3: 0.82   // discoverable/templates — outer ring
     ]
 
     var body: some View {
         GeometryReader { geometry in
             let centerPoint = CGPoint(
                 x: geometry.size.width / 2,
-                y: geometry.size.height / 2 - 40
+                y: geometry.size.height / 2 + 40
             )
             let halfScreen = min(geometry.size.width, geometry.size.height) / 2
 
             ZStack {
-                // Background
-                DiscoveryTheme.background
-                    .ignoresSafeArea()
+              // Full-bleed base so the safe-area edges stay filled behind the ScrollView.
+              DiscoveryTheme.background
+                  .ignoresSafeArea()
+
+              ScrollView {
+                ZStack {
+                // Tap-to-deselect backdrop
+                Color.clear
+                    .contentShape(Rectangle())
                     .onTapGesture {
                         withAnimation(.spring(response: 0.3)) {
                             selectedPlanetId = nil
@@ -807,7 +845,7 @@ struct DiscoveryView: View {
                     .allowsHitTesting(false)
 
                 // Image-based star field
-                ImageStarFieldView(stars: imageStars)
+                ImageStarFieldView(stars: imageStars, size: geometry.size)
                     .ignoresSafeArea()
                     .allowsHitTesting(false)
 
@@ -826,40 +864,59 @@ struct DiscoveryView: View {
                 )
                 .allowsHitTesting(false)
 
-                // Planet nodes
-                ForEach(Array(planets.enumerated()), id: \.element.id) { index, planet in
-                    let position = calculatePlanetPosition(
-                        planet: planet,
-                        center: centerPoint,
-                        halfScreen: halfScreen
-                    )
-                    let delay = 0.4 + Double(index) * 0.12
+                if initialLoadDone {
+                    // Planet nodes
+                    ForEach(Array(planets.enumerated()), id: \.element.id) { index, planet in
+                        let position = calculatePlanetPosition(
+                            planet: planet,
+                            center: centerPoint,
+                            halfScreen: halfScreen
+                        )
+                        let delay = 0.4 + Double(index) * 0.12
 
-                    PlanetNodeView(
-                        planet: planet,
-                        isSelected: selectedPlanetId == planet.id,
-                        appearanceDelay: delay,
-                        onTap: {
-                            handlePlanetTap(planet)
+                        PlanetNodeView(
+                            planet: planet,
+                            isSelected: selectedPlanetId == planet.id,
+                            appearanceDelay: delay,
+                            onTap: {
+                                handlePlanetTap(planet)
+                            }
+                        )
+                        .id("\(loadVersion)-\(planet.id)")
+                        .position(position)
+                        .onAppear {
+                            planetPositions[planet.id] = position
                         }
-                    )
-                    .position(position)
-                    .onAppear {
-                        planetPositions[planet.id] = position
                     }
-                }
 
-                // Center node (user)
-                CenterNodeView(
-                    imageUrl: userProfile.photo,
-                    username: userProfile.name
-                )
-                .position(centerPoint)
-                .onTapGesture {
-                    withAnimation(.spring(response: 0.3)) {
-                        selectedPlanetId = nil
+                    // Center node (user)
+                    CenterNodeView(
+                        imageUrl: userProfile.photo,
+                        username: userProfile.name
+                    )
+                    .position(centerPoint)
+                    .onTapGesture {
+                        withAnimation(.spring(response: 0.3)) {
+                            selectedPlanetId = nil
+                        }
                     }
+                } else {
+                    // Initial load placeholder
+                    GalaxyLoadingView()
+                        .position(centerPoint)
                 }
+                }
+                .frame(width: geometry.size.width, height: geometry.size.height)
+              }
+              .scrollIndicators(.hidden)
+              .refreshable {
+                  planets = []
+                  initialLoadDone = false
+                  loadVersion += 1
+                  await viewModel.reload()
+                  generatePlanets(halfScreen: halfScreen, screenSize: geometry.size, center: centerPoint)
+                  withAnimation(.easeOut(duration: 0.3)) { initialLoadDone = true }
+              }
             }
             .overlay(alignment: .top) {
                 VStack(spacing: 8) {
@@ -869,8 +926,6 @@ struct DiscoveryView: View {
                             showBadge: viewModel.showRecommendationBadge,
                             onTap: { showRecommendationsSheet = true }
                         )
-                        Spacer()
-                        DiscoveryLegend()
                         Spacer()
                         Button { showProfile = true } label: {
                             ProfileAvatarView(
@@ -908,6 +963,18 @@ struct DiscoveryView: View {
                 }
                 .padding(.bottom, 24)
             }
+            .overlay {
+                // Selected-planet info card — drawn last so it sits above the
+                // planets, center node, and VOYAGE button.
+                if let selected = planets.first(where: { $0.id == selectedPlanetId }),
+                   let pos = planetPositions[selected.id] {
+                    PlanetInfoLabel(planet: selected)
+                        .fixedSize()
+                        .position(x: pos.x, y: pos.y + 56)
+                        .transition(.opacity.combined(with: .scale))
+                        .allowsHitTesting(false)
+                }
+            }
             .fullScreenCover(isPresented: $showVoyage) {
                 VoyageView()
             }
@@ -917,20 +984,12 @@ struct DiscoveryView: View {
             }
             .task {
                 await viewModel.load()
-                viewModel.startBellTimer()
                 generatePlanets(halfScreen: halfScreen, screenSize: geometry.size, center: centerPoint)
-            }
-            .onChange(of: viewModel.items) {
-                generatePlanets(halfScreen: halfScreen, screenSize: geometry.size, center: centerPoint)
-            }
-            .onChange(of: isActive) { _, active in
-                if active {
-                    Task {
-                        await viewModel.reload()
-                        generatePlanets(halfScreen: halfScreen, screenSize: geometry.size, center: centerPoint)
-                    }
+                withAnimation(.easeOut(duration: 0.3)) {
+                    initialLoadDone = true
                 }
             }
+
             .sheet(item: $selectedMission) { mission in
                 MissionDetailView(mission: mission, viewModel: missionsVM, onJoined: {
                     selectedMission = nil
@@ -988,40 +1047,22 @@ struct DiscoveryView: View {
     // MARK: - Star Generation
 
     private func generateImageStars(in size: CGSize) {
-        let starCount = 16
-        let minDistance: CGFloat = 50
-        // Keep stars below the top bar + motivational banner (~100pt)
-        let topInset: CGFloat = 100
-        var positions: [CGPoint] = []
+        guard size.width > 0, size.height > 0 else { return }
+        let starCount = Int.random(in: 14...18)
 
-        for _ in 0..<starCount {
-            var candidate = CGPoint(
-                x: CGFloat.random(in: 30...(size.width - 30)),
-                y: CGFloat.random(in: topInset...(size.height - 30))
-            )
-            // Try to find a position far enough from existing stars
-            for _ in 0..<20 {
-                let tooClose = positions.contains { existing in
-                    hypot(existing.x - candidate.x, existing.y - candidate.y) < minDistance
-                }
-                if !tooClose { break }
-                candidate = CGPoint(
-                    x: CGFloat.random(in: 30...(size.width - 30)),
-                    y: CGFloat.random(in: topInset...(size.height - 30))
-                )
-            }
-            positions.append(candidate)
-        }
-
-        imageStars = positions.map { pos in
-            ImageStar(
-                position: pos,
-                size: CGFloat.random(in: 8...16),
-                isColored: false,
+        imageStars = (0..<starCount).map { _ in
+            let angle = Double.random(in: 0..<(2 * .pi))
+            // Some stars drift noticeably faster than others.
+            let speed = Double.random(in: 3...10)
+            return ImageStar(
+                position: CGPoint(
+                    x: CGFloat.random(in: 0...size.width),
+                    y: CGFloat.random(in: 0...size.height)
+                ),
+                size: CGFloat.random(in: 11...19),
+                velocity: CGVector(dx: CGFloat(cos(angle) * speed), dy: CGFloat(sin(angle) * speed)),
                 twinkleSpeed: Double.random(in: 0.5...2.0),
-                phaseOffset: Double.random(in: 0...Double.pi * 2),
-                floatAmplitude: CGFloat.random(in: 1...3),
-                floatSpeed: Double.random(in: 0.3...0.8)
+                phaseOffset: Double.random(in: 0...Double.pi * 2)
             )
         }
     }
@@ -1031,20 +1072,20 @@ struct DiscoveryView: View {
     private let maxPlanets = 7
 
     /// Minimum pixel distance between any two planet centers to prevent overlap.
-    private let minPlanetDistance: CGFloat = 150
+    private let minPlanetDistance: CGFloat = 124
 
     /// Minimum distance from the screen center so planets don't overlap the user profile node.
-    private let minCenterDistance: CGFloat = 100
+    private let minCenterDistance: CGFloat = 90
 
     /// Vertical stretch factor to create an oval layout that uses the taller screen dimension.
-    private let verticalStretch: CGFloat = 1.4
+    private let verticalStretch: CGFloat = 1.2
 
     /// Check if a candidate position is valid: no overlap, clear of center profile, and within screen bounds.
     private func isValidPosition(x: CGFloat, y: CGFloat, placed: [(x: CGFloat, y: CGFloat)],
                                   screenSize: CGSize, center: CGPoint) -> Bool {
-        let sideMargin: CGFloat = 44   // planet radius (26) + ring (11) + padding
-        let topMargin: CGFloat = 90    // top bar + motivational banner + padding
-        let bottomMargin: CGFloat = 80 // VOYAGE button + padding
+        let sideMargin: CGFloat = 44    // planet radius (26) + ring (11) + padding
+        let topMargin: CGFloat = 150    // top bar + motivational banner + breathing room
+        let bottomMargin: CGFloat = 170 // selected info label + VOYAGE button + navbar clearance
         let screenX = center.x + x
         let screenY = center.y + y
         guard screenX >= sideMargin,
@@ -1146,6 +1187,7 @@ struct DiscoveryView: View {
                 let radiusFraction = radius / halfScreen
 
                 allPlanets.append(PlanetNode(
+                    id: item.id,
                     type: type,
                     angle: angle,
                     radius: radiusFraction,

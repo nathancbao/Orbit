@@ -7,9 +7,25 @@ extension Notification.Name {
     static let unreadPodCountChanged = Notification.Name("unreadPodCountChanged")
 }
 
-enum PodSegment: String, CaseIterable {
-    case set = "Set"
-    case flex = "Flex"
+enum PodFilter: String, CaseIterable {
+    case all        = "All"
+    case leading    = "Leading"
+    case scheduling = "Scheduling"
+    case scheduled  = "Scheduled"
+    case done       = "Done"
+}
+
+// Unified item type for the pods list.
+private enum PodListItem: Identifiable {
+    case pod(Pod)
+    case signal(Mission)   // flex signal not yet matched into a pod
+
+    var id: String {
+        switch self {
+        case .pod(let p):    return "pod-\(p.id)"
+        case .signal(let m): return "sig-\(m.id)"
+        }
+    }
 }
 
 struct PodsView: View {
@@ -19,34 +35,73 @@ struct PodsView: View {
     @State private var rsvpedFlexMissions: [Mission] = []
     @State private var isLoading = false
     @State private var showProfile = false
-    @State private var segment: PodSegment = .set
+    @State private var activeFilter: PodFilter = .all
     @State private var searchText = ""
     @State private var showRecommendations = false
     @State private var recommendedMissions: [Mission] = []
     @State private var recommendedMissionForDetail: Mission? = nil
     @State private var unreadPodIds: Set<String> = []
 
-    /// Set pods sorted by scheduled time (soonest first), filtered by search.
-    /// Excludes flex pods so they only appear in the Flex tab.
-    private var sortedPods: [Pod] {
-        let setPods = pods.filter { !$0.isFlexPod }
-        let sorted = setPods.sorted { a, b in
-            let dateA = a.parsedScheduledTime ?? .distantFuture
-            let dateB = b.parsedScheduledTime ?? .distantFuture
+    private var currentUserId: Int {
+        UserDefaults.standard.integer(forKey: "orbit_user_id")
+    }
+
+    /// Unified, filtered, sorted list of pods + unmatched flex signals.
+    private var filteredItems: [PodListItem] {
+        let userId = currentUserId
+
+        // Pods that already have a pod ID in rsvpedFlexMissions — avoid duplicates.
+        let rsvpPodIds = Set(rsvpedFlexMissions.compactMap { $0.podId })
+
+        var items: [PodListItem] = []
+
+        for pod in pods {
+            guard !rsvpPodIds.contains(pod.id) else { continue }
+            let passes: Bool
+            switch activeFilter {
+            case .all:        passes = true
+            case .leading:    passes = pod.leaderId == userId
+            case .scheduling: passes = pod.isFlexPod && pod.isFlexForming
+            case .scheduled:  passes = pod.scheduledTime != nil && !pod.isActivityCompleted
+            case .done:       passes = pod.isActivityCompleted || pod.status == "completed"
+            }
+            if passes { items.append(.pod(pod)) }
+        }
+
+        for mission in rsvpedFlexMissions {
+            let passes: Bool
+            switch activeFilter {
+            case .all:        passes = true
+            case .leading:    passes = mission.creatorId == userId
+            case .scheduling: passes = mission.podId == nil
+            case .scheduled:  passes = mission.scheduledTime != nil
+            case .done:       passes = mission.isCompleted
+            }
+            if passes { items.append(.signal(mission)) }
+        }
+
+        // Sort: scheduled soonest first, then everything else
+        let sorted = items.sorted { a, b in
+            let dateA: Date
+            let dateB: Date
+            switch a {
+            case .pod(let p): dateA = p.parsedScheduledTime ?? .distantFuture
+            case .signal: dateA = .distantFuture
+            }
+            switch b {
+            case .pod(let p): dateB = p.parsedScheduledTime ?? .distantFuture
+            case .signal: dateB = .distantFuture
+            }
             return dateA < dateB
         }
-        if searchText.isEmpty { return sorted }
-        return sorted.filter { $0.displayName.localizedCaseInsensitiveContains(searchText) }
-    }
 
-    /// Flex missions filtered by search.
-    private var filteredFlexMissions: [Mission] {
-        if searchText.isEmpty { return rsvpedFlexMissions }
-        return rsvpedFlexMissions.filter { $0.displayTitle.localizedCaseInsensitiveContains(searchText) }
-    }
-
-    private var isSegmentDataEmpty: Bool {
-        segment == .set ? pods.isEmpty : rsvpedFlexMissions.isEmpty
+        guard !searchText.isEmpty else { return sorted }
+        return sorted.filter { item in
+            switch item {
+            case .pod(let p):    return p.displayName.localizedCaseInsensitiveContains(searchText)
+            case .signal(let m): return m.displayTitle.localizedCaseInsensitiveContains(searchText)
+            }
+        }
     }
 
     var body: some View {
@@ -60,13 +115,20 @@ struct PodsView: View {
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                 } else {
                     VStack(spacing: 0) {
-                        Picker("", selection: $segment) {
-                            ForEach(PodSegment.allCases, id: \.self) { s in
-                                Text(s.rawValue).tag(s)
+                        // Filter chips
+                        ScrollView(.horizontal, showsIndicators: false) {
+                            HStack(spacing: 8) {
+                                ForEach(PodFilter.allCases, id: \.self) { filter in
+                                    TagFilterChip(
+                                        label: filter.rawValue,
+                                        isSelected: activeFilter == filter
+                                    ) {
+                                        activeFilter = filter
+                                    }
+                                }
                             }
+                            .padding(.horizontal, 20)
                         }
-                        .pickerStyle(.segmented)
-                        .padding(.horizontal, 20)
                         .padding(.vertical, 12)
 
                         // Search bar
@@ -81,13 +143,13 @@ struct PodsView: View {
                         .padding(.horizontal, 20)
                         .padding(.bottom, 8)
 
-                        if isSegmentDataEmpty {
+                        if filteredItems.isEmpty {
                             VStack(spacing: 12) {
                                 Spacer()
-                                Image(systemName: segment == .set ? "calendar" : "antenna.radiowaves.left.and.right")
+                                Image(systemName: "person.3")
                                     .font(.system(size: 36))
                                     .foregroundStyle(OrbitTheme.gradient)
-                                Text(segment == .set ? "No Set Pods Yet" : "No Flex Pods Yet")
+                                Text(pods.isEmpty && rsvpedFlexMissions.isEmpty ? "No Pods Yet" : "No Matches")
                                     .font(.headline)
                                 Text("Join a Mission to form a Pod")
                                     .font(.subheadline)
@@ -100,14 +162,9 @@ struct PodsView: View {
                         } else {
                             ScrollView {
                                 VStack(spacing: 14) {
-                                    if segment == .set {
-                                        if sortedPods.isEmpty {
-                                            Text("No Matches")
-                                                .font(.subheadline)
-                                                .foregroundColor(.secondary)
-                                                .padding(.top, 40)
-                                        }
-                                        ForEach(sortedPods) { pod in
+                                    ForEach(filteredItems) { item in
+                                        switch item {
+                                        case .pod(let pod):
                                             PodRowCard(
                                                 pod: pod,
                                                 title: pod.displayName,
@@ -116,15 +173,7 @@ struct PodsView: View {
                                                 onPodNotFound: { pods.removeAll { $0.id == pod.id } }
                                             )
                                             .padding(.horizontal, 20)
-                                        }
-                                    } else {
-                                        if filteredFlexMissions.isEmpty {
-                                            Text("No Matches")
-                                                .font(.subheadline)
-                                                .foregroundColor(.secondary)
-                                                .padding(.top, 40)
-                                        }
-                                        ForEach(filteredFlexMissions) { mission in
+                                        case .signal(let mission):
                                             FlexMissionRsvpCard(
                                                 mission: mission,
                                                 hasUnread: {
@@ -375,7 +424,7 @@ struct FlexMissionRsvpCard: View {
 
                 VStack(alignment: .leading, spacing: 6) {
                     HStack(spacing: 8) {
-                        Image(systemName: mission.activityCategory?.icon ?? "star.fill")
+                        Image(systemName: mission.logo ?? "star.fill")
                             .font(.caption)
                             .foregroundColor(.white.opacity(0.8))
                         Text(mission.displayTitle)
@@ -486,24 +535,24 @@ struct PodStatusBadge: View {
 
     var label: String {
         if hasPendingSurvey { return "Activity done! Fill out survey!" }
-        if isActivityCompleted { return "activity completed ✓" }
+        if isActivityCompleted { return "done — exchange contacts!" }
         switch status {
-        case "open": return "forming"
-        case "full": return "full"
-        case "meeting_confirmed": return "meeting set ✓"
-        case "completed": return "completed"
+        case "open":               return "scheduling"
+        case "full":               return "scheduling"
+        case "meeting_confirmed":  return "scheduled ✓"
+        case "completed":          return "done"
         default: return status
         }
     }
 
     var color: Color {
         if hasPendingSurvey { return .green }
-        if isActivityCompleted { return .secondary }
+        if isActivityCompleted { return .green }
         switch status {
-        case "open": return .orange
-        case "full": return OrbitTheme.blue
+        case "open":              return .orange
+        case "full":              return .orange
         case "meeting_confirmed": return .green
-        case "completed": return .secondary
+        case "completed":         return .secondary
         default: return .secondary
         }
     }

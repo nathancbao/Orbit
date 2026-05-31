@@ -67,6 +67,7 @@ class DiscoveryViewModel: ObservableObject {
 
     private var hasLoaded = false
     private var bellTimerTask: Task<Void, Never>?
+    private var suggestionsTask: Task<Void, Never>?
     private var recommendedItems: [DiscoveryItem] = []
 
     private var currentUserId: Int {
@@ -82,33 +83,44 @@ class DiscoveryViewModel: ObservableObject {
     func load() async {
         guard !hasLoaded else { return }
         isLoading = true
-        defer { isLoading = false }
 
-        // Fetch each source independently so a single failure doesn't wipe others.
-        let missions = (try? await MissionService.shared.listMissions()) ?? []
-        let suggested = (try? await MissionService.shared.suggestedMissions()) ?? []
+        // 4 core calls in parallel — typically fast (~2s).
+        async let missionsResult = MissionService.shared.listMissions()
+        async let myFlexResult   = MissionService.shared.myFlexMissions()
+        async let discoverResult = MissionService.shared.listFlexMissions()
+        async let rsvpResult     = MissionService.shared.rsvpedFlexMissions()
 
-        // Fetch flex missions
-        let myFlexMissions = (try? await MissionService.shared.myFlexMissions()) ?? []
-        let discoverFlexMissions = (try? await MissionService.shared.listFlexMissions()) ?? []
-        let rsvpFlexMissions = (try? await MissionService.shared.rsvpedFlexMissions()) ?? []
+        let missions             = (try? await missionsResult) ?? []
+        let myFlexMissions       = (try? await myFlexResult)   ?? []
+        let discoverFlexMissions = (try? await discoverResult) ?? []
+        let rsvpFlexMissions     = (try? await rsvpResult)     ?? []
 
-        categorize(
-            missions: missions,
-            myFlexMissions: myFlexMissions,
-            discoverFlexMissions: discoverFlexMissions,
-            suggested: suggested,
-            rsvpFlexMissions: rsvpFlexMissions
-        )
+        // Show planets immediately with no AI suggestions yet.
+        categorize(missions: missions, myFlexMissions: myFlexMissions,
+                   discoverFlexMissions: discoverFlexMissions, suggested: [],
+                   rsvpFlexMissions: rsvpFlexMissions)
         hasLoaded = true
+        isLoading = false
+
+        // AI suggestions fetch runs after — won't block the initial render.
+        // Cancel any previous in-flight suggestions task (e.g. on reload).
+        suggestionsTask?.cancel()
+        suggestionsTask = Task {
+            guard let suggested = try? await MissionService.shared.suggestedMissions(),
+                  !Task.isCancelled else { return }
+            categorize(missions: missions, myFlexMissions: myFlexMissions,
+                       discoverFlexMissions: discoverFlexMissions, suggested: suggested,
+                       rsvpFlexMissions: rsvpFlexMissions)
+            startBellTimer()
+        }
     }
 
     func reload() async {
+        suggestionsTask?.cancel()
         hasLoaded = false
         showRecommendationBadge = false
         bellTimerTask?.cancel()
         await load()
-        startBellTimer()
     }
 
     // MARK: - Categorize

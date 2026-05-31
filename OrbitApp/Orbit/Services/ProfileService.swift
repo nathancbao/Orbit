@@ -33,6 +33,13 @@ class ProfileService {
         return response.profile
     }
 
+    func getProfileResponse() async throws -> ProfileResponseData {
+        return try await APIService.shared.request(
+            endpoint: Constants.API.Endpoints.me,
+            authenticated: true
+        )
+    }
+
     func getUserProfile(id: Int) async throws -> Profile {
         let response: ProfileResponseData = try await APIService.shared.request(
             endpoint: Constants.API.Endpoints.userProfile(id),

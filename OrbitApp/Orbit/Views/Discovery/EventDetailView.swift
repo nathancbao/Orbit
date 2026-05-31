@@ -861,7 +861,7 @@ struct SignalDetailView: View {
 
                             // Icon and Title
                             HStack(spacing: 12) {
-                                Image(systemName: mission.activityCategory?.icon ?? "star.fill")
+                                Image(systemName: mission.logo ?? "star.fill")
                                     .font(.title)
                                     .foregroundStyle(OrbitTheme.gradient)
 
@@ -873,11 +873,11 @@ struct SignalDetailView: View {
 
                             // Category and Status
                             HStack(spacing: 16) {
-                                if let category = mission.activityCategory {
+                                if let firstTag = mission.tags.first {
                                     HStack(spacing: 6) {
                                         Image(systemName: "tag")
                                             .foregroundStyle(OrbitTheme.gradient)
-                                        Text(category.displayName)
+                                        Text(firstTag)
                                             .font(.subheadline)
                                     }
                                 }

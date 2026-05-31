@@ -92,10 +92,10 @@ struct ContentView: View {
 
     private func loadExistingProfile() async {
         do {
-            let profile = try await ProfileService.shared.getProfile()
+            let response = try await ProfileService.shared.getProfileResponse()
             await MainActor.run {
-                currentProfile = profile
-                appState = .home
+                currentProfile = response.profile
+                appState = response.profileComplete ? .home : .profileSetup
             }
         } catch NetworkError.unauthorized {
             // Stale tokens — force back to login
@@ -103,8 +103,11 @@ struct ContentView: View {
                 appState = .auth
             }
         } catch {
+            // Transient error (network, server). Go back to auth so the user
+            // can retry — never route to profileSetup here, which would
+            // let a returning user accidentally overwrite their profile.
             await MainActor.run {
-                appState = .profileSetup
+                appState = .auth
             }
         }
     }

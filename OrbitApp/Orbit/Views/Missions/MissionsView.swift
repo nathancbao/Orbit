@@ -13,7 +13,6 @@ struct HourSlotKey: Hashable {
 struct MissionsView: View {
     @Binding var userProfile: Profile
     @StateObject private var viewModel = MissionsViewModel()
-    @State private var segment: MissionSegment = .discover
     @State private var selectedMission: Mission?
     @State private var showCreate = false
     @State private var showProfile = false
@@ -32,16 +31,6 @@ struct MissionsView: View {
                 Color(.systemBackground).ignoresSafeArea()
 
                 VStack(spacing: 0) {
-                    // Segment picker
-                    Picker("", selection: $segment) {
-                        ForEach(MissionSegment.allCases, id: \.self) { s in
-                            Text(s.rawValue).tag(s)
-                        }
-                    }
-                    .pickerStyle(.segmented)
-                    .padding(.horizontal, 20)
-                    .padding(.vertical, 12)
-
                     // Search bar
                     HStack {
                         Image(systemName: "magnifyingglass")
@@ -56,41 +45,39 @@ struct MissionsView: View {
 
                     ScrollView {
                         VStack(alignment: .leading, spacing: 24) {
-                            if segment == .discover {
-                                // Filters: type + topic (single row)
-                                ScrollView(.horizontal, showsIndicators: false) {
-                                    HStack(spacing: 8) {
-                                        TagFilterChip(label: "All", isSelected: viewModel.filterTag == nil && !viewModel.showMyYearOnly && viewModel.filterMode == nil) {
-                                            Task {
-                                                viewModel.applyModeFilter(nil)
-                                                if viewModel.showMyYearOnly { await viewModel.toggleYearFilter() }
-                                                await viewModel.applyTag(nil)
-                                            }
-                                        }
-                                        TagFilterChip(label: "Set", isSelected: viewModel.filterMode == .set) {
-                                            viewModel.applyModeFilter(viewModel.filterMode == .set ? nil : .set)
-                                        }
-                                        TagFilterChip(label: "Flex", isSelected: viewModel.filterMode == .flex) {
-                                            viewModel.applyModeFilter(viewModel.filterMode == .flex ? nil : .flex)
-                                        }
-                                        TagFilterChip(label: "My Year", isSelected: viewModel.showMyYearOnly) {
-                                            Task { await viewModel.toggleYearFilter() }
-                                        }
-                                        ForEach(allTags, id: \.self) { tag in
-                                            TagFilterChip(
-                                                label: tag,
-                                                isSelected: viewModel.filterTag == tag
-                                            ) {
-                                                Task { await viewModel.applyTag(viewModel.filterTag == tag ? nil : tag) }
-                                            }
+                            // Filters: type + topic (single row)
+                            ScrollView(.horizontal, showsIndicators: false) {
+                                HStack(spacing: 8) {
+                                    TagFilterChip(label: "All", isSelected: viewModel.filterTag == nil && !viewModel.showMyYearOnly && viewModel.filterMode == nil) {
+                                        Task {
+                                            viewModel.applyModeFilter(nil)
+                                            if viewModel.showMyYearOnly { await viewModel.toggleYearFilter() }
+                                            await viewModel.applyTag(nil)
                                         }
                                     }
-                                    .padding(.horizontal, 20)
+                                    TagFilterChip(label: "Set", isSelected: viewModel.filterMode == .set) {
+                                        viewModel.applyModeFilter(viewModel.filterMode == .set ? nil : .set)
+                                    }
+                                    TagFilterChip(label: "Flex", isSelected: viewModel.filterMode == .flex) {
+                                        viewModel.applyModeFilter(viewModel.filterMode == .flex ? nil : .flex)
+                                    }
+                                    TagFilterChip(label: "My Year", isSelected: viewModel.showMyYearOnly) {
+                                        Task { await viewModel.toggleYearFilter() }
+                                    }
+                                    ForEach(allTags, id: \.self) { tag in
+                                        TagFilterChip(
+                                            label: tag,
+                                            isSelected: viewModel.filterTag == tag
+                                        ) {
+                                            Task { await viewModel.applyTag(viewModel.filterTag == tag ? nil : tag) }
+                                        }
+                                    }
                                 }
+                                .padding(.horizontal, 20)
                             }
 
-                            // AI Suggested Section (Explore tab only)
-                            if segment == .discover && !viewModel.suggestedMissions.isEmpty && searchText.isEmpty {
+                            // AI Suggested Section
+                            if !viewModel.suggestedMissions.isEmpty && searchText.isEmpty {
                                 VStack(alignment: .leading, spacing: 10) {
                                     HStack(spacing: 6) {
                                         Image(systemName: "sparkles")
@@ -121,18 +108,15 @@ struct MissionsView: View {
                                 HStack { Spacer(); ProgressView(); Spacer() }
                                     .padding(.vertical, 40)
                             } else {
-                                let baseMissions = segment == .discover
-                                    ? viewModel.discoverMissions
-                                    : viewModel.myMissions
                                 let displayedMissions = searchText.isEmpty
-                                    ? baseMissions
-                                    : baseMissions.filter {
+                                    ? viewModel.discoverMissions
+                                    : viewModel.discoverMissions.filter {
                                         $0.title.localizedCaseInsensitiveContains(searchText)
                                         || $0.displayTitle.localizedCaseInsensitiveContains(searchText)
                                     }
 
                                 if displayedMissions.isEmpty {
-                                    EmptyMissionsView(segment: segment, onCreateTap: { showCreate = true })
+                                    EmptyMissionsView(onCreateTap: { showCreate = true })
                                         .padding(.horizontal, 20)
                                 } else {
                                     VStack(spacing: 14) {
@@ -230,8 +214,6 @@ struct MissionsView: View {
                     if mission.isFlexMode, let podId = mission.podId {
                         createdFlexPodId = podId
                         showCreatedFlexPod = true
-                    } else {
-                        segment = .mine
                     }
                 }
             )
@@ -696,23 +678,20 @@ struct TagFilterChip: View {
 // MARK: - Empty Missions View
 
 struct EmptyMissionsView: View {
-    var segment: MissionSegment = .discover
     var onCreateTap: (() -> Void)? = nil
 
     var body: some View {
         VStack(spacing: 16) {
-            Image(systemName: segment == .discover ? "paperplane" : "tray")
+            Image(systemName: "paperplane")
                 .font(.system(size: 48))
                 .foregroundStyle(OrbitTheme.gradient)
-            Text(segment == .discover ? "no missions yet" : "no missions joined")
+            Text("no missions yet")
                 .font(.headline)
-            Text(segment == .discover
-                 ? "be the first \u{2014} create a mission for others to join"
-                 : "discover and join missions to see them here")
+            Text("be the first \u{2014} create a mission for others to join")
                 .font(.subheadline)
                 .foregroundColor(.secondary)
                 .multilineTextAlignment(.center)
-            if let onCreateTap, segment == .discover {
+            if let onCreateTap {
                 Button(action: onCreateTap) {
                     Label("Create a Mission", systemImage: "plus")
                         .font(.subheadline)
@@ -768,6 +747,10 @@ struct MissionCreateView: View {
     @State private var customTagText = ""
     @State private var showLocationSearch = false
 
+    // Logo (SF Symbol) — replaces activity_category
+    @State private var selectedLogo: String? = nil
+    @State private var showLogoPicker = false
+
     @State private var isSubmitting = false
     @State private var errorMessage: String?
 
@@ -801,6 +784,7 @@ struct MissionCreateView: View {
             _location = State(initialValue: m.location)
             _tags = State(initialValue: m.tags)
             _maxPodSize = State(initialValue: m.maxPodSize)
+            _selectedLogo = State(initialValue: m.logo)
 
             // Set mode fields
             let dateFmt = DateFormatter()
@@ -884,6 +868,8 @@ struct MissionCreateView: View {
                         .foregroundColor(.secondary)
                         .frame(maxWidth: .infinity, alignment: .leading)
 
+                    logoPickerSection
+
                     if mode == .set {
                         setModeForm
                     } else {
@@ -912,6 +898,51 @@ struct MissionCreateView: View {
             .sheet(isPresented: $showLocationSearch) {
                 LocationSearchView(locationName: $location)
             }
+            .sheet(isPresented: $showLogoPicker) {
+                LogoPickerSheet(selected: $selectedLogo)
+                    .presentationDetents([.medium, .large])
+            }
+        }
+    }
+
+    // MARK: - Logo Picker (shared)
+
+    private var logoPickerSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            OrbitSectionHeader(title: "Logo")
+            Button {
+                showLogoPicker = true
+            } label: {
+                HStack(spacing: 12) {
+                    ZStack {
+                        Circle()
+                            .fill(Color(.systemGray6))
+                            .frame(width: 52, height: 52)
+                        if let logo = selectedLogo {
+                            Image(systemName: logo)
+                                .font(.system(size: 22, weight: .medium))
+                                .foregroundStyle(OrbitTheme.gradient)
+                        } else {
+                            Image(systemName: "face.smiling")
+                                .font(.system(size: 22))
+                                .foregroundColor(.secondary)
+                        }
+                    }
+                    Text(selectedLogo == nil ? "Choose a logo" : "Tap to change")
+                        .font(.subheadline)
+                        .foregroundColor(selectedLogo == nil ? .secondary : .primary)
+                    Spacer()
+                    Image(systemName: "chevron.right")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+                .padding(12)
+                .background(
+                    RoundedRectangle(cornerRadius: 12)
+                        .stroke(Color(.systemGray4), lineWidth: 1)
+                )
+            }
+            .buttonStyle(.plain)
         }
     }
 
@@ -1595,7 +1626,8 @@ struct MissionCreateView: View {
                     date: dateString,
                     startTime: startTimeString,
                     endTime: endTimeString,
-                    maxPodSize: maxPodSize
+                    maxPodSize: maxPodSize,
+                    logo: selectedLogo
                 ) {
                     await MainActor.run {
                         isSubmitting = false
@@ -1619,7 +1651,8 @@ struct MissionCreateView: View {
                         date: dateString,
                         startTime: startTimeString,
                         endTime: endTimeString,
-                        maxPodSize: maxPodSize
+                        maxPodSize: maxPodSize,
+                        logo: selectedLogo
                     )
                     if let pod = try? await MissionService.shared.joinMission(id: created.id) {
                         created.userPodStatus = "in_pod"
@@ -1663,7 +1696,8 @@ struct MissionCreateView: View {
                     links: linksArray,
                     tags: tags,
                     timeRangeStart: timeRangeStart,
-                    timeRangeEnd: timeRangeEnd
+                    timeRangeEnd: timeRangeEnd,
+                    logo: selectedLogo
                 ) {
                     onUpdated?(updated)
                     dismiss()
@@ -1679,7 +1713,8 @@ struct MissionCreateView: View {
                     availability: [defaultSlot],
                     description: description.trimmingCharacters(in: .whitespaces),
                     links: linksArray,
-                    tags: tags
+                    tags: tags,
+                    logo: selectedLogo
                 ) {
                     // Save creator availability to ScheduleService so PodView loads it pre-populated
                     if let podId = created.podId, !slotsToSave.isEmpty {
@@ -1804,5 +1839,93 @@ struct ProfileAvatarView: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .background(Color(.systemGray5))
         }
+    }
+}
+
+// MARK: - Logo Picker
+
+/// Curated set of activity SF Symbols offered when creating a mission.
+let missionLogoOptions: [String] = [
+    "figure.run", "figure.hiking", "figure.outdoor.cycle", "sportscourt.fill",
+    "basketball.fill", "soccerball", "football.fill", "tennis.racket",
+    "dumbbell.fill", "fork.knife", "cup.and.saucer.fill", "wineglass.fill",
+    "birthday.cake.fill", "carrot.fill", "film.fill", "tv.fill",
+    "music.note", "headphones", "gamecontroller.fill", "book.fill",
+    "graduationcap.fill", "pencil.and.ruler.fill", "paintpalette.fill", "camera.fill",
+    "person.2.fill", "party.popper.fill", "leaf.fill", "mountain.2.fill",
+    "airplane", "cart.fill", "hammer.fill", "theatermasks.fill",
+    "pawprint.fill", "gift.fill", "map.fill", "guitars.fill",
+    "dice.fill", "puzzlepiece.fill", "globe.americas.fill", "sparkles",
+]
+
+struct LogoPickerSheet: View {
+    @Binding var selected: String?
+    @Environment(\.dismiss) private var dismiss
+
+    private let columns = Array(repeating: GridItem(.flexible(), spacing: 14), count: 4)
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                LazyVGrid(columns: columns, spacing: 14) {
+                    // Clear / no logo
+                    LogoCell(symbol: nil, isSelected: selected == nil) {
+                        selected = nil
+                        dismiss()
+                    }
+                    ForEach(missionLogoOptions, id: \.self) { symbol in
+                        LogoCell(symbol: symbol, isSelected: selected == symbol) {
+                            selected = symbol
+                            dismiss()
+                        }
+                    }
+                }
+                .padding(20)
+            }
+            .navigationTitle("Choose a Logo")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") { dismiss() }
+                }
+            }
+        }
+    }
+}
+
+private struct LogoCell: View {
+    let symbol: String?
+    let isSelected: Bool
+    let onTap: () -> Void
+
+    var body: some View {
+        Button(action: onTap) {
+            ZStack {
+                RoundedRectangle(cornerRadius: 14)
+                    .fill(isSelected
+                          ? AnyShapeStyle(OrbitTheme.gradient.opacity(0.18))
+                          : AnyShapeStyle(Color(.systemGray6)))
+                    .frame(height: 64)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 14)
+                            .stroke(isSelected
+                                    ? AnyShapeStyle(OrbitTheme.gradient)
+                                    : AnyShapeStyle(Color.clear),
+                                    lineWidth: 2)
+                    )
+                if let symbol {
+                    Image(systemName: symbol)
+                        .font(.system(size: 24, weight: .medium))
+                        .foregroundStyle(isSelected
+                                         ? AnyShapeStyle(OrbitTheme.gradient)
+                                         : AnyShapeStyle(Color.primary))
+                } else {
+                    Image(systemName: "nosign")
+                        .font(.system(size: 22))
+                        .foregroundColor(.secondary)
+                }
+            }
+        }
+        .buttonStyle(.plain)
     }
 }
