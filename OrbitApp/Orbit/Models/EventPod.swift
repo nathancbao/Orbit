@@ -5,6 +5,7 @@ struct Pod: Codable, Identifiable {
     var missionId: String       // Int for missions, UUID string for signals
     var memberIds: [Int]
     var maxSize: Int
+    var minSize: Int?           // Enriched — mission min_pod_size (pods need 3+ people)
     var name: String?           // User-defined pod name
     var status: String          // open | full | meeting_confirmed | completed | cancelled
     var scheduledTime: String?
@@ -37,6 +38,7 @@ struct Pod: Codable, Identifiable {
         case missionId = "mission_id"
         case memberIds = "member_ids"
         case maxSize = "max_size"
+        case minSize = "min_pod_size"
         case status
         case scheduledTime = "scheduled_time"
         case scheduledEndTime = "scheduled_end_time"
@@ -63,6 +65,7 @@ struct Pod: Codable, Identifiable {
         }
         memberIds = (try? container.decode([Int].self, forKey: .memberIds)) ?? []
         maxSize = (try? container.decode(Int.self, forKey: .maxSize)) ?? 4
+        minSize = try? container.decodeIfPresent(Int.self, forKey: .minSize)
         name = try? container.decodeIfPresent(String.self, forKey: .name)
         status = (try? container.decode(String.self, forKey: .status)) ?? "open"
         scheduledTime = try? container.decodeIfPresent(String.self, forKey: .scheduledTime)
@@ -96,6 +99,12 @@ struct Pod: Codable, Identifiable {
 
     /// The leader of the pod (first member in join order).
     var leaderId: Int? { memberIds.first }
+
+    /// How many more people must join before the pod reaches its minimum size.
+    /// Pods need at least 3 people (or the mission's min_pod_size if higher).
+    var membersNeededForMinimum: Int {
+        max(0, (minSize ?? 3) - memberIds.count)
+    }
 
     /// Parsed scheduled time for sorting (tries common date formats).
     var parsedScheduledTime: Date? {

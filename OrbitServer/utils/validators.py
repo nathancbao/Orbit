@@ -112,19 +112,62 @@ def validate_profile_data(data):
     return True, None
 
 
+# Missions are schedulable from today up to this many days into the future.
+MISSION_MAX_WINDOW_DAYS = 14
+MISSION_DEFAULT_WINDOW_DAYS = 7
+
+# Minimum people in a pod. Two strangers meeting alone can feel unsafe, so a
+# pod needs at least three.
+MISSION_MIN_POD_SIZE = 3
+MISSION_MAX_POD_SIZE = 10
+
+
 def validate_mission_data(data, is_update=False):
+    """Validate a unified Mission payload.
+
+    A mission is one of two scheduling types, distinguished by ``mode``:
+      'set'  — happens on a single day with a required start_time and an
+               OPTIONAL end_time. Multi-day events are not supported.
+      'flex' — a "schedule later" mission: the pod picks the time from
+               everyone's availability, so date/start_time/end_time are NOT
+               required (a concrete date is created once the group schedules).
+    """
     errors = []
 
+    mode = data.get('mode', 'set')
+    if mode not in ('set', 'flex'):
+        errors.append("mode must be 'set' or 'flex'")
+
+    # A mission with no fixed date is a scheduling-type (flex) mission and is
+    # valid without date/times — a date gets created when the group schedules.
+    is_scheduling = (mode == 'flex')
+
+    # The client sends dates in the user's local timezone, while the server
+    # runs in UTC. A user's local "today" can be a calendar day off from the
+    # server's UTC date, so allow one day of grace on each end of the window —
+    # the client is the real gate that caps selection at 2 weeks.
+    today = datetime.date.today()
+    max_date = today + datetime.timedelta(days=MISSION_MAX_WINDOW_DAYS)
+    window_grace = datetime.timedelta(days=1)
+    earliest_allowed = today - window_grace
+    latest_allowed = max_date + window_grace
+
+    # ── Required fields per mode (create only) ──────────────────────────────
     if not is_update:
         if 'title' not in data or not data['title']:
             errors.append("title is required")
-        if not data.get('date'):
-            errors.append("date is required")
-        if not data.get('start_time'):
-            errors.append("start_time is required")
-        if not data.get('end_time'):
-            errors.append("end_time is required")
+        if not is_scheduling:
+            # Set mission: one day + a start time. End time is optional.
+            if not data.get('date'):
+                errors.append("date is required")
+            if not data.get('start_time'):
+                errors.append("start_time is required")
+        else:
+            avail = data.get('availability')
+            if not isinstance(avail, list) or len(avail) == 0:
+                errors.append("availability is required for schedule-later missions")
 
+    # ── Shared fields ───────────────────────────────────────────────────────
     if 'title' in data and isinstance(data['title'], str):
         if len(data['title']) > 200:
             errors.append("title must be 200 characters or fewer")
@@ -144,17 +187,56 @@ def validate_mission_data(data, is_update=False):
                     errors.append("Tags contain prohibited content")
                     break
 
-    if 'max_pod_size' in data:
-        try:
-            size = int(data['max_pod_size'])
-            if size < 2 or size > 10:
-                errors.append("max_pod_size must be between 2 and 10")
-        except (TypeError, ValueError):
-            errors.append("max_pod_size must be an integer")
+    if 'images' in data:
+        imgs = data['images']
+        if not isinstance(imgs, list):
+            errors.append("images must be a list")
+        elif len(imgs) > 3:
+            errors.append("Maximum 3 images allowed")
+        elif not all(isinstance(u, str) for u in imgs):
+            errors.append("images must be a list of URLs")
 
-    if 'date' in data and data.get('date'):
+    if 'logo' in data and data['logo'] is not None and not isinstance(data['logo'], str):
+        errors.append("logo must be a string")
+
+    # Links are optional on both set and flex missions (max 3).
+    if 'links' in data and data['links'] is not None:
+        lnks = data['links']
+        if not isinstance(lnks, list):
+            errors.append("links must be a list")
+        elif len(lnks) > 3:
+            errors.append("Maximum 3 links allowed")
+        else:
+            for item in lnks:
+                if not isinstance(item, str):
+                    errors.append("Each link must be a URL string")
+                    break
+                if len(item) > 500:
+                    errors.append("Each link must be 500 characters or fewer")
+                    break
+
+    for size_field in ('min_pod_size', 'max_pod_size'):
+        if size_field in data:
+            try:
+                size = int(data[size_field])
+                if size < MISSION_MIN_POD_SIZE or size > MISSION_MAX_POD_SIZE:
+                    errors.append(f"{size_field} must be between {MISSION_MIN_POD_SIZE} and {MISSION_MAX_POD_SIZE}")
+            except (TypeError, ValueError):
+                errors.append(f"{size_field} must be an integer")
+
+    if data.get('min_pod_size') is not None and data.get('max_pod_size') is not None and not errors:
         try:
-            datetime.date.fromisoformat(data['date'])
+            if int(data['min_pod_size']) > int(data['max_pod_size']):
+                errors.append("min_pod_size must be less than or equal to max_pod_size")
+        except (TypeError, ValueError):
+            pass
+
+    # ── Set mode: date + times ──────────────────────────────────────────────
+    if data.get('date'):
+        try:
+            parsed_date = datetime.date.fromisoformat(data['date'])
+            if mode == 'set' and (parsed_date < earliest_allowed or parsed_date > latest_allowed):
+                errors.append(f"date must be between today and {MISSION_MAX_WINDOW_DAYS} days from now")
         except ValueError:
             errors.append("date must be a valid date in YYYY-MM-DD format")
 
@@ -171,6 +253,29 @@ def validate_mission_data(data, is_update=False):
     if data.get('start_time') and data.get('end_time') and not errors:
         if data['start_time'] >= data['end_time']:
             errors.append("start_time must be before end_time")
+
+    # ── Flex mode: scheduling window + availability dates ───────────────────
+    if 'scheduling_window_days' in data:
+        try:
+            window = int(data['scheduling_window_days'])
+            if window < 1 or window > MISSION_MAX_WINDOW_DAYS:
+                errors.append(f"scheduling_window_days must be between 1 and {MISSION_MAX_WINDOW_DAYS}")
+        except (TypeError, ValueError):
+            errors.append("scheduling_window_days must be an integer")
+
+    if mode == 'flex' and isinstance(data.get('availability'), list):
+        for slot in data['availability']:
+            slot_date = slot.get('date') if isinstance(slot, dict) else None
+            if not slot_date:
+                continue
+            try:
+                d = datetime.date.fromisoformat(slot_date)
+            except (ValueError, TypeError):
+                errors.append("availability dates must be in YYYY-MM-DD format")
+                break
+            if d < earliest_allowed or d > latest_allowed:
+                errors.append(f"availability dates must be between today and {MISSION_MAX_WINDOW_DAYS} days from now")
+                break
 
     if errors:
         return False, errors

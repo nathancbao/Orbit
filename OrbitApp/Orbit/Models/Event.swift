@@ -27,7 +27,10 @@ struct Mission: Codable, Identifiable {
     var location: String
     var creatorId: Int?
     var creatorType: String?        // user | seeded | ai_suggested
+    var minPodSize: Int?            // minimum people before the pod activates
     var maxPodSize: Int
+    var logo: String?              // SF Symbol name shown on cards / discovery
+    var images: [String]?          // up to 3 uploaded image URLs (e.g. a flyer)
     var status: String              // open | completed | cancelled | pending | active
     var matchScore: Double?
     var suggestionReason: String?
@@ -49,9 +52,8 @@ struct Mission: Codable, Identifiable {
 
     // ── Flex mode fields (optional, only populated when mode == .flex) ──
 
-    var logo: String?              // SF Symbol name chosen by the creator (replaces activity_category)
     var customActivityName: String?
-    var minGroupSize: Int?
+    var minGroupSize: Int?          // legacy alias for minPodSize (Signal payloads)
     var availability: [AvailabilitySlot]?
     var timeRangeStart: Int?
     var timeRangeEnd: Int?
@@ -59,6 +61,8 @@ struct Mission: Codable, Identifiable {
     var signalStatus: SignalStatus?  // pending | active (flex mode status)
     var podId: String?              // user's pod from RSVP (flex mode)
     var scheduledTime: String?      // confirmed meeting time (flex mode, set by leader)
+    var schedulingWindowDays: Int?  // how many days out the group may schedule (1–14)
+    var scheduleableUntil: String?  // last schedulable day (YYYY-MM-DD)
     var createdAt: String?
     var utcOffset: Int?             // seconds east of UTC, used for deletion countdown
 
@@ -70,7 +74,9 @@ struct Mission: Codable, Identifiable {
         case endTime            = "end_time"
         case creatorId          = "creator_id"
         case creatorType        = "creator_type"
+        case minPodSize         = "min_pod_size"
         case maxPodSize         = "max_pod_size"
+        case images
         case matchScore         = "match_score"
         case suggestionReason   = "suggestion_reason"
         case userPodStatus      = "user_pod_status"
@@ -86,6 +92,8 @@ struct Mission: Codable, Identifiable {
         case signalStatus       = "signal_status"
         case podId              = "pod_id"
         case scheduledTime      = "scheduled_time"
+        case schedulingWindowDays = "scheduling_window_days"
+        case scheduleableUntil  = "scheduleable_until"
         case createdAt          = "created_at"
         case utcOffset          = "utc_offset"
     }
@@ -105,7 +113,9 @@ struct Mission: Codable, Identifiable {
         endTime         = try? c.decode(String.self, forKey: .endTime)
         creatorId       = try? c.decode(Int.self, forKey: .creatorId)
         creatorType     = try? c.decode(String.self, forKey: .creatorType)
+        minPodSize      = try? c.decode(Int.self, forKey: .minPodSize)
         maxPodSize      = (try? c.decode(Int.self, forKey: .maxPodSize)) ?? 4
+        images          = try? c.decode([String].self, forKey: .images)
         status          = (try? c.decode(String.self, forKey: .status)) ?? "open"
         matchScore      = try? c.decode(Double.self, forKey: .matchScore)
         suggestionReason = try? c.decode(String.self, forKey: .suggestionReason)
@@ -127,6 +137,8 @@ struct Mission: Codable, Identifiable {
         signalStatus      = try? c.decode(SignalStatus.self, forKey: .signalStatus)
         podId             = try? c.decode(String.self, forKey: .podId)
         scheduledTime     = try? c.decode(String.self, forKey: .scheduledTime)
+        schedulingWindowDays = try? c.decode(Int.self, forKey: .schedulingWindowDays)
+        scheduleableUntil = try? c.decode(String.self, forKey: .scheduleableUntil)
         createdAt         = try? c.decode(String.self, forKey: .createdAt)
         utcOffset         = try? c.decode(Int.self, forKey: .utcOffset)
     }
@@ -144,7 +156,10 @@ struct Mission: Codable, Identifiable {
         endTime: String? = nil,
         creatorId: Int? = nil,
         creatorType: String? = nil,
+        minPodSize: Int? = nil,
         maxPodSize: Int = 4,
+        logo: String? = nil,
+        images: [String]? = nil,
         status: String = "open",
         matchScore: Double? = nil,
         suggestionReason: String? = nil,
@@ -152,7 +167,6 @@ struct Mission: Codable, Identifiable {
         userPodId: String? = nil,
         pods: [PodSummary]? = nil,
         mode: MissionMode = .set,
-        logo: String? = nil,
         customActivityName: String? = nil,
         minGroupSize: Int? = nil,
         availability: [AvailabilitySlot]? = nil,
@@ -162,6 +176,8 @@ struct Mission: Codable, Identifiable {
         signalStatus: SignalStatus? = nil,
         podId: String? = nil,
         scheduledTime: String? = nil,
+        schedulingWindowDays: Int? = nil,
+        scheduleableUntil: String? = nil,
         createdAt: String? = nil,
         utcOffset: Int? = nil
     ) {
@@ -175,7 +191,10 @@ struct Mission: Codable, Identifiable {
         self.endTime = endTime
         self.creatorId = creatorId
         self.creatorType = creatorType
+        self.minPodSize = minPodSize
         self.maxPodSize = maxPodSize
+        self.logo = logo
+        self.images = images
         self.status = status
         self.matchScore = matchScore
         self.suggestionReason = suggestionReason
@@ -183,7 +202,6 @@ struct Mission: Codable, Identifiable {
         self.userPodId = userPodId
         self.pods = pods
         self.mode = mode
-        self.logo = logo
         self.customActivityName = customActivityName
         self.minGroupSize = minGroupSize
         self.availability = availability
@@ -193,6 +211,8 @@ struct Mission: Codable, Identifiable {
         self.signalStatus = signalStatus
         self.podId = podId
         self.scheduledTime = scheduledTime
+        self.schedulingWindowDays = schedulingWindowDays
+        self.scheduleableUntil = scheduleableUntil
         self.createdAt = createdAt
         self.utcOffset = utcOffset
     }
@@ -329,12 +349,18 @@ struct Mission: Codable, Identifiable {
         return "\(totalSlots) slot\(totalSlots == 1 ? "" : "s") over \(days) day\(days == 1 ? "" : "s")"
     }
 
-    /// Group size label for flex mode (e.g. "3–8 people").
+    /// Unified minimum pod size (new `min_pod_size`, falling back to legacy flex `min_group_size`).
+    var effectiveMinPodSize: Int? { minPodSize ?? minGroupSize }
+
+    /// Group size label (e.g. "3–8 people").
     var flexGroupSizeLabel: String? {
-        guard let min = minGroupSize else { return nil }
+        guard let min = effectiveMinPodSize else { return nil }
         let max = maxPodSize
         return min == max ? "\(min) people" : "\(min)–\(max) people"
     }
+
+    /// Whether the current user is part of this mission's pod.
+    var isJoined: Bool { userPodStatus == "in_pod" }
 
     /// Convert "HH:mm" to a localized short time string (e.g. "3:00 PM").
     private static func formatTime(_ hhmm: String) -> String {
@@ -359,9 +385,9 @@ struct Mission: Codable, Identifiable {
             date: "",
             creatorId: signal.creatorId,
             maxPodSize: signal.maxGroupSize,
+            logo: signal.activityCategory.icon,
             status: signal.status.rawValue,
             mode: .flex,
-            logo: signal.activityCategory.icon,
             customActivityName: signal.customActivityName,
             minGroupSize: signal.minGroupSize,
             availability: signal.availability,

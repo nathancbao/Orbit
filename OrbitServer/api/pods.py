@@ -2,9 +2,9 @@ from flask import Blueprint, request, g
 
 from OrbitServer.utils.responses import success, error
 from OrbitServer.utils.auth import require_auth
-from OrbitServer.models.models import get_pod, update_pod
 from OrbitServer.services.pod_service import (
     get_pod_with_members, vote_to_kick, confirm_attendance, leave_pod,
+    delete_pod_as_leader, edit_pod,
 )
 from OrbitServer.services.schedule_service import submit_availability, confirm_slot
 from OrbitServer.services.pod_invite_service import (
@@ -12,7 +12,6 @@ from OrbitServer.services.pod_invite_service import (
 )
 from OrbitServer.services.survey_service import submit_survey
 from OrbitServer.utils.validators import validate_schedule_slots
-from OrbitServer.utils.helpers import safe_int
 
 pods_bp = Blueprint('pods', __name__, url_prefix='/api/pods')
 
@@ -26,26 +25,40 @@ def get_pod_detail(pod_id):
     return success(pod)
 
 
+@pods_bp.route('/<pod_id>', methods=['PUT'])
+@require_auth
+def edit_pod_route(pod_id):
+    """Edit pod name and/or meeting place (leader only)."""
+    data = request.get_json(silent=True) or {}
+    pod, err, status_code = edit_pod(pod_id, g.user_id, data)
+    if err:
+        return error(err, status_code)
+    return success(pod)
+
+
 @pods_bp.route('/<pod_id>/name', methods=['PUT'])
 @require_auth
 def rename(pod_id):
+    # Kept for back-compat — now routes through the leader-only edit path.
     data = request.get_json(silent=True) or {}
     name = data.get('name', '').strip()
     if not name:
         return error("name is required", 400)
-    if len(name) > 100:
-        return error("name must be 100 characters or fewer", 400)
+    pod, err, status_code = edit_pod(pod_id, g.user_id, {'name': name})
+    if err:
+        return error(err, status_code)
+    return success(pod)
 
-    pod = get_pod(pod_id)
-    if not pod:
-        return error("Pod not found", 404)
 
-    uid = safe_int(g.user_id)
-    if uid not in (pod.get('member_ids') or []):
-        return error("You are not a member of this pod", 403)
-
-    updated = update_pod(pod_id, {'name': name})
-    return success(updated)
+@pods_bp.route('/<pod_id>', methods=['DELETE'])
+@require_auth
+def delete_pod_route(pod_id):
+    """Delete a pod entirely (leader only). Other members get a notification."""
+    ok, err = delete_pod_as_leader(pod_id, g.user_id)
+    if not ok:
+        msg, status_code = err
+        return error(msg, status_code)
+    return success({'message': 'Pod deleted'})
 
 
 @pods_bp.route('/<pod_id>/leave', methods=['DELETE'])

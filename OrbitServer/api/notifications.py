@@ -13,10 +13,31 @@ from flask import Blueprint, request, g
 from OrbitServer.utils.responses import success, error
 from OrbitServer.utils.auth import require_auth
 from OrbitServer.services.ai_suggestion_service import get_suggested_missions
+from OrbitServer.models.models import list_notifications, mark_notifications_read
 
 logger = logging.getLogger(__name__)
 
 notifications_bp = Blueprint('notifications', __name__, url_prefix='/api/notifications')
+
+
+@notifications_bp.route('', methods=['GET'])
+@require_auth
+def inbox():
+    """Return the user's in-app notifications, newest first."""
+    try:
+        notifs = list_notifications(g.user_id)
+    except Exception:
+        logger.exception("Failed to list notifications")
+        return success([])
+    return success(notifs)
+
+
+@notifications_bp.route('/read', methods=['POST'])
+@require_auth
+def mark_read():
+    """Mark all of the user's notifications as read."""
+    count = mark_notifications_read(g.user_id)
+    return success({'marked_read': count})
 
 
 @notifications_bp.route('/suggested', methods=['GET'])

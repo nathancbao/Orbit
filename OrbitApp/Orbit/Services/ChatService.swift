@@ -31,6 +31,38 @@ class ChatService {
         )
     }
 
+    /// Toggle a reaction (thumbs_up | thumbs_down | heart) on a message.
+    /// Returns the updated message.
+    func reactToMessage(podId: String, messageId: String, reaction: String) async throws -> ChatMessage {
+        let body: [String: Any] = ["reaction": reaction]
+        return try await APIService.shared.request(
+            endpoint: Constants.API.Endpoints.podMessageReact(podId, messageId),
+            method: "POST",
+            body: body,
+            authenticated: true
+        )
+    }
+
+    /// Pin or unpin a message (pod leader only). Returns the updated message.
+    func pinMessage(podId: String, messageId: String, pinned: Bool) async throws -> ChatMessage {
+        let body: [String: Any] = ["pinned": pinned]
+        return try await APIService.shared.request(
+            endpoint: Constants.API.Endpoints.podMessagePin(podId, messageId),
+            method: "POST",
+            body: body,
+            authenticated: true
+        )
+    }
+
+    /// Delete a message (own messages only).
+    func deleteMessage(podId: String, messageId: String) async throws {
+        let _: EmptyResponse = try await APIService.shared.request(
+            endpoint: Constants.API.Endpoints.podMessage(podId, messageId),
+            method: "DELETE",
+            authenticated: true
+        )
+    }
+
     func getVotes(podId: String) async throws -> [Vote] {
         return try await APIService.shared.request(
             endpoint: Constants.API.Endpoints.podVotes(podId),

@@ -2,6 +2,8 @@ import datetime
 
 from OrbitServer.models.models import (
     get_pod, create_chat_message, list_chat_messages,
+    get_chat_message, transactional_message_update, delete_chat_message,
+    REACTION_TYPES,
     create_vote, get_vote, update_vote, list_votes_for_pod,
     update_pod, transactional_vote_update,
     dm_conversation_id, list_dm_conversations, get_user,
@@ -52,6 +54,80 @@ def send_message(pod_id, user_id, content):
 
     msg = create_chat_message(pod_id, user_id, content.strip(), message_type='text')
     return msg, None
+
+
+def _pod_leader_id(pod):
+    """The pod leader is the first member in join order."""
+    member_ids = pod.get('member_ids') or []
+    return int(member_ids[0]) if member_ids else None
+
+
+def _get_pod_message(pod_id, message_id, user_id):
+    """Shared lookup: pod exists, requester is a member, message belongs to pod.
+    Returns (pod, message, error_string)."""
+    pod = get_pod(pod_id)
+    if not pod:
+        return None, None, "Pod not found"
+    if int(user_id) not in (pod.get('member_ids') or []):
+        return None, None, "You are not a member of this pod"
+    msg = get_chat_message(message_id)
+    if not msg or msg.get('pod_id') != str(pod_id):
+        return None, None, "Message not found"
+    return pod, msg, None
+
+
+def react_to_message(pod_id, message_id, user_id, reaction):
+    """Toggle a reaction (thumbs_up | thumbs_down | heart) on a message."""
+    if reaction not in REACTION_TYPES:
+        return None, f"reaction must be one of: {', '.join(REACTION_TYPES)}"
+
+    _, msg, err = _get_pod_message(pod_id, message_id, user_id)
+    if err:
+        return None, err
+
+    uid = int(user_id)
+
+    def _toggle(entity):
+        reactions = {r: [int(u) for u in (entity.get('reactions') or {}).get(r, [])]
+                     for r in REACTION_TYPES}
+        if uid in reactions[reaction]:
+            reactions[reaction].remove(uid)
+        else:
+            reactions[reaction].append(uid)
+        entity['reactions'] = reactions
+
+    _, msg = transactional_message_update(message_id, _toggle)
+    if msg is None:
+        return None, "Message not found"
+    return msg, None
+
+
+def set_message_pinned(pod_id, message_id, user_id, pinned):
+    """Pin or unpin a message. Only the pod leader may pin."""
+    pod, msg, err = _get_pod_message(pod_id, message_id, user_id)
+    if err:
+        return None, err
+    if _pod_leader_id(pod) != int(user_id):
+        return None, "Only the pod leader can pin messages"
+
+    def _set(entity):
+        entity['pinned'] = bool(pinned)
+
+    _, msg = transactional_message_update(message_id, _set)
+    if msg is None:
+        return None, "Message not found"
+    return msg, None
+
+
+def delete_message(pod_id, message_id, user_id):
+    """Delete a message. Users can only delete their own messages."""
+    _, msg, err = _get_pod_message(pod_id, message_id, user_id)
+    if err:
+        return False, err
+    if int(msg.get('user_id', -1)) != int(user_id):
+        return False, "You can only delete your own messages"
+    delete_chat_message(message_id)
+    return True, None
 
 
 def create_poll(pod_id, user_id, vote_type, options):

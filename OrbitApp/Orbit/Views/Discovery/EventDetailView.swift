@@ -239,7 +239,93 @@ struct MissionDetailView: View {
         }
     }
 
-    // MARK: - Set Mode Content (unchanged)
+    // MARK: - Shared detail pieces
+
+    /// Horizontal gallery of the mission's uploaded images (e.g. a flyer).
+    @ViewBuilder
+    private var missionImageGallery: some View {
+        if let images = mission.images, !images.isEmpty {
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 12) {
+                    ForEach(images, id: \.self) { urlString in
+                        if let url = URL(string: urlString) {
+                            AsyncImage(url: url) { img in
+                                img.resizable().scaledToFill()
+                            } placeholder: {
+                                Color(.systemGray5)
+                            }
+                            .frame(width: 220, height: 150)
+                            .clipShape(RoundedRectangle(cornerRadius: 16))
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    /// Reminder describing the allowable scheduling window for flex missions.
+    @ViewBuilder
+    private var schedulingWindowReminder: some View {
+        HStack(spacing: 10) {
+            Image(systemName: "calendar.badge.clock")
+                .foregroundStyle(OrbitTheme.gradient)
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Pick a time together")
+                    .font(.subheadline).fontWeight(.semibold)
+                if let until = mission.scheduleableUntil {
+                    Text("Schedulable from today through \(Self.prettyDate(until)).")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                } else {
+                    Text("Schedulable from today up to 2 weeks out.")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+            }
+            Spacer()
+        }
+        .padding(14)
+        .background(OrbitTheme.purple.opacity(0.08))
+        .cornerRadius(12)
+    }
+
+    private static func prettyDate(_ iso: String) -> String {
+        let inFmt = DateFormatter()
+        inFmt.dateFormat = "yyyy-MM-dd"
+        guard let d = inFmt.date(from: iso) else { return iso }
+        let outFmt = DateFormatter()
+        outFmt.dateStyle = .medium
+        outFmt.timeStyle = .none
+        return outFmt.string(from: d)
+    }
+
+    // MARK: - Set Mode Content
+
+    /// Tappable link rows — links are optional on both set and flex missions.
+    @ViewBuilder
+    private var missionLinksSection: some View {
+        if let links = mission.links, !links.isEmpty {
+            VStack(alignment: .leading, spacing: 8) {
+                ForEach(links, id: \.self) { link in
+                    if let url = URL(string: link) {
+                        Button {
+                            UIApplication.shared.open(url)
+                        } label: {
+                            HStack(spacing: 6) {
+                                Image(systemName: "link")
+                                    .font(.caption)
+                                Text(link)
+                                    .font(.subheadline)
+                                    .lineLimit(1)
+                                    .truncationMode(.middle)
+                            }
+                            .foregroundColor(OrbitTheme.blue)
+                        }
+                    }
+                }
+            }
+        }
+    }
 
     private var setContent: some View {
         ScrollView {
@@ -312,6 +398,10 @@ struct MissionDetailView: View {
                     .font(.body)
                     .foregroundColor(.primary)
                     .lineSpacing(4)
+
+                missionImageGallery
+
+                missionLinksSection
 
                 Divider()
 
@@ -483,6 +573,13 @@ struct MissionDetailView: View {
                             .lineSpacing(4)
                     }
 
+                    missionImageGallery
+
+                    // Scheduling window reminder
+                    if mission.scheduledTime == nil {
+                        schedulingWindowReminder
+                    }
+
                     // Links
                     if let links = mission.links, !links.isEmpty {
                         VStack(alignment: .leading, spacing: 8) {
@@ -613,20 +710,21 @@ struct MissionDetailView: View {
     }
 
     private func joinFlexMission() {
+        // Flex missions now live in the unified Mission kind and form pods the
+        // same way set missions do.
         isJoining = true
         errorMessage = nil
         Task {
             do {
-                let updated = try await MissionService.shared.joinFlexMission(id: mission.id)
+                let pod = try await MissionService.shared.joinMission(id: mission.id)
                 await MainActor.run {
                     isJoining = false
                     showSignedUp = true
-                    joinedPodId = updated.podId
+                    joinedPodId = pod.id
+                    mission.userPodStatus = "in_pod"
+                    mission.userPodId = pod.id
+                    mission.podId = pod.id
                     withAnimation(.spring(duration: 0.3)) { localToast = true }
-                }
-                // If pod_id missing from response, fetch signal fresh to resolve it
-                if updated.podId == nil {
-                    await resolvePodId()
                 }
             } catch {
                 await MainActor.run {
@@ -634,12 +732,11 @@ struct MissionDetailView: View {
                     let message = error.localizedDescription
                     if message.localizedCaseInsensitiveContains("already") {
                         showSignedUp = true
-                        joinedPodId = mission.podId
+                        joinedPodId = mission.userPodId ?? mission.podId
                     } else {
                         errorMessage = message
                     }
                 }
-                // If already RSVP'd but pod_id unknown, fetch it
                 if joinedPodId == nil && showSignedUp {
                     await resolvePodId()
                 }
@@ -650,9 +747,9 @@ struct MissionDetailView: View {
     /// Fetch the mission fresh to resolve the pod_id when it's missing.
     private func resolvePodId() async {
         do {
-            let fetched = try await MissionService.shared.getFlexMission(id: mission.id)
+            let fetched = try await MissionService.shared.getMission(id: mission.id)
             await MainActor.run {
-                if let podId = fetched.podId {
+                if let podId = fetched.userPodId ?? fetched.podId {
                     joinedPodId = podId
                 }
             }
@@ -688,12 +785,8 @@ struct MissionDetailView: View {
 
     private func fetchFullMissionDetail() async {
         do {
-            let detailed: Mission
-            if mission.isFlexMode {
-                detailed = try await MissionService.shared.getFlexMission(id: mission.id)
-            } else {
-                detailed = try await MissionService.shared.getMission(id: mission.id)
-            }
+            // Both modes now live in the unified Mission kind.
+            let detailed = try await MissionService.shared.getMission(id: mission.id)
             // Merge pods and pod-status fields into local state
             if let pods = detailed.pods, !pods.isEmpty {
                 mission.pods = pods
@@ -1088,25 +1181,21 @@ struct SignalDetailView: View {
         rsvpError = nil
         Task {
             do {
-                let updated = try await MissionService.shared.joinFlexMission(id: mission.id)
+                let pod = try await MissionService.shared.joinMission(id: mission.id)
                 await MainActor.run {
                     isRsvping = false
                     showSignedUp = true
-                    joinedPodId = updated.podId
+                    joinedPodId = pod.id
                     withAnimation(.spring(duration: 0.3)) { localToast = true }
-                    // If we got a pod, don't auto-dismiss — let user open the pod
-                    if updated.podId == nil {
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) { dismiss() }
-                    }
                 }
             } catch {
                 await MainActor.run {
                     isRsvping = false
                     let message = error.localizedDescription
                     if message.localizedCaseInsensitiveContains("already") {
-                        // User already RSVP'd — treat as success
+                        // User already joined — treat as success
                         showSignedUp = true
-                        joinedPodId = mission.podId
+                        joinedPodId = mission.userPodId ?? mission.podId
                     } else {
                         rsvpError = message
                     }

@@ -24,6 +24,21 @@ indexes:
       - name: pod_id
       - name: created_at
 
+  # ── Notification ──────────────────────────────────────────────────────────────
+  # list_notifications: filter by user_id, ORDER BY created_at DESC
+  # Used by GET /api/notifications
+  - kind: Notification
+    properties:
+      - name: user_id
+      - name: created_at
+        direction: desc
+
+  # mark_notifications_read: filter by user_id AND read
+  - kind: Notification
+    properties:
+      - name: user_id
+      - name: read
+
   # ── Signal (activity request) ─────────────────────────────────────────────────
   # list_signals_for_user: filter by creator_id, ORDER BY created_at DESC
   # Used by GET /api/signals

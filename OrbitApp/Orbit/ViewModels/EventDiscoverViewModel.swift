@@ -2,7 +2,10 @@
 //  MissionsViewModel.swift (stored as EventDiscoverViewModel.swift)
 //  Orbit
 //
-//  State management for missions feed — supports both Set and Flex modes.
+//  State for the unified Missions feed. Both Set (fixed-date) and Flex
+//  (group-picks-time) missions now live in a single Mission kind served by
+//  GET /api/missions, so this view model loads one list and applies the
+//  client-side filter + sort the Missions page exposes.
 //
 
 import Foundation
@@ -13,16 +16,38 @@ enum MissionSegment: String, CaseIterable {
     case discover = "Explore"
 }
 
+/// How the Missions feed is ordered. `.bestMatch` is the default and uses a
+/// composite ordering: best match → happening soonest → oldest still standing.
+enum MissionSort: String, CaseIterable, Identifiable {
+    case bestMatch      = "Best match"
+    case soonest        = "Happening soon"
+    case furthest       = "Furthest out"
+    case recentlyPosted = "Recently posted"
+
+    var id: String { rawValue }
+
+    var icon: String {
+        switch self {
+        case .bestMatch:      return "sparkles"
+        case .soonest:        return "clock.arrow.circlepath"
+        case .furthest:       return "calendar"
+        case .recentlyPosted: return "clock.badge"
+        }
+    }
+}
+
 @MainActor
 class MissionsViewModel: ObservableObject {
     @Published var suggestedMissions: [Mission] = []
-    @Published var allMissions: [Mission] = []        // set mode missions from /missions
-    @Published var allFlexMissions: [Mission] = []     // flex mode missions from /signals
+    @Published var allMissions: [Mission] = []         // both modes, from /api/missions
     @Published var isLoading = false
     @Published var errorMessage: String?
+
+    // Filter + sort state
     @Published var filterTag: String?
-    @Published var showMyYearOnly = false
-    @Published var filterMode: MissionMode? = nil      // nil = show all
+    @Published var createdByMeOnly = false
+    @Published var sort: MissionSort = .bestMatch
+
     @Published var isSubmitting = false
     @Published var toastMessage: String?
     @Published var showToast = false
@@ -40,110 +65,86 @@ class MissionsViewModel: ObservableObject {
             .publisher(for: .missionsNeedRefresh)
             .sink { [weak self] _ in
                 guard let self else { return }
-                Task { @MainActor in
-                    await self.reload()
-                }
+                Task { @MainActor in await self.reload() }
             }
     }
 
-    // MARK: - Computed: Combined + Filtered
+    // MARK: - Filter helpers
 
-    /// All missions (set + flex), filtered by mode and tag.
-    private var combinedMissions: [Mission] {
-        var all = allMissions + allFlexMissions
-        if let mode = filterMode {
-            all = all.filter { $0.mode == mode }
-        }
-        if let tag = filterTag {
-            all = all.filter {
-                $0.tags.contains(tag)
+    /// Distinct tags present in the current feed, for the filter sheet picker.
+    var availableTags: [String] {
+        var seen = Set<String>()
+        var result: [String] = []
+        for m in allMissions {
+            for tag in m.tags where seen.insert(tag.lowercased()).inserted {
+                result.append(tag)
             }
         }
-        return all
+        return result.sorted()
     }
 
-    /// Missions the user has joined (in a pod for set, or created/RSVPed for flex).
-    /// Sorted newest-created first so newly joined missions appear at the top.
+    var hasActiveFilter: Bool {
+        filterTag != nil || createdByMeOnly || sort != .bestMatch
+    }
+
+    // MARK: - Computed feed
+
+    /// Missions the user is part of (created or joined) — surfaced first.
     var myMissions: [Mission] {
         let uid = currentUserId
-        return combinedMissions
-            .filter { m in
-                if m.mode == .flex {
-                    return m.podId != nil || m.creatorId == uid || m.userPodStatus == "in_pod"
-                }
-                return m.userPodStatus == "in_pod"
-            }
+        return allMissions
+            .filter { $0.creatorId == uid || $0.isJoined }
             .sorted { $0.createdAtDate > $1.createdAtDate }
     }
 
-    /// Missions available to discover.
-    /// Sorted by event time (soonest first), with flex missions at the bottom.
+    /// The filtered + sorted list shown in the Missions feed.
     var discoverMissions: [Mission] {
-        let uid = currentUserId
-        let mine = combinedMissions.filter { m in
-            if m.mode == .flex {
-                return m.creatorId == uid || m.userPodStatus == "in_pod" || m.podId != nil
+        var list = allMissions
+        if let tag = filterTag {
+            list = list.filter { $0.tags.contains(where: { $0.caseInsensitiveCompare(tag) == .orderedSame }) }
+        }
+        if createdByMeOnly {
+            let uid = currentUserId
+            list = list.filter { $0.creatorId == uid }
+        }
+        return sortMissions(list)
+    }
+
+    private func sortMissions(_ list: [Mission]) -> [Mission] {
+        switch sort {
+        case .soonest:
+            return list.sorted { $0.sortDate < $1.sortDate }
+        case .furthest:
+            return list.sorted { $0.sortDate > $1.sortDate }
+        case .recentlyPosted:
+            return list.sorted { $0.createdAtDate > $1.createdAtDate }
+        case .bestMatch:
+            // Composite: best match → soonest happening → oldest still standing.
+            return list.sorted { a, b in
+                let sa = a.matchScore ?? 0, sb = b.matchScore ?? 0
+                if abs(sa - sb) > 0.0001 { return sa > sb }
+                if a.sortDate != b.sortDate { return a.sortDate < b.sortDate }
+                return a.createdAtDate < b.createdAtDate
             }
-            return m.userPodStatus == "in_pod"
         }
-        let mineIds = Set(mine.map { $0.id })
-        let rest = combinedMissions.filter { m in
-            guard !mineIds.contains(m.id) else { return false }
-            if m.mode == .flex {
-                return m.podId == nil && m.creatorId != uid
-            }
-            return m.userPodStatus != "in_pod"
-        }
-        // Sort each group: set missions by event time, flex at the end
-        let sortByTime: (Mission, Mission) -> Bool = { a, b in
-            if a.isFlexMode != b.isFlexMode { return !a.isFlexMode }
-            return a.sortDate < b.sortDate
-        }
-        return rest.sorted(by: sortByTime)
     }
 
     private var hasLoaded = false
 
     // MARK: - Load
 
-    func load(userYear: String) async {
+    func load(userYear: String = "") async {
         guard !hasLoaded || allMissions.isEmpty else { return }
         self.userYear = userYear
         isLoading = true
         errorMessage = nil
 
-        // Fetch set missions + flex missions concurrently.
-        // Each call is independent — one failing should not wipe the others.
-        async let setResult: [Mission]? = try? MissionService.shared.listMissions(
-            tag: filterTag,
-            year: showMyYearOnly ? userYear : nil
-        )
-        async let flexResult: [Mission]? = try? MissionService.shared.listFlexMissions()
-        async let myFlexResult: [Mission]? = try? MissionService.shared.myFlexMissions()
-
-        let (s, f, mf) = await (setResult, flexResult, myFlexResult)
-
-        // Only update each array when its API call actually returned data.
-        if let s = s {
-            allMissions = s
-        }
-
-        // Merge discover + my flex, dedup by id (only if at least one call succeeded)
-        if f != nil || mf != nil {
-            var seen = Set<String>()
-            var merged: [Mission] = []
-            for m in (f ?? []) + (mf ?? []) {
-                if seen.insert(m.id).inserted { merged.append(m) }
-            }
-            // Only replace if we got results; don't wipe existing data on total failure
-            if !merged.isEmpty || (f != nil && mf != nil) {
-                allFlexMissions = merged
-            }
+        if let result = try? await MissionService.shared.listMissions() {
+            allMissions = result
         }
         isLoading = false
         hasLoaded = true
 
-        // Suggested missions load after — won't block the main feed.
         if let suggested = try? await MissionService.shared.suggestedMissions() {
             suggestedMissions = suggested
         }
@@ -156,16 +157,6 @@ class MissionsViewModel: ObservableObject {
 
     func applyTag(_ tag: String?) async {
         filterTag = tag
-        await reload()
-    }
-
-    func toggleYearFilter() async {
-        showMyYearOnly.toggle()
-        await reload()
-    }
-
-    func applyModeFilter(_ mode: MissionMode?) {
-        filterMode = mode
     }
 
     // MARK: - Actions
@@ -173,63 +164,107 @@ class MissionsViewModel: ObservableObject {
     func skipMission(_ mission: Mission) async {
         try? await MissionService.shared.skipMission(id: mission.id)
         allMissions.removeAll { $0.id == mission.id }
-        allFlexMissions.removeAll { $0.id == mission.id }
         suggestedMissions.removeAll { $0.id == mission.id }
     }
 
     /// Insert a newly created mission at the top so it appears immediately.
     func insertCreatedMission(_ mission: Mission) {
-        if mission.mode == .flex {
-            allFlexMissions.insert(mission, at: 0)
-        } else {
-            allMissions.insert(mission, at: 0)
-        }
+        allMissions.removeAll { $0.id == mission.id }
+        allMissions.insert(mission, at: 0)
     }
 
-    // MARK: - Flex Creation
+    // MARK: - Create (unified)
 
     @discardableResult
-    func createFlexMission(
-        title: String = "",
-        minGroupSize: Int,
-        maxGroupSize: Int,
-        availability: [AvailabilitySlot],
+    func createMission(
+        mode: MissionMode,
+        title: String,
         description: String,
+        tags: [String],
+        logo: String?,
+        images: [String],
+        minPodSize: Int,
+        maxPodSize: Int,
+        location: String = "",
+        date: String? = nil,
+        startTime: String? = nil,
+        endTime: String? = nil,
+        availability: [AvailabilitySlot] = [],
+        timeRangeStart: Int? = nil,
+        timeRangeEnd: Int? = nil,
         links: [String] = [],
-        tags: [String] = [],
-        timeRangeStart: Int = 9,
-        timeRangeEnd: Int = 21,
-        logo: String? = nil
+        schedulingWindowDays: Int? = nil
     ) async -> Mission? {
         isSubmitting = true
         errorMessage = nil
         defer { isSubmitting = false }
 
         do {
-            let created = try await MissionService.shared.createFlexMission(
-                title: title,
-                minGroupSize: minGroupSize,
-                maxGroupSize: maxGroupSize,
-                availability: availability,
-                description: description,
-                links: links,
-                tags: tags,
-                timeRangeStart: timeRangeStart,
-                timeRangeEnd: timeRangeEnd,
-                logo: logo
+            let created = try await MissionService.shared.createUnifiedMission(
+                mode: mode, title: title, description: description, tags: tags,
+                logo: logo, images: images, minPodSize: minPodSize, maxPodSize: maxPodSize,
+                location: location, date: date, startTime: startTime, endTime: endTime,
+                availability: availability, timeRangeStart: timeRangeStart,
+                timeRangeEnd: timeRangeEnd, links: links, schedulingWindowDays: schedulingWindowDays
             )
-            // Auto-RSVP the creator so they're in a pod from the start.
-            // Do NOT insert here — caller's onCreated → insertCreatedMission handles it once.
-            var rsvped = (try? await MissionService.shared.joinFlexMission(id: created.id)) ?? created
-            // Stamp creator identity so myMissions/discoverMissions filters work
-            // even if the backend RSVP response omits creator_id.
-            if rsvped.creatorId == nil {
-                rsvped.creatorId = currentUserId
+            // Auto-join the creator so they're in a pod from the start.
+            var joined = created
+            if let pod = try? await MissionService.shared.joinMission(id: created.id) {
+                joined.userPodStatus = "in_pod"
+                joined.userPodId = pod.id
+                joined.podId = pod.id
             }
-            rsvped.userPodStatus = "in_pod"
-            rsvped.tags = tags
+            if joined.creatorId == nil { joined.creatorId = currentUserId }
+            joined.tags = tags
+            joined.logo = logo
             showToastMessage("Mission created!")
-            return rsvped
+            return joined
+        } catch {
+            errorMessage = error.localizedDescription
+            return nil
+        }
+    }
+
+    // MARK: - Update (unified)
+
+    @discardableResult
+    func updateMission(
+        id: String,
+        mode: MissionMode,
+        title: String,
+        description: String,
+        tags: [String],
+        logo: String?,
+        images: [String],
+        minPodSize: Int,
+        maxPodSize: Int,
+        location: String = "",
+        date: String? = nil,
+        startTime: String? = nil,
+        endTime: String? = nil,
+        availability: [AvailabilitySlot] = [],
+        timeRangeStart: Int? = nil,
+        timeRangeEnd: Int? = nil,
+        links: [String] = [],
+        schedulingWindowDays: Int? = nil
+    ) async -> Mission? {
+        isSubmitting = true
+        errorMessage = nil
+        defer { isSubmitting = false }
+
+        do {
+            var updated = try await MissionService.shared.updateUnifiedMission(
+                id: id, mode: mode, title: title, description: description, tags: tags,
+                logo: logo, images: images, minPodSize: minPodSize, maxPodSize: maxPodSize,
+                location: location, date: date, startTime: startTime, endTime: endTime,
+                availability: availability, timeRangeStart: timeRangeStart,
+                timeRangeEnd: timeRangeEnd, links: links, schedulingWindowDays: schedulingWindowDays
+            )
+            updated.tags = tags
+            updated.logo = logo
+            replaceInFeed(updated)
+            showToastMessage("Mission updated!")
+            return updated
         } catch {
             errorMessage = error.localizedDescription
             return nil
@@ -238,17 +273,8 @@ class MissionsViewModel: ObservableObject {
 
     // MARK: - Delete
 
-    func deleteFlexMission(id: String) async {
-        do {
-            try await MissionService.shared.deleteFlexMission(id: id)
-            allFlexMissions.removeAll { $0.id == id }
-            showToastMessage("Mission removed")
-        } catch {
-            errorMessage = error.localizedDescription
-        }
-    }
-
-    func deleteSetMission(id: String) async {
+    /// Delete any mission (both modes now live in the Mission kind).
+    func deleteMission(id: String) async {
         do {
             try await MissionService.shared.deleteSetMission(id: id)
             allMissions.removeAll { $0.id == id }
@@ -258,85 +284,13 @@ class MissionsViewModel: ObservableObject {
         }
     }
 
-    // MARK: - Update
-
-    func updateSetMission(
-        id: String,
-        title: String,
-        description: String,
-        tags: [String],
-        location: String,
-        date: String,
-        startTime: String?,
-        endTime: String?,
-        maxPodSize: Int,
-        logo: String? = nil
-    ) async -> Mission? {
-        isSubmitting = true
-        errorMessage = nil
-        defer { isSubmitting = false }
-
-        do {
-            let updated = try await MissionService.shared.updateMission(
-                id: id, title: title, description: description,
-                tags: tags, location: location, date: date,
-                startTime: startTime, endTime: endTime,
-                maxPodSize: maxPodSize, logo: logo
-            )
-            replaceInFeed(updated)
-            showToastMessage("Mission updated!")
-            return updated
-        } catch {
-            errorMessage = error.localizedDescription
-            return nil
-        }
-    }
-
-    func updateFlexMission(
-        id: String,
-        title: String,
-        minGroupSize: Int,
-        maxGroupSize: Int,
-        availability: [AvailabilitySlot],
-        description: String,
-        links: [String],
-        tags: [String],
-        timeRangeStart: Int,
-        timeRangeEnd: Int,
-        logo: String? = nil
-    ) async -> Mission? {
-        isSubmitting = true
-        errorMessage = nil
-        defer { isSubmitting = false }
-
-        do {
-            var updated = try await MissionService.shared.updateFlexMission(
-                id: id, title: title,
-                minGroupSize: minGroupSize, maxGroupSize: maxGroupSize,
-                availability: availability, description: description,
-                links: links, tags: tags,
-                timeRangeStart: timeRangeStart, timeRangeEnd: timeRangeEnd,
-                logo: logo
-            )
-            updated.tags = tags
-            replaceInFeed(updated)
-            showToastMessage("Mission updated!")
-            return updated
-        } catch {
-            errorMessage = error.localizedDescription
-            return nil
-        }
-    }
+    // Back-compat aliases for callers (e.g. MissionDetailView).
+    func deleteFlexMission(id: String) async { await deleteMission(id: id) }
+    func deleteSetMission(id: String) async { await deleteMission(id: id) }
 
     private func replaceInFeed(_ mission: Mission) {
-        if mission.mode == .flex {
-            if let idx = allFlexMissions.firstIndex(where: { $0.id == mission.id }) {
-                allFlexMissions[idx] = mission
-            }
-        } else {
-            if let idx = allMissions.firstIndex(where: { $0.id == mission.id }) {
-                allMissions[idx] = mission
-            }
+        if let idx = allMissions.firstIndex(where: { $0.id == mission.id }) {
+            allMissions[idx] = mission
         }
     }
 

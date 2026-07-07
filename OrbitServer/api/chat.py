@@ -6,7 +6,7 @@ from OrbitServer.utils.rate_limit import limiter
 from OrbitServer.utils.validators import validate_message_data, validate_vote_data
 from OrbitServer.services.chat_service import (
     get_messages, send_message, create_poll, respond_to_vote, remove_vote, get_votes_for_pod,
-    get_pod_conversations,
+    get_pod_conversations, react_to_message, set_message_pinned, delete_message,
 )
 
 chat_bp = Blueprint('chat', __name__, url_prefix='/api/pods')
@@ -46,6 +46,47 @@ def post_message(pod_id):
         status = 400 if "prohibited" in err.lower() or "not a member" in err.lower() else 404
         return error(err, status)
     return success(msg, 201)
+
+
+def _message_error_status(err):
+    low = err.lower()
+    if "not found" in low:
+        return 404
+    if "not a member" in low or "leader" in low or "your own" in low:
+        return 403
+    return 400
+
+
+@chat_bp.route('/<pod_id>/messages/<message_id>/react', methods=['POST'])
+@require_auth
+def react(pod_id, message_id):
+    data = request.get_json(silent=True) or {}
+    msg, err = react_to_message(pod_id, message_id, g.user_id, data.get('reaction'))
+    if err:
+        return error(err, _message_error_status(err))
+    return success(msg)
+
+
+@chat_bp.route('/<pod_id>/messages/<message_id>/pin', methods=['POST'])
+@require_auth
+def pin(pod_id, message_id):
+    data = request.get_json(silent=True) or {}
+    pinned = data.get('pinned', True)
+    if not isinstance(pinned, bool):
+        return error("pinned must be a boolean", 400)
+    msg, err = set_message_pinned(pod_id, message_id, g.user_id, pinned)
+    if err:
+        return error(err, _message_error_status(err))
+    return success(msg)
+
+
+@chat_bp.route('/<pod_id>/messages/<message_id>', methods=['DELETE'])
+@require_auth
+def remove_message(pod_id, message_id):
+    ok, err = delete_message(pod_id, message_id, g.user_id)
+    if not ok:
+        return error(err, _message_error_status(err))
+    return success({'message': 'Message deleted'})
 
 
 @chat_bp.route('/<pod_id>/votes', methods=['GET'])

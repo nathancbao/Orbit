@@ -141,33 +141,64 @@ def search_users(query_str, exclude_user_id=None, limit=20):
     return results
 
 
-# ── Mission (was Event) ─────────────────────────────────────────────────────
-# Fixed-date activities. Browseable in the discovery feed.
-# Fields: id, title, description, tags, location, date (YYYY-MM-DD),
-#         creator_id, creator_type (user|seeded|ai_suggested),
-#         max_pod_size (default 4), status (open|completed|cancelled),
+# ── Mission (unified kind — replaces Event + Signal) ────────────────────────
+# Supports two modes:
+#   'set'  — fixed date/time activity (date + start_time + end_time)
+#   'flex' — group picks the time from the creator's availability grid
+# Fields: id, title, description, tags, location, mode, logo, images (<=3),
+#         date (YYYY-MM-DD), start_time, end_time,
+#         min_pod_size, max_pod_size, creator_id, creator_type,
+#         status (open|completed|cancelled), utc_offset, embedding,
 #         created_at, updated_at
+#   Flex-only: custom_activity_name, availability, time_range_start,
+#         time_range_end, links, scheduling_window_days,
+#         scheduleable_from, scheduleable_until
 
 def create_mission(data, creator_id, creator_type='user'):
     key = client.key('Mission')
-    entity = datastore.Entity(key=key)
+    entity = datastore.Entity(key=key, exclude_from_indexes=['embedding', 'availability', 'images', 'description'])
+
+    mode = data.get('mode', 'set')
+    max_pod_size = int(data.get('max_pod_size', 4))
+    min_pod_size = int(data.get('min_pod_size', 3))
+
     entity.update({
         'title': data['title'],
         'description': data.get('description', ''),
         'tags': data.get('tags', []),
         'location': data.get('location', ''),
+        'mode': mode,
+        'logo': data.get('logo'),
+        'images': list(data.get('images') or [])[:3],
         'date': data.get('date', ''),
         'start_time': data.get('start_time'),
         'end_time': data.get('end_time'),
+        'min_pod_size': min_pod_size,
+        'max_pod_size': max_pod_size,
         'creator_id': int(creator_id),
         'creator_type': creator_type,
-        'max_pod_size': int(data.get('max_pod_size', 4)),
         'utc_offset': data.get('utc_offset', 0),
+        'links': list(data.get('links') or [])[:3],
         'status': 'open',
         'embedding': None,
         'created_at': datetime.datetime.utcnow(),
         'updated_at': datetime.datetime.utcnow(),
     })
+
+    if mode == 'flex':
+        window_days = int(data.get('scheduling_window_days', 7))
+        today = datetime.date.today()
+        entity.update({
+            'custom_activity_name': data.get('custom_activity_name'),
+            'availability': data.get('availability', []),
+            'time_range_start': data.get('time_range_start'),
+            'time_range_end': data.get('time_range_end'),
+            'scheduling_window_days': window_days,
+            'scheduleable_from': data.get('scheduleable_from') or today.isoformat(),
+            'scheduleable_until': data.get('scheduleable_until')
+                or (today + datetime.timedelta(days=window_days)).isoformat(),
+        })
+
     client.put(entity)
     return _entity_to_dict(entity)
 
@@ -189,7 +220,12 @@ def update_mission(mission_id, data):
     entity = client.get(key)
     if not entity:
         return None
-    allowed = ['title', 'description', 'tags', 'location', 'date', 'start_time', 'end_time', 'max_pod_size', 'status']
+    allowed = [
+        'title', 'description', 'tags', 'location', 'date', 'start_time', 'end_time',
+        'max_pod_size', 'min_pod_size', 'status', 'mode', 'logo', 'images',
+        'custom_activity_name', 'availability', 'time_range_start', 'time_range_end',
+        'links', 'scheduling_window_days', 'scheduleable_from', 'scheduleable_until',
+    ]
     for field in allowed:
         if field in data:
             entity[field] = data[field]
@@ -365,21 +401,56 @@ def transactional_pod_update(pod_id, update_fn):
 
 
 # ── ChatMessage ───────────────────────────────────────────────────────────────
-# Fields: id (UUID), pod_id, user_id, content, message_type, created_at
+# Fields: id (UUID), pod_id, user_id, content, message_type,
+#         reactions {thumbs_up|thumbs_down|heart: [user_ids]}, pinned, created_at
+
+# The three reactions a message supports (👍 👎 ❤️ on the client).
+REACTION_TYPES = ('thumbs_up', 'thumbs_down', 'heart')
+
 
 def create_chat_message(pod_id, user_id, content, message_type='text'):
     msg_id = str(uuid.uuid4())
     key = client.key('ChatMessage', msg_id)
-    entity = datastore.Entity(key=key, exclude_from_indexes=['content'])
+    entity = datastore.Entity(key=key, exclude_from_indexes=['content', 'reactions'])
     entity.update({
         'pod_id': str(pod_id),
         'user_id': int(user_id),
         'content': content,
         'message_type': message_type,
+        'reactions': {r: [] for r in REACTION_TYPES},
+        'pinned': False,
         'created_at': datetime.datetime.utcnow(),
     })
     client.put(entity)
     return _entity_to_dict(entity)
+
+
+def get_chat_message(message_id):
+    key = client.key('ChatMessage', str(message_id))
+    entity = client.get(key)
+    return _entity_to_dict(entity)
+
+
+def transactional_message_update(message_id, update_fn):
+    """Atomically read-modify-write a ChatMessage inside a Datastore transaction.
+
+    update_fn(entity) is called with the raw Datastore entity.
+    It should mutate the entity in place and return a result value.
+    Returns (result, updated_message_dict) or (None, None) if message not found.
+    """
+    with client.transaction():
+        key = client.key('ChatMessage', str(message_id))
+        entity = client.get(key)
+        if not entity:
+            return None, None
+        result = update_fn(entity)
+        client.put(entity)
+        return result, _entity_to_dict(entity)
+
+
+def delete_chat_message(message_id):
+    key = client.key('ChatMessage', str(message_id))
+    client.delete(key)
 
 
 def list_chat_messages(pod_id, limit=100, since=None):
@@ -779,15 +850,18 @@ def get_user_pods(user_id, limit=100):
             pod['mission_title'] = signal.get('title', 'Untitled') if signal else 'Untitled'
             pod['mission_tags'] = signal.get('tags', []) if signal else []
             pod['mode'] = 'flex'
+            pod['min_pod_size'] = int(signal.get('min_group_size', 3)) if signal else 3
         elif mission_id is not None:
             mission = get_mission(int(mission_id))
             pod['mission_title'] = mission.get('title', 'Untitled') if mission else 'Untitled'
             pod['mission_tags'] = mission.get('tags', []) if mission else []
-            pod['mode'] = 'set'
+            pod['mode'] = mission.get('mode', 'set') if mission else 'set'
+            pod['min_pod_size'] = int(mission.get('min_pod_size', 3)) if mission else 3
         else:
             pod['mission_title'] = 'Untitled'
             pod['mission_tags'] = []
             pod['mode'] = 'set'
+            pod['min_pod_size'] = 3
 
         # Survey eligibility: completed pod, user hasn't submitted, within 7-day window
         survey_completed_by = pod.get('survey_completed_by') or []
@@ -807,6 +881,49 @@ def get_user_pods(user_id, limit=100):
         )
 
     return pods
+
+
+# ── Notification ─────────────────────────────────────────────────────────────
+# In-app notification inbox (e.g. "the pod you were in was deleted").
+# Fields: id (UUID), user_id, type, title, body, data (dict), read, created_at
+
+def create_notification(user_id, notif_type, title, body, data=None):
+    notif_id = str(uuid.uuid4())
+    key = client.key('Notification', notif_id)
+    entity = datastore.Entity(key=key, exclude_from_indexes=['body', 'data'])
+    entity.update({
+        'user_id': int(user_id),
+        'type': notif_type,
+        'title': title,
+        'body': body,
+        'data': data or {},
+        'read': False,
+        'created_at': datetime.datetime.utcnow(),
+    })
+    client.put(entity)
+    return _entity_to_dict(entity)
+
+
+def list_notifications(user_id, limit=50):
+    query = client.query(kind='Notification')
+    query.add_filter(filter=PropertyFilter('user_id', '=', int(user_id)))
+    query.order = ['-created_at']
+    results = list(query.fetch(limit=limit))
+    return [_entity_to_dict(e) for e in results]
+
+
+def mark_notifications_read(user_id):
+    """Mark all of a user's unread notifications as read. Returns count updated."""
+    query = client.query(kind='Notification')
+    query.add_filter(filter=PropertyFilter('user_id', '=', int(user_id)))
+    query.add_filter(filter=PropertyFilter('read', '=', False))
+    updated = []
+    for entity in query.fetch(limit=200):
+        entity['read'] = True
+        updated.append(entity)
+    if updated:
+        client.put_multi(updated)
+    return len(updated)
 
 
 # ── RefreshToken ──────────────────────────────────────────────────────────────
