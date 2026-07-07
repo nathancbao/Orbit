@@ -13,6 +13,7 @@ from OrbitServer.models.models import (
     get_user_survey_for_pod, get_history_entry, update_history,
     adjust_trust_score, transactional_pod_update,
 )
+from OrbitServer.services.analytics_service import emit as emit_event
 
 logger = logging.getLogger(__name__)
 
@@ -118,5 +119,11 @@ def submit_survey(user_id, pod_id, enjoyment_rating, added_interests, member_vot
         entity['survey_completed_by'] = completed_by
 
     transactional_pod_update(pod_id, _mark_survey_done)
+
+    emit_event('survey_submitted', uid, {
+        'pod_id': str(pod_id),
+        'enjoyment_rating': enjoyment_rating,
+        'added_interest_count': len(added_interests),
+    })
 
     return {'survey_id': survey['id'], 'message': 'Survey submitted successfully'}, None

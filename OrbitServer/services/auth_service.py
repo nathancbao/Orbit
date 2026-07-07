@@ -12,8 +12,17 @@ from OrbitServer.models.models import (
     store_refresh_token, get_refresh_token, delete_refresh_token,
 )
 from OrbitServer.utils.auth import create_access_token, create_refresh_token, decode_token
+from OrbitServer.services.analytics_service import emit as emit_event
 
 logger = logging.getLogger(__name__)
+
+
+def _emit_signup_if_new(user, is_new_user):
+    """Emit signup_completed the first time a user verifies (best-effort)."""
+    if is_new_user:
+        emit_event('signup_completed', user['id'], {
+            'college_year': user.get('college_year') or '',
+        })
 
 SENDGRID_API_KEY = os.environ.get('SENDGRID_API_KEY', '')
 FROM_EMAIL = os.environ.get('FROM_EMAIL', 'theorbitapp.noreply@gmail.com')
@@ -138,6 +147,7 @@ def verify_code(email, code):
         access_token = create_access_token(user_id)
         refresh_token = create_refresh_token(user_id)
         store_refresh_token(_hash_token(refresh_token), user_id)
+        _emit_signup_if_new(user, is_new_user)
 
         return {
             'access_token': access_token,
@@ -180,6 +190,7 @@ def verify_code(email, code):
     access_token = create_access_token(user_id)
     refresh_token = create_refresh_token(user_id)
     store_refresh_token(_hash_token(refresh_token), user_id)
+    _emit_signup_if_new(user, is_new_user)
 
     return {
         'access_token': access_token,
