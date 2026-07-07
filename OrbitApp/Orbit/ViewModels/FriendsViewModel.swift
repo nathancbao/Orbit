@@ -45,7 +45,15 @@ class FriendsViewModel: ObservableObject {
         async let podInvitesResult = PodService.shared.getIncomingInvites()
         async let conversationsResult = try? ChatService.shared.getDMConversations()
 
-        do { friends = try await friendsResult } catch { print("[Friends] friends error: \(error)") }
+        // The friends list is the primary content — surface its failure so the
+        // view can show an error state. The secondary lists (requests, invites)
+        // fail quietly to a log; they're supplementary.
+        do {
+            friends = try await friendsResult
+            errorMessage = nil
+        } catch {
+            errorMessage = error.localizedDescription
+        }
         do { incomingRequests = try await incomingResult } catch { print("[Friends] incoming error: \(error)") }
         do { outgoingRequests = try await outgoingResult } catch { print("[Friends] outgoing error: \(error)") }
         do { podInvites = try await podInvitesResult } catch { print("[Friends] pod invites error: \(error)") }

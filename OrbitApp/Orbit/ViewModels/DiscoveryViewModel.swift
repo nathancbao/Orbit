@@ -62,6 +62,7 @@ class DiscoveryViewModel: ObservableObject {
     @Published var items: [DiscoveryItem] = []
     @Published var isLoading = false
     @Published var showRecommendationBadge = false
+    @Published var errorMessage: String?
 
     let userInterests: [String]
 
@@ -90,7 +91,17 @@ class DiscoveryViewModel: ObservableObject {
         async let discoverResult = MissionService.shared.listFlexMissions()
         async let rsvpResult     = MissionService.shared.rsvpedFlexMissions()
 
-        let missions             = (try? await missionsResult) ?? []
+        // The set-mission list is the primary content — surface its failure so
+        // the view can show an error state instead of an empty galaxy. The flex
+        // lists are supplementary and fail quietly to empty.
+        let missions: [Mission]
+        do {
+            missions = try await missionsResult
+            errorMessage = nil
+        } catch {
+            missions = []
+            errorMessage = error.localizedDescription
+        }
         let myFlexMissions       = (try? await myFlexResult)   ?? []
         let discoverFlexMissions = (try? await discoverResult) ?? []
         let rsvpFlexMissions     = (try? await rsvpResult)     ?? []

@@ -23,9 +23,12 @@ class DMChatViewModel: ObservableObject {
     func load() async {
         do {
             messages = try await ChatService.shared.getDMMessages(friendId: friendId)
+            errorMessage = nil
             markRead()
         } catch {
-            print("[DM] load error: \(error)")
+            // Surface load failures so the view can show an error state instead
+            // of a silent empty conversation.
+            errorMessage = error.localizedDescription
         }
     }
 
