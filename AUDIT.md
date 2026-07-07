@@ -295,7 +295,7 @@ before and after, and I stop for your approval before starting each.
 | **D** | `hardening/efficiency` | M1 (batch N+1), M2/M3 (DM + conversation denormalization), M8 (pagination), M5 backend side | Medium |
 | **E** | `hardening/testing-ci` | flip auth test, auth/authz regression tests, ruff + coverage gate in CI, wire XCTest | Medium |
 | **F** | `hardening/ios-a11y-ux` | H5 (accessibility), M5 (polling backoff), M6 (error/empty states) | High(a11y)/Med |
-| **G** | `hardening/analytics` | implement `docs/analytics-and-metrics.md` once approved | — |
+| **G** | `hardening/analytics` | **done** — Datastore-only v1 of `docs/analytics-and-metrics.md`: pseudonymized event stream (`AnalyticsEvent` kind, idempotent), `POST /api/analytics/events`, server-side authoritative emission, iOS buffered client, deletion cascade, tests. BigQuery/Pub/Sub + rollups deferred to v2 (see doc header). | — |
 
 **Recommended order:** A → B first (security), then E (lock in with tests), then
 C/D (reliability/perf), then F (iOS), then G (analytics). See `main.md` for the

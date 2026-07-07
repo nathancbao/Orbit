@@ -1,8 +1,26 @@
 # Orbit Analytics & Metrics Design — 2026-07-06
 
-> **Status:** design/contract only — no instrumentation is implemented yet. This
-> is the spec the future admin platform and ML layer build on. Implementation is
-> **Batch G** in `AUDIT.md`, gated on your approval.
+> **Status:** **Batch G v1 implemented (2026-07-07)** — Datastore-only event
+> stream is live in code (not yet deployed). This document remains the contract
+> the future admin platform and ML layer build on.
+>
+> **What's implemented:** the event taxonomy (§2) via `services/analytics_service`
+> (`emit` + `ingest_batch`), the pseudonymous id (`utils/analytics_id`), the
+> `AnalyticsEvent` Datastore kind (idempotent by `event_id`), the
+> `POST /api/analytics/events` ingestion endpoint, server-side emission of the
+> authoritative events (`signup_completed`, `mission_joined`, `mission_left`,
+> `survey_submitted`, `friend_request_sent`, `friend_accepted`), the iOS
+> `AnalyticsService` client (buffers + flushes `app_opened`, `mission_viewed`),
+> and the deletion cascade (§4). Covered by `tests/test_analytics.py`.
+>
+> **Deferred (v2, noted in §3):** the BigQuery + Pub/Sub streaming path (this v1
+> writes events directly to the `AnalyticsEvent` Datastore kind), the
+> `MetricRollup` / `User` rollup counters, the `mission_completed` /
+> `pod_meeting_confirmed` / `attendance_confirmed` emissions (need the pod
+> lifecycle transition points wired), the `source` property on `mission_viewed`,
+> and `notification_opened` (no in-app notification list to hook yet). The
+> deletion cascade currently purges Datastore only; the BigQuery `DELETE` step
+> activates when the BQ sink is stood up.
 >
 > **Design principle:** measure the core loop — **discover → join → complete →
 > feedback** — with a clean, stable event taxonomy so the same data serves
