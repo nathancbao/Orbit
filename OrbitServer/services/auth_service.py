@@ -180,7 +180,18 @@ def refresh_access_token(refresh_token):
     user_id = payload['user_id']
     new_access_token = create_access_token(user_id)
 
-    return {'access_token': new_access_token}, None
+    # Rotate the refresh token: mint a new one, persist its hash, and invalidate
+    # the old one. A leaked refresh token is then usable at most once before it
+    # stops working, and reuse of a rotated-out token is rejected as "invalid".
+    new_refresh_token = create_refresh_token(user_id)
+    store_refresh_token(_hash_token(new_refresh_token), user_id)
+    delete_refresh_token(token_hash)
+
+    return {
+        'access_token': new_access_token,
+        'refresh_token': new_refresh_token,
+        'expires_in': 900,
+    }, None
 
 
 def logout(refresh_token):

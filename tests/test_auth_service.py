@@ -153,6 +153,26 @@ class TestRefreshAccessToken:
         assert result is None
         assert "Invalid token type" in err
 
+    @patch('OrbitServer.services.auth_service.delete_refresh_token')
+    @patch('OrbitServer.services.auth_service.store_refresh_token')
+    @patch('OrbitServer.services.auth_service.get_refresh_token')
+    def test_rotates_refresh_token(self, mock_get, mock_store, mock_delete):
+        """A successful refresh mints a NEW refresh token, stores its hash, and
+        deletes the old one (rotation) — a leaked token is single-use."""
+        from OrbitServer.services.auth_service import refresh_access_token, _hash_token
+        old_token = create_refresh_token(42)
+        mock_get.return_value = {'user_id': 42}
+
+        result, err = refresh_access_token(old_token)
+        assert err is None
+        # A fresh, different refresh token is returned to the client.
+        assert 'refresh_token' in result
+        assert result['refresh_token'] != old_token
+        assert result['expires_in'] == 900
+        # The new token's hash is persisted and the old one is invalidated.
+        mock_store.assert_called_once_with(_hash_token(result['refresh_token']), 42)
+        mock_delete.assert_called_once_with(_hash_token(old_token))
+
 
 class TestLogout:
     @patch('OrbitServer.services.auth_service.delete_refresh_token')
