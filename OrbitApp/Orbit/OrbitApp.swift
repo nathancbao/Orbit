@@ -10,6 +10,7 @@ import SwiftUI
 @main
 struct OrbitApp: App {
     @UIApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
+    @Environment(\.scenePhase) private var scenePhase
     @State private var deepLinkFriendId: Int?
 
     var body: some Scene {
@@ -19,6 +20,20 @@ struct OrbitApp: App {
                 .onOpenURL { url in
                     handleDeepLink(url)
                 }
+        }
+        .onChange(of: scenePhase) { _, phase in
+            switch phase {
+            case .active:
+                // New foreground session — start a session id, record the open,
+                // and flush anything held from before.
+                AnalyticsService.shared.startSession()
+                AnalyticsService.shared.track(.appOpened)
+            case .background:
+                // Best chance to ship buffered events before we're suspended.
+                Task { await AnalyticsService.shared.flush() }
+            default:
+                break
+            }
         }
     }
 

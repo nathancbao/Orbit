@@ -218,6 +218,11 @@ struct MissionDetailView: View {
                     joinedPodId = podId
                 }
             }
+            AnalyticsService.shared.track(.missionViewed, properties: [
+                "mission_id": mission.id,
+                "mode": mission.mode.rawValue,
+                "tags": mission.tags,
+            ])
         }
         .task {
             // Fetch full mission detail so pods are always populated

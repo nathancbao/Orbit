@@ -95,6 +95,9 @@ enum Constants {
             static let voyageClusters = "/voyage/clusters"
             static let voyageHeartbeat = "/voyage/heartbeat"
 
+            // Analytics
+            static let analyticsEvents = "/analytics/events"
+
             // Notifications
             static let notifications = "/notifications"
             static let notificationsRead = "/notifications/read"
