@@ -1,5 +1,6 @@
 from OrbitServer.models.models import (
-    get_pod, get_user, create_pod_invite, get_pod_invite, update_pod_invite_status,
+    get_pod, get_user, get_users_batch, create_pod_invite, get_pod_invite,
+    update_pod_invite_status,
     list_incoming_pod_invites, find_pending_pod_invite,
     find_friendship, transactional_pod_update, record_action,
 )
@@ -108,8 +109,9 @@ def decline_pod_invite(invite_id, user_id):
 def get_incoming_invites(user_id):
     """Return pending pod invites for this user, enriched with from_user + pod info."""
     invites = list_incoming_pod_invites(user_id)
+    from_users = get_users_batch([inv['from_user_id'] for inv in invites])
     for inv in invites:
-        from_user = get_user(int(inv['from_user_id']))
+        from_user = from_users.get(str(inv['from_user_id']))
         inv['from_user'] = {
             'name': from_user.get('name', '') if from_user else '',
             'photo': from_user.get('photo') if from_user else None,

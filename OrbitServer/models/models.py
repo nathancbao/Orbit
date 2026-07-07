@@ -119,6 +119,46 @@ def list_all_users(limit=10000):
     return [_entity_to_dict(e) for e in results]
 
 
+def get_users_batch(user_ids):
+    """Fetch multiple users in a single Datastore multi-get.
+
+    Returns {str(id): user_dict}. Populates the per-user TTL cache as a side
+    effect and serves cached users without re-fetching, so repeated enrichment
+    of overlapping id sets stays cheap. Replaces per-item get_user() loops
+    (the N+1 pattern) in list endpoints.
+    """
+    if not user_ids:
+        return {}
+
+    result = {}
+    missing = []
+    seen = set()
+    for uid in user_ids:
+        try:
+            iid = int(uid)
+        except (TypeError, ValueError):
+            continue
+        if iid in seen:
+            continue
+        seen.add(iid)
+        cached = user_cache.get(iid)
+        if cached is not None:
+            result[str(iid)] = cached
+        else:
+            missing.append(iid)
+
+    if missing:
+        keys = [client.key('User', iid) for iid in missing]
+        for entity in client.get_multi(keys):
+            if entity is None:
+                continue
+            d = _entity_to_dict(entity)
+            result[d['id']] = d
+            user_cache.set(int(entity.key.id_or_name), d)
+
+    return result
+
+
 def search_users(query_str, exclude_user_id=None, limit=20):
     """Search users by name or email (case-insensitive partial match).
 
@@ -451,6 +491,19 @@ def transactional_message_update(message_id, update_fn):
 def delete_chat_message(message_id):
     key = client.key('ChatMessage', str(message_id))
     client.delete(key)
+
+
+def get_last_chat_message(pod_id):
+    """Return the most recent message in a conversation, or None.
+
+    A descending-order, limit-1 query so conversation-list views don't have to
+    load the full message history just to show the last line.
+    """
+    query = client.query(kind='ChatMessage')
+    query.add_filter(filter=PropertyFilter('pod_id', '=', str(pod_id)))
+    query.order = ['-created_at']
+    results = list(query.fetch(limit=1))
+    return _entity_to_dict(results[0]) if results else None
 
 
 def list_chat_messages(pod_id, limit=100, since=None):
