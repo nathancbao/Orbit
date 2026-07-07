@@ -49,12 +49,26 @@ def _is_profile_complete(profile):
     )
 
 
-def get_user_profile(user_id):
+# Fields that are private to the account owner and must not be exposed on
+# other users' public profiles.
+PRIVATE_PROFILE_FIELDS = {'email'}
+
+
+def get_user_profile(user_id, include_private=True):
+    """Return a user's profile.
+
+    include_private=False strips owner-only fields (e.g. email) so the shape is
+    safe to return for *other* users. Callers serving `/me` pass True; the
+    public `/users/<id>` endpoint passes False.
+    """
     user_data = get_user(user_id)
     if not user_data:
         return None, "User not found"
 
     profile = _format_profile(user_data)
+    if not include_private:
+        for field in PRIVATE_PROFILE_FIELDS:
+            profile.pop(field, None)
     return {
         'profile': profile,
         'profile_complete': _is_profile_complete(profile),
@@ -78,9 +92,10 @@ def upload_photo(user_id, file):
     try:
         url = upload_file(file, folder='profile_photos')
     except ValueError as e:
-        return None, str(e)
-    except RuntimeError as e:
-        return None, str(e)
+        return None, str(e)  # validation message (bad type/size) — safe to show
+    except RuntimeError:
+        logger.exception("Photo upload to storage failed for user %s", user_id)
+        return None, "Failed to upload photo"
 
     user_data = update_user(user_id, {'photo': url})
     profile = _format_profile(user_data)
@@ -102,9 +117,10 @@ def upload_gallery_photo(user_id, file):
     try:
         url = upload_file(file, folder='gallery_photos')
     except ValueError as e:
-        return None, str(e)
-    except RuntimeError as e:
-        return None, str(e)
+        return None, str(e)  # validation message (bad type/size) — safe to show
+    except RuntimeError:
+        logger.exception("Gallery upload to storage failed for user %s", user_id)
+        return None, "Failed to upload photo"
 
     gallery.append(url)
     user_data = update_user(user_id, {'gallery_photos': gallery})
