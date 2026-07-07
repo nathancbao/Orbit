@@ -3,7 +3,7 @@ import logging
 
 from OrbitServer.models.models import (
     get_mission, get_pod, update_pod, create_pod,
-    find_open_pod_for_mission, get_user_pod_for_mission,
+    get_user_pod_for_mission,
     list_pods, get_user, record_action,
     adjust_trust_score, transactional_pod_update, delete_pod,
     create_notification, get_signal,

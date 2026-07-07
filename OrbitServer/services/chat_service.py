@@ -4,7 +4,7 @@ from OrbitServer.models.models import (
     get_pod, create_chat_message, list_chat_messages,
     get_chat_message, transactional_message_update, delete_chat_message,
     REACTION_TYPES,
-    create_vote, get_vote, update_vote, list_votes_for_pod,
+    create_vote, get_vote, list_votes_for_pod,
     update_pod, transactional_vote_update,
     dm_conversation_id, list_dm_conversations, get_user,
     get_user_pods,

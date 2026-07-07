@@ -1,6 +1,5 @@
 from OrbitServer.models.models import (
-    get_pod, get_user, update_pod,
-    create_pod_invite, get_pod_invite, update_pod_invite_status,
+    get_pod, get_user, create_pod_invite, get_pod_invite, update_pod_invite_status,
     list_incoming_pod_invites, find_pending_pod_invite,
     find_friendship, transactional_pod_update, record_action,
 )

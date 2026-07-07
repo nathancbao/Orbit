@@ -174,7 +174,6 @@ def _resolve_pod_ids(signals, user_id):
     scheduled_time when the meeting has been confirmed.
     Otherwise, removes pod-related fields from the response.
     """
-    uid = int(user_id)
     for s in signals:
         user_pod = _user_pod_id(s, user_id)
         # Clean internal pod_ids from response; expose only pod_id

@@ -217,10 +217,10 @@ def get_lightfm_scores(user_id: int, mission_ids: list) -> dict:
         if not known:
             return result
 
-        known_mids, internal_iids = zip(*known)
+        known_mids, internal_iids = zip(*known, strict=True)
         raw_scores = model.predict(internal_uid, np.array(internal_iids))
 
-        for mid, raw in zip(known_mids, raw_scores):
+        for mid, raw in zip(known_mids, raw_scores, strict=True):
             result[mid] = _sigmoid(raw)
 
         return result

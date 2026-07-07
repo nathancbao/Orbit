@@ -1,7 +1,6 @@
 """Tests for services/embedding_service.py"""
 
 import numpy as np
-import pytest
 from unittest.mock import patch, MagicMock
 
 

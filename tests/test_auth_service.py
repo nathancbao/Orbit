@@ -1,7 +1,7 @@
 """Tests for services/auth_service.py — verify_code and refresh logic."""
 
 import datetime
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 from OrbitServer.utils.auth import create_access_token, create_refresh_token
 
 

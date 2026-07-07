@@ -1,6 +1,6 @@
 """Voyage Mode endpoints — deterministic tile-based infinite exploration."""
 
-from flask import Blueprint, request, g
+from flask import Blueprint, request
 
 from OrbitServer.utils.responses import success, error
 from OrbitServer.utils.auth import require_auth
@@ -67,7 +67,6 @@ def get_clusters():
     # Fetch the global content pool (cached at app level for 60s)
     missions = list_missions(filters={'status': 'open'})
     # For signals, fetch a flat list (no pagination needed for pool)
-    from google.cloud.datastore.query import PropertyFilter
     sig_query = client.query(kind='Signal')
     sig_results = list(sig_query.fetch(limit=200))
     signals = [_entity_to_dict(e) for e in sig_results]

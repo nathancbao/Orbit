@@ -1,7 +1,7 @@
 """Tests for api/auth.py endpoints using Flask test client with mocked Datastore."""
 
 import json
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 
 
 class TestSendCode:

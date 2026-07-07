@@ -48,7 +48,7 @@ def upload_file(file, folder='photos'):
         blob = bucket.blob(blob_name)
         blob.upload_from_string(file_data, content_type=file.content_type)
     except Exception as e:
-        raise RuntimeError(f"Failed to upload file to storage: {e}")
+        raise RuntimeError(f"Failed to upload file to storage: {e}") from e
 
     # Try to make the blob public (works with fine-grained ACL buckets).
     # If the bucket uses uniform bucket-level access (GCS default for new

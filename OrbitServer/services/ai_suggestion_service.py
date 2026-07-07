@@ -20,7 +20,6 @@ import logging
 import math
 import random
 
-import numpy as np
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity as sk_cosine
 
@@ -29,7 +28,7 @@ from OrbitServer.models.models import (
     get_user, get_user_history,
 )
 from OrbitServer.services.embedding_service import (
-    get_or_create_mission_embedding, get_user_embedding, cosine_similarity,
+    get_user_embedding, cosine_similarity,
     preload_embeddings,
 )
 from OrbitServer.services.lightfm_service import get_lightfm_scores

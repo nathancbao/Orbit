@@ -95,7 +95,7 @@ def send_verification_code(email):
             print(f"[FALLBACK] Verification code for {email}: {code}")
     else:
         print(f"[DEMO MODE] Verification code for {email}: {code}")
-        print(f"[DEMO MODE] Use code '123456' to bypass verification")
+        print("[DEMO MODE] Use code '123456' to bypass verification")
 
     return True
 

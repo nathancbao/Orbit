@@ -105,7 +105,7 @@ def validate_profile_data(data):
 
     if 'mbti' in data:
         if data['mbti'] not in VALID_MBTI:
-            errors.append(f"mbti must be one of the 16 MBTI types")
+            errors.append("mbti must be one of the 16 MBTI types")
 
     if errors:
         return False, errors

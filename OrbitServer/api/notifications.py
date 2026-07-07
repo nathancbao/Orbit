@@ -8,9 +8,9 @@ decide what notification to display.
 
 import logging
 
-from flask import Blueprint, request, g
+from flask import Blueprint, g
 
-from OrbitServer.utils.responses import success, error
+from OrbitServer.utils.responses import success
 from OrbitServer.utils.auth import require_auth
 from OrbitServer.services.ai_suggestion_service import get_suggested_missions
 from OrbitServer.models.models import list_notifications, mark_notifications_read
