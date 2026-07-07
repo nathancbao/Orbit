@@ -4,5 +4,9 @@ entrypoint: gunicorn -b :$PORT main:app
 env_variables:
   PROJECT_ID: "your-gcp-project-id"
   JWT_SECRET: "generate-a-random-secret-here"
+  # Salt for pseudonymizing analytics user ids (HMAC). Required in production —
+  # the app refuses to start if unset there. Generate a strong random value and
+  # keep it stable (rotating it re-anonymizes the whole event history).
+  ANALYTICS_SALT: "generate-a-random-analytics-salt-here"
   SENDGRID_API_KEY: "your-sendgrid-api-key"
   GCS_BUCKET_NAME: "your-gcs-bucket-name"
