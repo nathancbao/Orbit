@@ -1,7 +1,7 @@
 """Tests for services/auth_service.py — verify_code and refresh logic."""
 
 import datetime
-from unittest.mock import patch
+from unittest.mock import patch, MagicMock
 from OrbitServer.utils.auth import create_access_token, create_refresh_token
 
 
@@ -181,3 +181,55 @@ class TestLogout:
         result = logout('some-token')
         assert result is True
         mock_delete.assert_called_once_with(_hash_token('some-token'))
+
+
+class TestSendEmailRetry:
+    """_send_email retries transient (5xx / network) failures but not 4xx."""
+
+    def _install_fake_sendgrid(self, send_side_effect):
+        """Inject a fake `sendgrid` package so the lazy import inside _send_email
+        resolves regardless of whether the real SDK is installed."""
+        import types
+        client_instance = MagicMock()
+        client_instance.send.side_effect = send_side_effect
+        sg_mod = types.ModuleType('sendgrid')
+        sg_mod.SendGridAPIClient = MagicMock(return_value=client_instance)
+        helpers_mod = types.ModuleType('sendgrid.helpers')
+        mail_mod = types.ModuleType('sendgrid.helpers.mail')
+        mail_mod.Mail = MagicMock()
+        return {
+            'sendgrid': sg_mod,
+            'sendgrid.helpers': helpers_mod,
+            'sendgrid.helpers.mail': mail_mod,
+        }, client_instance
+
+    def _resp(self, status):
+        r = MagicMock()
+        r.status_code = status
+        return r
+
+    def test_retries_5xx_then_succeeds(self, monkeypatch):
+        import sys
+        from OrbitServer.services import auth_service
+        monkeypatch.setattr(auth_service.time, 'sleep', lambda *_: None)
+        modules, client = self._install_fake_sendgrid(
+            [self._resp(503), self._resp(202)]  # transient, then success
+        )
+        for name, mod in modules.items():
+            monkeypatch.setitem(sys.modules, name, mod)
+
+        auth_service._send_email('a@b.edu', 'subj', '<p>hi</p>')
+        assert client.send.call_count == 2  # retried once
+
+    def test_does_not_retry_4xx(self, monkeypatch):
+        import sys
+        import pytest
+        from OrbitServer.services import auth_service
+        monkeypatch.setattr(auth_service.time, 'sleep', lambda *_: None)
+        modules, client = self._install_fake_sendgrid([self._resp(400)])
+        for name, mod in modules.items():
+            monkeypatch.setitem(sys.modules, name, mod)
+
+        with pytest.raises(RuntimeError):
+            auth_service._send_email('a@b.edu', 'subj', '<p>hi</p>')
+        assert client.send.call_count == 1  # permanent error, no retry

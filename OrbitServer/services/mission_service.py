@@ -207,7 +207,7 @@ def edit_mission(mission_id, data, user_id):
             try:
                 get_or_create_mission_embedding(mission_id)
             except Exception:
-                pass
+                logger.exception("Async embedding regeneration failed for mission %s", mission_id)
         threading.Thread(target=_regenerate, daemon=True).start()
 
     return updated, None, None

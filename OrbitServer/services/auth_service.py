@@ -2,6 +2,7 @@ import hashlib
 import logging
 import os
 import random
+import time
 import datetime
 
 from OrbitServer.models.models import (
@@ -17,6 +18,12 @@ logger = logging.getLogger(__name__)
 SENDGRID_API_KEY = os.environ.get('SENDGRID_API_KEY', '')
 FROM_EMAIL = os.environ.get('FROM_EMAIL', 'theorbitapp.noreply@gmail.com')
 
+# Bounded retry for transient SendGrid failures (network blips, 5xx). Kept small
+# so a real outage still fails fast into the log fallback rather than hanging the
+# request. 4xx responses (bad key, invalid recipient) are not retried.
+_EMAIL_MAX_ATTEMPTS = 3
+_EMAIL_RETRY_BACKOFF_SECONDS = 0.5
+
 
 def _hash_token(token):
     """SHA-256 hash a token for safe storage in Datastore."""
@@ -24,7 +31,12 @@ def _hash_token(token):
 
 
 def _send_email(to_email, subject, html_content):
-    """Send an email via SendGrid. Raises on failure."""
+    """Send an email via SendGrid, retrying transient failures. Raises on failure.
+
+    A 4xx response is a permanent error (bad credentials / recipient) and is not
+    retried; a 5xx or a network exception is transient and retried up to
+    _EMAIL_MAX_ATTEMPTS with a short linear backoff.
+    """
     from sendgrid import SendGridAPIClient
     from sendgrid.helpers.mail import Mail
 
@@ -34,10 +46,28 @@ def _send_email(to_email, subject, html_content):
         subject=subject,
         html_content=html_content,
     )
-    sg = SendGridAPIClient(SENDGRID_API_KEY)
-    response = sg.send(message)
-    if response.status_code >= 400:
-        raise RuntimeError(f"SendGrid returned status {response.status_code}")
+
+    last_error = None
+    for attempt in range(1, _EMAIL_MAX_ATTEMPTS + 1):
+        try:
+            sg = SendGridAPIClient(SENDGRID_API_KEY)
+            response = sg.send(message)
+            if response.status_code < 400:
+                return
+            if response.status_code < 500:
+                # Permanent client error — retrying won't help.
+                raise RuntimeError(f"SendGrid returned status {response.status_code}")
+            last_error = RuntimeError(f"SendGrid returned status {response.status_code}")
+        except RuntimeError:
+            raise
+        except Exception as e:  # network/timeout/transient SDK error
+            last_error = e
+
+        if attempt < _EMAIL_MAX_ATTEMPTS:
+            logger.warning("SendGrid attempt %d/%d failed, retrying", attempt, _EMAIL_MAX_ATTEMPTS)
+            time.sleep(_EMAIL_RETRY_BACKOFF_SECONDS * attempt)
+
+    raise last_error if last_error else RuntimeError("SendGrid send failed")
 
 
 def _get_or_create_user(email):
