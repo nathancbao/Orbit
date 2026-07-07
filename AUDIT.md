@@ -182,15 +182,17 @@ generate and the failure is swallowed (`except Exception: pass`).
 **Fix:** move embedding generation to a proper task queue (Cloud Tasks) or
 generate lazily on first read with a cached result; at minimum log failures.
 
-### M5 — iOS polling is aggressive
-`ScheduleViewModel` polls every **1s**, `EventDiscoverViewModel` **2.5s**,
-`DMChatViewModel` **5s**, `VoyageViewModel` **10s**, `DiscoveryViewModel` **30s**.
-The 1–2.5s loops hammer the battery and the backend (each poll is an authed
-Datastore read).
-**Fix (batch D/F):** back off to a sane cadence, pause polling when the view is
-backgrounded, and lean on the existing incremental `since` cursor
-(`list_chat_messages` already supports it) so polls fetch only deltas. The chat
-cache added in commit `f334316` is the pattern to extend.
+### M5 — iOS polling (mostly a false alarm — corrected 2026-07-06)
+On closer inspection the flagged sub-second timers are **not** backend polling:
+`ScheduleViewModel`'s 1s loops update a visible **countdown** display,
+`EventDiscoverViewModel`'s 2.5s is a **toast auto-dismiss**, `PodViewModel`'s
+1.5s is a **retry-once-after-join** backoff, and `FriendsViewModel`'s 400ms is a
+**search debounce**. The only genuine backend poll loops are `DMChatViewModel`
+(5s, already incremental via the `since` cursor from commit `f334316`),
+`VoyageViewModel` (10s presence heartbeat), and `DiscoveryViewModel` (30s) — all
+reasonable cadences.
+**Resolution:** no change needed; the original finding conflated UI timers with
+polling. Left here for the record.
 
 ### M6 — Errors swallowed into `print()` on iOS; no user-facing error state
 Multiple ViewModels (`FriendsViewModel:48-51`, `DMChatViewModel:28,45`,
