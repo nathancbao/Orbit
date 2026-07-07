@@ -404,7 +404,7 @@ struct QuickProfileSetupView: View {
                                     .tint(.white)
                             } else {
                                 Text(initialProfile != nil ? "Save Changes" : "Let's Go →")
-                                    .font(.system(size: 16, weight: .semibold))
+                                    .orbitFont(16, weight: .semibold)
                                     .tracking(1)
                             }
                         }
@@ -429,7 +429,7 @@ struct QuickProfileSetupView: View {
                                 Image(systemName: "trash")
                                 Text(isDeleting ? "Deleting..." : "Delete Account")
                             }
-                            .font(.system(size: 14, weight: .medium))
+                            .orbitFont(14, weight: .medium)
                             .foregroundColor(.red)
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, 14)

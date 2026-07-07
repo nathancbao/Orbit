@@ -29,7 +29,7 @@ struct PodInviteSheet: View {
                     VStack(spacing: 12) {
                         Spacer()
                         Image(systemName: "person.crop.circle.badge.questionmark")
-                            .font(.system(size: 36))
+                            .orbitFont(36)
                             .foregroundColor(.secondary)
                         Text("No friends to invite")
                             .font(.headline)

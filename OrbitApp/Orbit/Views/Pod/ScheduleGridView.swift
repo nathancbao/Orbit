@@ -45,7 +45,7 @@ struct ScheduleGridView: View {
                             .foregroundColor(.primary)
                         if entry.hasSubmitted {
                             Image(systemName: "checkmark.circle.fill")
-                                .font(.system(size: 10))
+                                .orbitFont(10)
                                 .foregroundColor(.green)
                         }
                     }
@@ -96,9 +96,9 @@ struct ScheduleGridView: View {
             ForEach(viewModel.grid.dates, id: \.self) { date in
                 VStack(spacing: 2) {
                     Text(dayLabel(for: date))
-                        .font(.system(size: 11, weight: .semibold))
+                        .orbitFont(11, weight: .semibold)
                     Text(dateLabel(for: date))
-                        .font(.system(size: 10))
+                        .orbitFont(10)
                         .foregroundColor(.secondary)
                 }
                 .frame(maxWidth: .infinity)
@@ -113,7 +113,7 @@ struct ScheduleGridView: View {
         HStack(spacing: cellSpacing) {
             // Hour label
             Text(hourLabel(hour))
-                .font(.system(size: 11, weight: .medium))
+                .orbitFont(11, weight: .medium)
                 .foregroundColor(.secondary)
                 .frame(width: hourLabelWidth, alignment: .trailing)
                 .padding(.trailing, 4)
@@ -164,7 +164,7 @@ struct ScheduleGridView: View {
             // Overlap checkmark
             if isOverlap && count >= 2 {
                 Image(systemName: "checkmark")
-                    .font(.system(size: 9, weight: .bold))
+                    .orbitFont(9, weight: .bold)
                     .foregroundColor(.white)
             }
 
@@ -404,9 +404,9 @@ struct CreatorAvailabilityGridView: View {
             ForEach(dates, id: \.self) { date in
                 VStack(spacing: 2) {
                     Text(dayLabel(for: date))
-                        .font(.system(size: 11, weight: .semibold))
+                        .orbitFont(11, weight: .semibold)
                     Text(dateLabel(for: date))
-                        .font(.system(size: 10))
+                        .orbitFont(10)
                         .foregroundColor(.secondary)
                 }
                 .frame(maxWidth: .infinity)
@@ -420,7 +420,7 @@ struct CreatorAvailabilityGridView: View {
     private func hourRow(hour: Int) -> some View {
         HStack(spacing: cellSpacing) {
             Text(hourLabel(hour))
-                .font(.system(size: 11, weight: .medium))
+                .orbitFont(11, weight: .medium)
                 .foregroundColor(.secondary)
                 .frame(width: hourLabelWidth, alignment: .trailing)
                 .padding(.trailing, 4)
@@ -635,9 +635,9 @@ struct AvailabilityPickerSheet: View {
                 ForEach(visibleDates, id: \.self) { date in
                     VStack(spacing: 2) {
                         Text(dayLabel(for: date))
-                            .font(.system(size: 12, weight: .semibold))
+                            .orbitFont(12, weight: .semibold)
                         Text(dateLabel(for: date))
-                            .font(.system(size: 10))
+                            .orbitFont(10)
                             .foregroundColor(.secondary)
                     }
                     .frame(width: colW, height: headerH)
@@ -648,7 +648,7 @@ struct AvailabilityPickerSheet: View {
             ForEach(Array(hours.enumerated()), id: \.element) { _, hour in
                 HStack(spacing: 0) {
                     Text(hourLabel(hour))
-                        .font(.system(size: 11, weight: .medium))
+                        .orbitFont(11, weight: .medium)
                         .foregroundColor(.secondary)
                         .frame(width: hourLabelW, height: rowH, alignment: .trailing)
                         .padding(.trailing, 4)
@@ -713,7 +713,7 @@ struct AvailabilityPickerSheet: View {
         if pageCount > 1 {
             Button(action: action) {
                 Image(systemName: systemName)
-                    .font(.system(size: 16, weight: .bold))
+                    .orbitFont(16, weight: .bold)
                     .foregroundColor(disabled ? Color(.systemGray4) : .primary)
                     .frame(width: 28, height: 44)
             }

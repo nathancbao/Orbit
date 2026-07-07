@@ -94,7 +94,7 @@ struct MainTabView: View {
 
                                 if tab == .friends && unreadDMCount > 0 {
                                     Text(unreadDMCount > 9 ? "9+" : "\(unreadDMCount)")
-                                        .font(.system(size: 9, weight: .bold))
+                                        .orbitFont(9, weight: .bold)
                                         .foregroundColor(.white)
                                         .padding(.horizontal, 4)
                                         .padding(.vertical, 2)
@@ -105,7 +105,7 @@ struct MainTabView: View {
 
                                 if tab == .pods && unreadPodCount > 0 {
                                     Text(unreadPodCount > 9 ? "9+" : "\(unreadPodCount)")
-                                        .font(.system(size: 9, weight: .bold))
+                                        .orbitFont(9, weight: .bold)
                                         .foregroundColor(.white)
                                         .padding(.horizontal, 4)
                                         .padding(.vertical, 2)

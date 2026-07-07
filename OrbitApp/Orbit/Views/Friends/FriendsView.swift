@@ -24,7 +24,7 @@ struct FriendsView: View {
                     // Empty state
                     VStack(spacing: 16) {
                         Image(systemName: "person.2")
-                            .font(.system(size: 48))
+                            .orbitFont(48)
                             .foregroundStyle(OrbitTheme.gradient)
                         Text("No Friends Yet")
                             .font(.headline)
@@ -105,7 +105,7 @@ struct FriendsView: View {
                                     .frame(width: 22, height: 22)
                                 if viewModel.inboxCount > 0 {
                                     Text("\(viewModel.inboxCount)")
-                                        .font(.system(size: 10, weight: .bold))
+                                        .orbitFont(10, weight: .bold)
                                         .foregroundColor(.white)
                                         .padding(3)
                                         .background(Color.red)
@@ -114,6 +114,8 @@ struct FriendsView: View {
                                 }
                             }
                         }
+                        .accessibilityLabel(viewModel.inboxCount > 0
+                            ? "Inbox, \(viewModel.inboxCount) pending" : "Inbox")
                         Button { showSearch = true } label: {
                             Image(systemName: "person.badge.plus")
                                 .resizable()
@@ -122,12 +124,14 @@ struct FriendsView: View {
                                 .foregroundStyle(Color.primary)
                                 .frame(width: 22, height: 22)
                         }
+                        .accessibilityLabel("Add friend")
                     }
                 }
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button { showProfile = true } label: {
                         ProfileAvatarView(photo: userProfile.photo, size: 34, name: userProfile.name)
                     }
+                    .accessibilityLabel("Profile")
                 }
             }
         }

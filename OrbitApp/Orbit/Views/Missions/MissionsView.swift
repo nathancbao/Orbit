@@ -46,7 +46,7 @@ struct MissionsView: View {
                             showFilterSheet = true
                         } label: {
                             Image(systemName: "slider.horizontal.3")
-                                .font(.system(size: 18, weight: .semibold))
+                                .orbitFont(18, weight: .semibold)
                                 .foregroundColor(viewModel.hasActiveFilter ? .white : .primary)
                                 .frame(width: 42, height: 42)
                                 .background(
@@ -108,9 +108,9 @@ struct MissionsView: View {
                 } label: {
                     HStack(spacing: 8) {
                         Image(systemName: "plus")
-                            .font(.system(size: 18, weight: .bold))
+                            .orbitFont(18, weight: .bold)
                         Text("Create")
-                            .font(.system(size: 16, weight: .semibold))
+                            .orbitFont(16, weight: .semibold)
                     }
                     .foregroundColor(.white)
                     .padding(.horizontal, 22)
@@ -180,7 +180,7 @@ struct MissionsView: View {
                     .transition(.move(edge: .bottom).combined(with: .opacity))
             }
         }
-        .animation(.spring(duration: 0.3), value: viewModel.showToast)
+        .orbitAnimation(.spring(duration: 0.3), value: viewModel.showToast)
         .task {
             await viewModel.load(userYear: userProfile.collegeYear)
         }
@@ -284,13 +284,13 @@ struct MissionListCard: View {
                 VStack(alignment: .leading, spacing: 7) {
                     // Mode eyebrow — uppercase, tracked, gradient accent
                     Text(eyebrow)
-                        .font(.system(size: 10, weight: .heavy, design: .rounded))
+                        .orbitFont(10, weight: .heavy, design: .rounded)
                         .tracking(1.4)
                         .foregroundStyle(OrbitTheme.gradient)
 
                     // Title — rounded display weight for a bolder, less "default" feel
                     Text(mission.displayTitle)
-                        .font(.system(size: 19, weight: .bold, design: .rounded))
+                        .orbitFont(19, weight: .bold, design: .rounded)
                         .foregroundColor(.white)
                         .lineLimit(2)
                         .fixedSize(horizontal: false, vertical: true)
@@ -314,7 +314,7 @@ struct MissionListCard: View {
                                     let matches = lowerInterests.contains(tag.lowercased())
                                     let color = OrbitTheme.color(forTag: tag, matchesUser: matches)
                                     Text(tag.lowercased())
-                                        .font(.system(size: 11, weight: matches ? .bold : .medium, design: .rounded))
+                                        .orbitFont(11, weight: matches ? .bold : .medium, design: .rounded)
                                         .padding(.horizontal, 9)
                                         .padding(.vertical, 4)
                                         .background((matches ? color : Color.white).opacity(matches ? 0.22 : 0.1))
@@ -378,7 +378,7 @@ struct MissionListCard: View {
                 .stroke(Color.white.opacity(0.12), lineWidth: 1)
                 .frame(width: 50, height: 50)
             Image(systemName: mission.logo ?? "sparkles")
-                .font(.system(size: 21, weight: .semibold))
+                .orbitFont(21, weight: .semibold)
                 .foregroundColor(.white)
         }
     }
@@ -595,8 +595,8 @@ struct OrbitRingsBackground: View {
                 .position(x: geo.size.width * 0.80, y: geo.size.height * 0.20)
                 .rotationEffect(.degrees(spin ? 360 : 0))
                 .offset(x: drift ? 20 : -20, y: drift ? 16 : -16)
-                .animation(.linear(duration: 130).repeatForever(autoreverses: false), value: spin)
-                .animation(.easeInOut(duration: 28).repeatForever(autoreverses: true), value: drift)
+                .orbitAnimation(.linear(duration: 130).repeatForever(autoreverses: false), value: spin)
+                .orbitAnimation(.easeInOut(duration: 28).repeatForever(autoreverses: true), value: drift)
         }
         .allowsHitTesting(false)
         .ignoresSafeArea()
@@ -820,7 +820,7 @@ struct EmptyMissionsView: View {
     var body: some View {
         VStack(spacing: 16) {
             Image(systemName: "paperplane")
-                .font(.system(size: 48))
+                .orbitFont(48)
                 .foregroundStyle(OrbitTheme.gradient)
             Text("no missions yet")
                 .font(.headline)
@@ -1114,7 +1114,7 @@ struct MissionCreateView: View {
 
             Button(action: onRemove) {
                 Image(systemName: "xmark.circle.fill")
-                    .font(.system(size: 18))
+                    .orbitFont(18)
                     .foregroundStyle(.white, .black.opacity(0.5))
             }
             .offset(x: 6, y: -6)
@@ -1136,11 +1136,11 @@ struct MissionCreateView: View {
                             .frame(width: 52, height: 52)
                         if let logo = selectedLogo {
                             Image(systemName: logo)
-                                .font(.system(size: 22, weight: .medium))
+                                .orbitFont(22, weight: .medium)
                                 .foregroundStyle(OrbitTheme.gradient)
                         } else {
                             Image(systemName: "face.smiling")
-                                .font(.system(size: 22))
+                                .orbitFont(22)
                                 .foregroundColor(.secondary)
                         }
                     }
@@ -1415,7 +1415,7 @@ struct MissionCreateView: View {
             } label: {
                 HStack(spacing: 12) {
                     Image(systemName: "person.3.sequence.fill")
-                        .font(.system(size: 18))
+                        .orbitFont(18)
                         .foregroundColor(mode == .flex ? .white : OrbitTheme.purple)
                     VStack(alignment: .leading, spacing: 2) {
                         Text("Schedule as a group")
@@ -1535,7 +1535,7 @@ struct MissionCreateView: View {
             } label: {
                 HStack(spacing: 12) {
                     Image(systemName: "calendar.badge.clock")
-                        .font(.system(size: 18))
+                        .orbitFont(18)
                         .foregroundStyle(OrbitTheme.gradient)
                     VStack(alignment: .leading, spacing: 2) {
                         Text(creatorSlots.isEmpty ? "Input your availability" : "Edit your availability")
@@ -2029,9 +2029,9 @@ struct MissionCreateView: View {
                     ForEach(sortedDays, id: \.self) { offset in
                         VStack(spacing: 2) {
                             Text(dayLabel(for: offset))
-                                .font(.system(size: 12, weight: .semibold))
+                                .orbitFont(12, weight: .semibold)
                             Text(dateLabel(for: offset))
-                                .font(.system(size: 10))
+                                .orbitFont(10)
                                 .foregroundColor(.secondary)
                         }
                         .frame(maxWidth: .infinity)
@@ -2043,7 +2043,7 @@ struct MissionCreateView: View {
                 ForEach(visibleHours, id: \.self) { hour in
                     HStack(spacing: 0) {
                         Text(hourString(hour))
-                            .font(.system(size: 11, weight: .medium))
+                            .orbitFont(11, weight: .medium)
                             .foregroundColor(.secondary)
                             .frame(width: 56, alignment: .trailing)
                             .padding(.trailing, 6)
@@ -2395,14 +2395,14 @@ struct ProfileAvatarView: View {
     private var placeholder: some View {
         if let first = name?.first {
             Text(String(first).uppercased())
-                .font(.system(size: size * 0.4, weight: .semibold))
+                .orbitFont(size * 0.4, weight: .semibold)
                 .foregroundColor(.white)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .background(OrbitTheme.gradientFill)
         } else {
             Image(systemName: "person.fill")
                 .foregroundColor(.secondary)
-                .font(.system(size: size * 0.5))
+                .orbitFont(size * 0.5)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .background(Color(.systemGray5))
         }
@@ -2482,13 +2482,13 @@ private struct LogoCell: View {
                     )
                 if let symbol {
                     Image(systemName: symbol)
-                        .font(.system(size: 24, weight: .medium))
+                        .orbitFont(24, weight: .medium)
                         .foregroundStyle(isSelected
                                          ? AnyShapeStyle(OrbitTheme.gradient)
                                          : AnyShapeStyle(Color.primary))
                 } else {
                     Image(systemName: "nosign")
-                        .font(.system(size: 22))
+                        .orbitFont(22)
                         .foregroundColor(.secondary)
                 }
             }

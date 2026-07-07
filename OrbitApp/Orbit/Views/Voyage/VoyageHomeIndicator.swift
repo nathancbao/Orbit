@@ -22,11 +22,11 @@ struct VoyageHomeIndicator: View {
 
             VStack(spacing: 2) {
                 Image(systemName: "house.fill")
-                    .font(.system(size: 14, weight: .semibold))
+                    .orbitFont(14, weight: .semibold)
                     .foregroundColor(.white)
 
                 Image(systemName: "arrowtriangle.down.fill")
-                    .font(.system(size: 10))
+                    .orbitFont(10)
                     .foregroundColor(.white.opacity(0.7))
                     .rotationEffect(.radians(Double(angle) + .pi / 2))
             }
@@ -48,7 +48,7 @@ struct VoyageHomeIndicator: View {
             .scaleEffect(pulse ? 1.1 : 1.0)
             .opacity(0.9)
             .position(position)
-            .animation(.easeInOut(duration: 1.5).repeatForever(autoreverses: true), value: pulse)
+            .orbitAnimation(.easeInOut(duration: 1.5).repeatForever(autoreverses: true), value: pulse)
             .onAppear { pulse = true }
         }
         .allowsHitTesting(false)

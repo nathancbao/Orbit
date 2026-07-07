@@ -46,7 +46,7 @@ struct FriendSearchView: View {
                     VStack(spacing: 12) {
                         Spacer()
                         Image(systemName: "person.crop.circle.badge.magnifyingglass")
-                            .font(.system(size: 48))
+                            .orbitFont(48)
                             .foregroundColor(.secondary)
                         Text("Type an email or name to find people")
                             .font(.subheadline)
@@ -57,7 +57,7 @@ struct FriendSearchView: View {
                     VStack(spacing: 12) {
                         Spacer()
                         Image(systemName: "person.slash")
-                            .font(.system(size: 40))
+                            .orbitFont(40)
                             .foregroundColor(.secondary)
                         Text("No users found")
                             .font(.subheadline)
@@ -170,7 +170,7 @@ struct SearchResultCard: View {
                     onSendRequest()
                 } label: {
                     Image(systemName: "person.badge.plus")
-                        .font(.system(size: 16))
+                        .orbitFont(16)
                         .fontWeight(.semibold)
                         .foregroundColor(.white)
                         .padding(8)

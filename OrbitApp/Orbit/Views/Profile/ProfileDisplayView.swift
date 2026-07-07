@@ -337,7 +337,7 @@ struct ProfileDisplayView: View {
         ZStack {
             OrbitTheme.gradientFill
             Text(String(profile.name.prefix(1)).uppercased())
-                .font(.system(size: 56, weight: .bold))
+                .orbitFont(56, weight: .bold)
                 .foregroundColor(.white)
         }
     }
