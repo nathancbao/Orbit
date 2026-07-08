@@ -33,6 +33,7 @@ def send_code():
 
 
 @auth_bp.route('/verify-code', methods=['POST'])
+@limiter.limit("10 per minute")
 def verify():
     data = request.get_json(silent=True) or {}
     email = data.get('email', '')
@@ -49,6 +50,7 @@ def verify():
 
 
 @auth_bp.route('/refresh', methods=['POST'])
+@limiter.limit("20 per minute")
 def refresh():
     data = request.get_json(silent=True) or {}
     refresh_token = data.get('refresh_token', '')

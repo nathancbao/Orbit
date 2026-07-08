@@ -60,6 +60,12 @@ class AuthService {
 
         if let newAccessToken = response["access_token"] {
             KeychainHelper.shared.save(newAccessToken, forKey: Constants.Keychain.accessToken)
+            // The server rotates refresh tokens: when a new one is returned, the
+            // old one is invalidated, so we must persist the replacement. Older
+            // backends omit this field, in which case we keep the existing token.
+            if let newRefreshToken = response["refresh_token"] {
+                KeychainHelper.shared.save(newRefreshToken, forKey: Constants.Keychain.refreshToken)
+            }
             return newAccessToken
         }
         throw NetworkError.noData

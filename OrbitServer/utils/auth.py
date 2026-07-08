@@ -1,6 +1,7 @@
 import os
 import datetime
 import logging
+import uuid
 from functools import wraps
 
 import jwt
@@ -10,7 +11,28 @@ from OrbitServer.utils.responses import error
 
 logger = logging.getLogger(__name__)
 
-JWT_SECRET = os.environ.get('JWT_SECRET', 'dev-secret-change-me')
+_DEV_SECRET_FALLBACK = 'dev-secret-change-me'
+
+
+def _load_jwt_secret():
+    """Resolve the JWT signing secret.
+
+    In production (running on App Engine, where GAE_ENV is set) a real secret is
+    mandatory: refuse to start rather than silently sign tokens with a
+    publicly-known value, which would let anyone forge tokens for any user. In
+    local dev the fallback is allowed for convenience.
+    """
+    secret = os.environ.get('JWT_SECRET')
+    in_production = bool(os.environ.get('GAE_ENV'))
+    if in_production and (not secret or secret == _DEV_SECRET_FALLBACK):
+        raise RuntimeError(
+            "JWT_SECRET is missing or set to the insecure dev default in a "
+            "production environment. Set a strong JWT_SECRET before deploying."
+        )
+    return secret or _DEV_SECRET_FALLBACK
+
+
+JWT_SECRET = _load_jwt_secret()
 ACCESS_TOKEN_EXPIRY = datetime.timedelta(minutes=15)
 REFRESH_TOKEN_EXPIRY = datetime.timedelta(days=7)
 
@@ -19,6 +41,7 @@ def create_access_token(user_id):
     payload = {
         'user_id': user_id,
         'type': 'access',
+        'jti': uuid.uuid4().hex,
         'exp': datetime.datetime.utcnow() + ACCESS_TOKEN_EXPIRY,
         'iat': datetime.datetime.utcnow(),
     }
@@ -26,9 +49,14 @@ def create_access_token(user_id):
 
 
 def create_refresh_token(user_id):
+    # A unique jti guarantees every refresh token is distinct even when two are
+    # minted in the same second — required by rotation, which stores the new
+    # token's hash and deletes the old one's. Without it, a same-second rotation
+    # would store then delete the same hash and orphan the session.
     payload = {
         'user_id': user_id,
         'type': 'refresh',
+        'jti': uuid.uuid4().hex,
         'exp': datetime.datetime.utcnow() + REFRESH_TOKEN_EXPIRY,
         'iat': datetime.datetime.utcnow(),
     }
