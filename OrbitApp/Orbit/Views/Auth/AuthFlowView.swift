@@ -52,7 +52,7 @@ struct AuthFlowView: View {
 
                 // Title text
                 Text("Type in your student email!")
-                    .font(.system(size: 18, weight: .medium, design: .monospaced))
+                    .orbitFont(18, weight: .medium, design: .monospaced)
                     .foregroundColor(.black)
 
                 // Email text field
@@ -62,7 +62,7 @@ struct AuthFlowView: View {
                     .textInputAutocapitalization(.never)
                     .autocorrectionDisabled()
                     .multilineTextAlignment(.center)
-                    .font(.system(size: 16, design: .monospaced))
+                    .orbitFont(16, design: .monospaced)
                     .padding(.horizontal, 20)
                     .padding(.vertical, 14)
                     .background(
@@ -123,11 +123,11 @@ struct AuthFlowView: View {
 
                 // Title text
                 Text("Check your inbox!")
-                    .font(.system(size: 18, weight: .medium, design: .monospaced))
+                    .orbitFont(18, weight: .medium, design: .monospaced)
                     .foregroundColor(.black)
 
                 Text(viewModel.email)
-                    .font(.system(size: 14, design: .monospaced))
+                    .orbitFont(14, design: .monospaced)
                     .foregroundColor(.gray)
 
                 // Code text field
@@ -135,7 +135,7 @@ struct AuthFlowView: View {
                     .textFieldStyle(.plain)
                     .keyboardType(.numberPad)
                     .multilineTextAlignment(.center)
-                    .font(.system(size: 24, weight: .bold, design: .monospaced))
+                    .orbitFont(24, weight: .bold, design: .monospaced)
                     .padding(.horizontal, 20)
                     .padding(.vertical, 14)
                     .background(
@@ -157,7 +157,7 @@ struct AuthFlowView: View {
                     viewModel.resetToEmailEntry()
                 }) {
                     Text("Change Email")
-                        .font(.system(size: 14, design: .monospaced))
+                        .orbitFont(14, design: .monospaced)
                         .foregroundColor(.gray)
                         .padding(.horizontal, 20)
                         .padding(.vertical, 10)
@@ -330,7 +330,7 @@ struct GradientArrowButton: View {
                         .tint(.white)
                 } else {
                     Image(systemName: "arrow.right")
-                        .font(.system(size: 24, weight: .semibold))
+                        .orbitFont(24, weight: .semibold)
                         .foregroundColor(.white)
                 }
             }

@@ -84,7 +84,7 @@ struct PodView: View {
                         Color(.systemBackground).ignoresSafeArea()
                         VStack(spacing: 12) {
                             Image(systemName: "trash.circle.fill")
-                                .font(.system(size: 44))
+                                .orbitFont(44)
                                 .foregroundColor(.secondary)
                             Text("Pod not found. Deleting.")
                                 .font(.headline)
@@ -97,7 +97,7 @@ struct PodView: View {
                         Color(.systemBackground).ignoresSafeArea()
                         VStack(spacing: 16) {
                             Image(systemName: "person.fill.xmark")
-                                .font(.system(size: 44))
+                                .orbitFont(44)
                                 .foregroundColor(.secondary)
                             Text("You are not a member of this pod.")
                                 .font(.headline)
@@ -487,7 +487,7 @@ struct PodView: View {
         if time != nil || place != nil {
             HStack(spacing: 12) {
                 Image(systemName: "checkmark.seal.fill")
-                    .font(.system(size: 20))
+                    .orbitFont(20)
                     .foregroundStyle(OrbitTheme.gradient)
 
                 VStack(alignment: .leading, spacing: 2) {
@@ -530,7 +530,7 @@ struct PodView: View {
         if let pod = viewModel.pod, pod.isActivityCompleted {
             HStack(spacing: 12) {
                 Image(systemName: "checkmark.circle.fill")
-                    .font(.system(size: 22))
+                    .orbitFont(22)
                     .foregroundColor(Color(hex: "059669"))
 
                 VStack(alignment: .leading, spacing: 2) {
@@ -580,7 +580,7 @@ struct PodView: View {
                     if missionMode == .flex && viewModel.messages.isEmpty && !viewModel.isLoading {
                         VStack(spacing: 8) {
                             Image(systemName: "calendar.badge.clock")
-                                .font(.system(size: 32))
+                                .orbitFont(32)
                                 .foregroundStyle(OrbitTheme.gradient)
                             Text("Scheduling in progress")
                                 .font(.subheadline)

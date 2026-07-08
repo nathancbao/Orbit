@@ -37,7 +37,7 @@ struct FriendRowCard: View {
                 } label: {
                     ZStack(alignment: .topTrailing) {
                         Image(systemName: "bubble.left.fill")
-                            .font(.system(size: 16))
+                            .orbitFont(16)
                             .foregroundStyle(OrbitTheme.gradient)
                             .frame(width: 36, height: 36)
                             .background(Color(.systemGray6))
@@ -57,7 +57,7 @@ struct FriendRowCard: View {
                     showRemoveConfirm = true
                 } label: {
                     Image(systemName: "xmark")
-                        .font(.system(size: 12, weight: .semibold))
+                        .orbitFont(12, weight: .semibold)
                         .foregroundColor(.secondary)
                         .frame(width: 36, height: 36)
                         .background(Color(.systemGray6))

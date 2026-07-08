@@ -79,7 +79,7 @@ struct VoyageView: View {
                 if zoomedTile == nil {
                     VStack {
                         Text("Tap on solar systems to explore more activities!")
-                            .font(.system(size: 15, weight: .semibold, design: .rounded))
+                            .orbitFont(15, weight: .semibold, design: .rounded)
                             .tracking(0.4)
                             .foregroundStyle(OrbitTheme.gradient)
                             .padding(.horizontal, 20)
@@ -345,7 +345,7 @@ struct VoyageView: View {
                 }
             }
         }
-        .animation(.easeOut(duration: 0.3), value: viewModel.loadedTiles.count)
+        .orbitAnimation(.easeOut(duration: 0.3), value: viewModel.loadedTiles.count)
     }
 
     // MARK: - Zoomed Cluster Overlay
@@ -393,9 +393,9 @@ struct VoyageView: View {
                 } label: {
                     HStack(spacing: 8) {
                         Image(systemName: "xmark")
-                            .font(.system(size: 16, weight: .bold))
+                            .orbitFont(16, weight: .bold)
                         Text("Close")
-                            .font(.system(size: 16, weight: .semibold, design: .rounded))
+                            .orbitFont(16, weight: .semibold, design: .rounded)
                     }
                     .foregroundColor(.white)
                     .padding(.horizontal, 28)
@@ -502,9 +502,9 @@ struct VoyageView: View {
             } label: {
                 HStack(spacing: 8) {
                     Image(systemName: "arrow.uturn.backward")
-                        .font(.system(size: 14, weight: .bold))
+                        .orbitFont(14, weight: .bold)
                     Text("End Voyage")
-                        .font(.system(size: 15, weight: .semibold))
+                        .orbitFont(15, weight: .semibold)
                 }
                 .foregroundColor(.white)
                 .padding(.horizontal, 24)
@@ -688,7 +688,7 @@ private struct VoyageRocketLoading: View {
             Spacer()
 
             Text("Launching...")
-                .font(.system(size: 14, weight: .medium))
+                .orbitFont(14, weight: .medium)
                 .foregroundColor(.white.opacity(0.5))
                 .padding(.bottom, 100)
         }

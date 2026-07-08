@@ -144,7 +144,7 @@ struct MissionDetailView: View {
                         .transition(.move(edge: .bottom).combined(with: .opacity))
                 }
             }
-            .animation(.spring(duration: 0.3), value: localToast)
+            .orbitAnimation(.spring(duration: 0.3), value: localToast)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
@@ -338,7 +338,7 @@ struct MissionDetailView: View {
                 if mission.isCompleted {
                     HStack(spacing: 10) {
                         Image(systemName: "checkmark.circle.fill")
-                            .font(.system(size: 20))
+                            .orbitFont(20)
                             .foregroundColor(Color(hex: "059669"))
                         VStack(alignment: .leading, spacing: 2) {
                             Text("Mission completed!")
@@ -465,7 +465,7 @@ struct MissionDetailView: View {
                         ProgressView().tint(.white)
                     } else {
                         Text("Join Pod \u{2192}")
-                            .font(.system(size: 16, weight: .semibold))
+                            .orbitFont(16, weight: .semibold)
                             .tracking(0.5)
                     }
                 }
@@ -484,7 +484,7 @@ struct MissionDetailView: View {
         if showSignedUp {
             Button(action: { openFlexPod() }) {
                 Label("Open Pod", systemImage: "person.3.fill")
-                    .font(.system(size: 16, weight: .semibold))
+                    .orbitFont(16, weight: .semibold)
                     .tracking(0.5)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 16)
@@ -504,7 +504,7 @@ struct MissionDetailView: View {
                         ProgressView().tint(.white)
                     } else {
                         Text("Join Pod \u{2192}")
-                            .font(.system(size: 16, weight: .semibold))
+                            .orbitFont(16, weight: .semibold)
                             .tracking(0.5)
                     }
                 }
@@ -1091,7 +1091,7 @@ struct SignalDetailView: View {
                     if showSignedUp, joinedPodId != nil {
                         Button(action: { showPod = true }) {
                             Label("Open Pod", systemImage: "person.3.fill")
-                                .font(.system(size: 16, weight: .semibold))
+                                .orbitFont(16, weight: .semibold)
                                 .tracking(0.5)
                                 .frame(maxWidth: .infinity)
                                 .padding(.vertical, 16)
@@ -1119,7 +1119,7 @@ struct SignalDetailView: View {
                                     ProgressView().tint(.white)
                                 } else {
                                     Text("Join Pod \u{2192}")
-                                        .font(.system(size: 16, weight: .semibold))
+                                        .orbitFont(16, weight: .semibold)
                                         .tracking(0.5)
                                 }
                             }
@@ -1154,7 +1154,7 @@ struct SignalDetailView: View {
                         .transition(.move(edge: .bottom).combined(with: .opacity))
                 }
             }
-            .animation(.spring(duration: 0.3), value: localToast)
+            .orbitAnimation(.spring(duration: 0.3), value: localToast)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {

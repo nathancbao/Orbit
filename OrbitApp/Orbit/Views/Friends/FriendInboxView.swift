@@ -72,7 +72,7 @@ struct FriendInboxView: View {
                         VStack(spacing: 12) {
                             Spacer(minLength: 80)
                             Image(systemName: "tray")
-                                .font(.system(size: 36))
+                                .orbitFont(36)
                                 .foregroundColor(.secondary)
                             Text("No Notifications")
                                 .font(.headline)
@@ -137,6 +137,7 @@ struct PodInviteCard: View {
                         .background(Color(.systemGray5))
                         .clipShape(Circle())
                 }
+                .accessibilityLabel("Decline invite")
 
                 Button(action: onAccept) {
                     Image(systemName: "checkmark")
@@ -147,6 +148,7 @@ struct PodInviteCard: View {
                         .background(OrbitTheme.gradientFill)
                         .clipShape(Circle())
                 }
+                .accessibilityLabel("Accept invite")
             }
         }
         .padding(14)
@@ -194,6 +196,7 @@ struct IncomingRequestCard: View {
                         .background(Color(.systemGray5))
                         .clipShape(Circle())
                 }
+                .accessibilityLabel("Decline request")
 
                 Button(action: onAccept) {
                     Image(systemName: "checkmark")
@@ -204,6 +207,7 @@ struct IncomingRequestCard: View {
                         .background(OrbitTheme.gradientFill)
                         .clipShape(Circle())
                 }
+                .accessibilityLabel("Accept request")
             }
         }
         .padding(14)

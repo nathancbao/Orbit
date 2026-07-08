@@ -227,7 +227,7 @@ struct VoyageBubble: View {
                 // Icon + label
                 VStack(spacing: 2) {
                     Image(systemName: item.isMission ? "calendar" : "antenna.radiowaves.left.and.right")
-                        .font(.system(size: bubbleSize * 0.24))
+                        .orbitFont(bubbleSize * 0.24)
                         .foregroundColor(.white)
 
                     if showLabel && bubbleSize > 36 {

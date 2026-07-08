@@ -57,7 +57,7 @@ struct LaunchView: View {
                 // Launch button
                 Button(action: onLaunch) {
                     Text("L A U N C H !")
-                        .font(.system(size: 16, weight: .medium, design: .default))
+                        .orbitFont(16, weight: .medium, design: .default)
                         .tracking(2)
                         .foregroundStyle(OrbitTheme.gradient)
                         .padding(.horizontal, 35)

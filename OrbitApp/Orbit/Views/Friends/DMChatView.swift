@@ -50,7 +50,7 @@ struct DMChatView: View {
                     if viewModel.messages.isEmpty {
                         VStack(spacing: 8) {
                             Image(systemName: "bubble.left.and.bubble.right")
-                                .font(.system(size: 32))
+                                .orbitFont(32)
                                 .foregroundStyle(OrbitTheme.gradient)
                             Text("Start a conversation")
                                 .font(.subheadline)
@@ -101,6 +101,7 @@ struct DMChatView: View {
                     .foregroundStyle(OrbitTheme.gradient)
             }
             .disabled(viewModel.messageText.trimmingCharacters(in: .whitespaces).isEmpty || viewModel.isSending)
+            .accessibilityLabel("Send message")
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 10)

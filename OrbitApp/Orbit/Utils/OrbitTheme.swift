@@ -62,6 +62,64 @@ enum OrbitTheme {
     }
 }
 
+// MARK: - Dynamic Type (Accessibility)
+
+/// A system font at a fixed design size that **scales with the user's Dynamic
+/// Type setting**, via `@ScaledMetric`. Use this instead of a bare
+/// `.font(.system(size:))`, which is frozen and ignores accessibility text
+/// sizes. The design size is the base at the default (Large) content size.
+private struct ScaledSystemFont: ViewModifier {
+    @ScaledMetric private var size: CGFloat
+    private let weight: Font.Weight
+    private let design: Font.Design
+
+    init(size: CGFloat, relativeTo textStyle: Font.TextStyle,
+         weight: Font.Weight, design: Font.Design) {
+        self._size = ScaledMetric(wrappedValue: size, relativeTo: textStyle)
+        self.weight = weight
+        self.design = design
+    }
+
+    func body(content: Content) -> some View {
+        content.font(.system(size: size, weight: weight, design: design))
+    }
+}
+
+extension View {
+    /// Dynamic-Type-aware replacement for `.font(.system(size:weight:design:))`.
+    /// The `relativeTo` style controls which accessibility text style it tracks
+    /// (default `.body`); pick `.title`/`.headline` for large display text so it
+    /// scales at the right rate.
+    func orbitFont(_ size: CGFloat,
+                   weight: Font.Weight = .regular,
+                   design: Font.Design = .default,
+                   relativeTo textStyle: Font.TextStyle = .body) -> some View {
+        modifier(ScaledSystemFont(size: size, relativeTo: textStyle,
+                                  weight: weight, design: design))
+    }
+}
+
+// MARK: - Reduced Motion (Accessibility)
+
+extension View {
+    /// Applies `animation` only when the user has **not** enabled Reduce Motion;
+    /// otherwise the change is applied without animating. Honors WCAG/HIG
+    /// motion-sensitivity guidance for spring/scale effects.
+    func orbitAnimation<V: Equatable>(_ animation: Animation?, value: V) -> some View {
+        modifier(ReducedMotionAnimation(animation: animation, value: value))
+    }
+}
+
+private struct ReducedMotionAnimation<V: Equatable>: ViewModifier {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    let animation: Animation?
+    let value: V
+
+    func body(content: Content) -> some View {
+        content.animation(reduceMotion ? nil : animation, value: value)
+    }
+}
+
 // MARK: - Tag Chip
 
 struct TagChip: View {

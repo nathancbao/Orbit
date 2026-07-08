@@ -261,7 +261,7 @@ struct MotivationalBannerView: View {
 
     var body: some View {
         Text(messages[currentIndex])
-            .font(.system(size: 15, weight: .semibold, design: .rounded))
+            .orbitFont(15, weight: .semibold, design: .rounded)
             .foregroundColor(DiscoveryTheme.textPrimary)
             .multilineTextAlignment(.center)
             .id(currentIndex)
@@ -298,7 +298,7 @@ struct RecommendationBellView: View {
         Button(action: onTap) {
             ZStack(alignment: .topTrailing) {
                 Image(systemName: "bell")
-                    .font(.system(size: 20))
+                    .orbitFont(20)
                     .fontWeight(.medium)
                     .foregroundStyle(Color.primary)
                     .frame(width: 34, height: 34)
@@ -436,12 +436,12 @@ struct CenterNodeView: View {
                                     image.resizable().scaledToFill()
                                 } placeholder: {
                                     Image(systemName: "person.fill")
-                                        .font(.system(size: 36))
+                                        .orbitFont(36)
                                         .foregroundColor(DiscoveryTheme.textMuted)
                                 }
                             } else {
                                 Image(systemName: "person.fill")
-                                    .font(.system(size: 36))
+                                    .orbitFont(36)
                                     .foregroundColor(DiscoveryTheme.textMuted)
                             }
                         }
@@ -633,7 +633,7 @@ struct PlanetNodeView: View {
                 // Icon overlay (only when the activity type is known)
                 if let icon = planet.activityIcon {
                     Image(systemName: icon)
-                        .font(.system(size: isSelected ? 20 : 16, weight: .medium))
+                        .orbitFont(isSelected ? 20 : 16, weight: .medium)
                         .foregroundColor(.white.opacity(0.9))
                         .shadow(color: Color.black.opacity(0.3), radius: 2, x: 0, y: 1)
                 }
@@ -749,7 +749,7 @@ struct GalaxyLoadingView: View {
                 .rotationEffect(.degrees(rotation))
 
             Text("Loading . . .")
-                .font(.system(size: 15, weight: .medium, design: .rounded))
+                .orbitFont(15, weight: .medium, design: .rounded)
                 .foregroundColor(DiscoveryTheme.textMuted)
         }
         .onAppear {
@@ -934,12 +934,26 @@ struct DiscoveryView: View {
                                 name: userProfile.name
                             )
                         }
+                        .accessibilityLabel("Profile")
                     }
                     .padding(.horizontal, 16)
                     .padding(.top, 4)
 
                     // Motivational banner
                     MotivationalBannerView()
+
+                    // Surface a load failure so the galaxy isn't just silently empty.
+                    if let error = viewModel.errorMessage {
+                        Text(error)
+                            .orbitFont(13, weight: .medium)
+                            .foregroundColor(.white)
+                            .padding(.horizontal, 14)
+                            .padding(.vertical, 8)
+                            .background(Color.red.opacity(0.35))
+                            .clipShape(Capsule())
+                            .padding(.horizontal, 16)
+                            .accessibilityLabel("Couldn't load missions: \(error)")
+                    }
                 }
             }
             .overlay(alignment: .bottom) {
@@ -949,9 +963,9 @@ struct DiscoveryView: View {
                 } label: {
                     HStack(spacing: 8) {
                         Image(systemName: "sparkles")
-                            .font(.system(size: 14, weight: .bold))
+                            .orbitFont(14, weight: .bold)
                         Text("VOYAGE")
-                            .font(.system(size: 15, weight: .bold, design: .rounded))
+                            .orbitFont(15, weight: .bold, design: .rounded)
                             .tracking(2)
                     }
                     .foregroundColor(.white)

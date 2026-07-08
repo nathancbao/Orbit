@@ -87,7 +87,6 @@ class ScheduleViewModel: ObservableObject {
             startDate: grid.startDate
         )
         grid = freshGrid
-        print("[Schedule] reloadGrid: \(grid.entries.count) entries: \(grid.entries.map { "\($0.userId):\($0.slots.count)slots" })")
 
         // Re-register current user if absent (e.g., first time before save)
         if grid.entries.first(where: { $0.userId == currentUserId }) == nil {

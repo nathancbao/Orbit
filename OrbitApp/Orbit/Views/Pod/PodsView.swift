@@ -177,7 +177,7 @@ struct PodsView: View {
                             VStack(spacing: 12) {
                                 Spacer()
                                 Image(systemName: "person.3")
-                                    .font(.system(size: 36))
+                                    .orbitFont(36)
                                     .foregroundStyle(OrbitTheme.gradient)
                                 Text(pods.isEmpty && rsvpedFlexMissions.isEmpty ? "No Pods Yet" : "No Matches")
                                     .font(.headline)
@@ -249,7 +249,7 @@ struct PodsView: View {
                     } label: {
                         ZStack(alignment: .topTrailing) {
                             Image(systemName: "bell")
-                                .font(.system(size: 18))
+                                .orbitFont(18)
                                 .fontWeight(.medium)
                                 .foregroundStyle(Color.primary)
                                 .padding(4)
