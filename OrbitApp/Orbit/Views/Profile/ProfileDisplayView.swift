@@ -17,6 +17,7 @@ struct ProfileDisplayView: View {
     @State private var isSendingRequest = false
     @State private var showLogoutConfirm = false
     @State private var showComingSoon = false
+    @State private var collegeName: String?
 
     init(profile: Profile, onEdit: (() -> Void)? = nil,
          onProfileUpdated: ((Profile) -> Void)? = nil, otherUserId: Int? = nil) {
@@ -81,6 +82,12 @@ struct ProfileDisplayView: View {
                         Text(Profile.displayYear(profile.collegeYear))
                             .font(.headline)
                             .foregroundStyle(OrbitTheme.gradient)
+
+                        if let collegeName {
+                            Text(collegeName)
+                                .font(.subheadline)
+                                .foregroundColor(.secondary)
+                        }
 
                         Text("{Age} Years Old")
                             .font(.subheadline)
@@ -318,6 +325,11 @@ struct ProfileDisplayView: View {
                     if let full = await profileFetch {
                         profile = full
                     }
+                }
+                // Resolve the college id to its display name
+                if !profile.college.isEmpty {
+                    let colleges = (try? await ProfileService.shared.getColleges()) ?? []
+                    collegeName = colleges.first(where: { $0.id == profile.college })?.name
                 }
             }
             .navigationDestination(isPresented: $showEdit) {

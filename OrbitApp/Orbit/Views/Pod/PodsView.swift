@@ -41,6 +41,7 @@ struct PodsView: View {
     @State private var recommendedMissions: [Mission] = []
     @State private var recommendedMissionForDetail: Mission? = nil
     @State private var unreadPodIds: Set<String> = []
+    @State private var signalPendingDelete: Mission?
 
     private var currentUserId: Int {
         UserDefaults.standard.integer(forKey: "orbit_user_id")
@@ -183,6 +184,15 @@ struct PodsView: View {
                                                 onDismiss: { Task { await loadData() } },
                                                 onPodNotFound: { rsvpedFlexMissions.removeAll { $0.id == mission.id } }
                                             )
+                                            .contextMenu {
+                                                if mission.isCreatedByCurrentUser {
+                                                    Button(role: .destructive) {
+                                                        signalPendingDelete = mission
+                                                    } label: {
+                                                        Label("Delete Mission", systemImage: "trash")
+                                                    }
+                                                }
+                                            }
                                             .padding(.horizontal, 20)
                                         }
                                     }
@@ -257,6 +267,26 @@ struct PodsView: View {
                     recommendedMissionForDetail = nil
                 })
             }
+        }
+        .alert(
+            "Delete this mission?",
+            isPresented: Binding(
+                get: { signalPendingDelete != nil },
+                set: { if !$0 { signalPendingDelete = nil } }
+            )
+        ) {
+            Button("Delete", role: .destructive) {
+                if let mission = signalPendingDelete {
+                    Task {
+                        try? await MissionService.shared.deleteFlexMission(id: mission.id)
+                        await loadData()
+                    }
+                }
+                signalPendingDelete = nil
+            }
+            Button("Cancel", role: .cancel) { signalPendingDelete = nil }
+        } message: {
+            Text("This removes the mission and its pods for everyone.")
         }
         .task { await loadData() }
         .onChange(of: isActive) { _, active in
@@ -344,9 +374,14 @@ struct PodRowCard: View {
                     .cornerRadius(2)
 
                 VStack(alignment: .leading, spacing: 6) {
-                    Text(title)
-                        .font(.headline)
-                        .foregroundColor(.primary)
+                    HStack(spacing: 8) {
+                        Text(title)
+                            .font(.headline)
+                            .foregroundColor(.primary)
+                        if pod.leaderId == UserDefaults.standard.integer(forKey: "orbit_user_id") {
+                            MissionBadge(text: "Leader", color: OrbitTheme.purple)
+                        }
+                    }
 
                     HStack(spacing: 4) {
                         Image(systemName: "person.3")
@@ -430,6 +465,9 @@ struct FlexMissionRsvpCard: View {
                         Text(mission.displayTitle)
                             .font(.headline)
                             .foregroundColor(.white)
+                        if mission.isCreatedByCurrentUser {
+                            MissionBadge(text: "Yours", color: OrbitTheme.purple, onDark: true)
+                        }
                     }
 
                     if let groupLabel = mission.flexGroupSizeLabel {

@@ -22,6 +22,12 @@ struct QuickProfileSetupView: View {
     @State private var isSaving = false
     @State private var errorMessage: String?
 
+    // College + distance filter
+    @State private var colleges: [College] = []
+    @State private var selectedCollege: String = ""      // college id, "" = not set
+    @State private var distanceLimitEnabled: Bool = false
+    @State private var distanceMiles: Double = 25
+
     // Extended profile fields
     @State private var bio: String = ""
     @State private var selectedGender: String = ""
@@ -55,6 +61,10 @@ struct QuickProfileSetupView: View {
         _link2 = State(initialValue: existingLinks.indices.contains(1) ? existingLinks[1] : "")
         _link3 = State(initialValue: existingLinks.indices.contains(2) ? existingLinks[2] : "")
         _galleryURLs = State(initialValue: initialProfile?.galleryPhotos ?? [])
+        _selectedCollege = State(initialValue: initialProfile?.college ?? "")
+        let savedDistance = initialProfile?.maxDistanceMiles ?? 0
+        _distanceLimitEnabled = State(initialValue: savedDistance > 0)
+        _distanceMiles = State(initialValue: savedDistance > 0 ? Double(savedDistance) : 25)
     }
 
     private let availableInterests = [
@@ -79,6 +89,11 @@ struct QuickProfileSetupView: View {
         [link1, link2, link3]
             .map { $0.trimmingCharacters(in: .whitespaces) }
             .filter { !$0.isEmpty }
+    }
+
+    private var selectedCollegeName: String {
+        if selectedCollege.isEmpty { return "Select your college" }
+        return colleges.first(where: { $0.id == selectedCollege })?.name ?? selectedCollege
     }
 
     private var totalGalleryCount: Int {
@@ -161,6 +176,51 @@ struct QuickProfileSetupView: View {
                                     isSelected: selectedYear == year,
                                     action: { selectedYear = year }
                                 )
+                            }
+                        }
+                    }
+
+                    // College + mission distance
+                    VStack(alignment: .leading, spacing: 10) {
+                        Text("College")
+                            .font(.subheadline)
+                            .foregroundColor(.secondary)
+                        Menu {
+                            Button("Not set") { selectedCollege = "" }
+                            ForEach(colleges) { college in
+                                Button(college.name) { selectedCollege = college.id }
+                            }
+                        } label: {
+                            HStack {
+                                Text(selectedCollegeName)
+                                    .foregroundColor(selectedCollege.isEmpty ? .secondary : .primary)
+                                Spacer()
+                                Image(systemName: "chevron.up.chevron.down")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                            }
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 12)
+                            .background(Color(.systemGray6))
+                            .clipShape(Capsule())
+                        }
+
+                        if !selectedCollege.isEmpty {
+                            Toggle(isOn: $distanceLimitEnabled) {
+                                Text("Limit missions by distance")
+                                    .font(.subheadline)
+                                    .foregroundColor(.secondary)
+                            }
+                            .tint(OrbitTheme.purple)
+
+                            if distanceLimitEnabled {
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text("Show missions within \(Int(distanceMiles)) miles")
+                                        .font(.caption)
+                                        .foregroundColor(.secondary)
+                                    Slider(value: $distanceMiles, in: 5...50, step: 5)
+                                        .tint(OrbitTheme.purple)
+                                }
                             }
                         }
                     }
@@ -485,6 +545,10 @@ struct QuickProfileSetupView: View {
             }
         }
         .task {
+            // Load the selectable college list
+            if colleges.isEmpty {
+                colleges = (try? await ProfileService.shared.getColleges()) ?? []
+            }
             // Load existing profile photo from URL when editing
             if profilePhoto == nil,
                let urlString = initialProfile?.photo,
@@ -540,6 +604,8 @@ struct QuickProfileSetupView: View {
             links: linksArray,
             gender: selectedGender,
             mbti: selectedMBTI,
+            college: selectedCollege,
+            maxDistanceMiles: (selectedCollege.isEmpty || !distanceLimitEnabled) ? 0 : Int(distanceMiles),
             matchScore: nil
         )
 

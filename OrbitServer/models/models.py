@@ -50,6 +50,8 @@ def create_user(email):
         'links': [],
         'gender': '',
         'mbti': '',
+        'college': '',
+        'max_distance_miles': 0,
         'trust_score': 0.0,
         'created_at': datetime.datetime.utcnow(),
         'updated_at': datetime.datetime.utcnow(),
@@ -148,7 +150,7 @@ def search_users(query_str, exclude_user_id=None, limit=20):
 #         max_pod_size (default 4), status (open|completed|cancelled),
 #         created_at, updated_at
 
-def create_mission(data, creator_id, creator_type='user'):
+def create_mission(data, creator_id, creator_type='user', college=''):
     key = client.key('Mission')
     entity = datastore.Entity(key=key)
     entity.update({
@@ -156,6 +158,7 @@ def create_mission(data, creator_id, creator_type='user'):
         'description': data.get('description', ''),
         'tags': data.get('tags', []),
         'location': data.get('location', ''),
+        'college': college or '',
         'date': data.get('date', ''),
         'start_time': data.get('start_time'),
         'end_time': data.get('end_time'),
@@ -537,12 +540,13 @@ def get_history_entry(user_id, mission_id):
 #         pod_ids (list of pod UUID strings, max 2, assigned on RSVP),
 #         status (pending | active), created_at
 
-def create_signal(data, creator_id):
+def create_signal(data, creator_id, college=''):
     signal_id = str(uuid.uuid4())
     key = client.key('Signal', signal_id)
     entity = datastore.Entity(key=key, exclude_from_indexes=['availability', 'links'])
     entity.update({
         'creator_id': int(creator_id),
+        'college': college or '',
         'title': data.get('title', ''),
         'description': data.get('description', ''),
         'activity_category': data.get('activity_category', 'Custom'),
@@ -748,7 +752,8 @@ def get_user_pods(user_id, limit=100):
     now = datetime.datetime.utcnow()
     survey_window = datetime.timedelta(days=7)
 
-    # Filter out expired pods (2 hours after scheduled_end_time)
+    # Filter out expired pods (24 hours after scheduled_end_time, matching
+    # the mission grace period so a pod dies with its mission)
     live_pods = []
     for pod in pods:
         end_time_raw = pod.get('scheduled_end_time')
@@ -763,7 +768,7 @@ def get_user_pods(user_id, limit=100):
                     end_dt = None
             elif isinstance(end_time_raw, datetime.datetime):
                 end_dt = end_time_raw
-            if end_dt and now > end_dt + datetime.timedelta(hours=2):
+            if end_dt and now > end_dt + datetime.timedelta(hours=24):
                 # Pod expired — delete and skip
                 delete_pod(pod['id'])
                 continue

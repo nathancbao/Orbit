@@ -76,30 +76,14 @@ class MissionsViewModel: ObservableObject {
             .sorted { $0.createdAtDate > $1.createdAtDate }
     }
 
-    /// Missions available to discover.
-    /// Sorted by event time (soonest first), with flex missions at the bottom.
+    /// Missions available to discover — includes ones the user joined or
+    /// created (badged in the UI), sorted by event time with flex at the bottom.
     var discoverMissions: [Mission] {
-        let uid = currentUserId
-        let mine = combinedMissions.filter { m in
-            if m.mode == .flex {
-                return m.creatorId == uid || m.userPodStatus == "in_pod" || m.podId != nil
-            }
-            return m.userPodStatus == "in_pod"
-        }
-        let mineIds = Set(mine.map { $0.id })
-        let rest = combinedMissions.filter { m in
-            guard !mineIds.contains(m.id) else { return false }
-            if m.mode == .flex {
-                return m.podId == nil && m.creatorId != uid
-            }
-            return m.userPodStatus != "in_pod"
-        }
-        // Sort each group: set missions by event time, flex at the end
         let sortByTime: (Mission, Mission) -> Bool = { a, b in
             if a.isFlexMode != b.isFlexMode { return !a.isFlexMode }
             return a.sortDate < b.sortDate
         }
-        return rest.sorted(by: sortByTime)
+        return combinedMissions.sorted(by: sortByTime)
     }
 
     private var hasLoaded = false

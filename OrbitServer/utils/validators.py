@@ -35,7 +35,8 @@ def validate_edu_email(email):
 def validate_profile_data(data):
     errors = []
     allowed_fields = {'name', 'college_year', 'interests', 'photo',
-                       'gallery_photos', 'bio', 'links', 'gender', 'mbti'}
+                       'gallery_photos', 'bio', 'links', 'gender', 'mbti',
+                       'college', 'max_distance_miles'}
 
     for key in data:
         if key not in allowed_fields:
@@ -106,6 +107,19 @@ def validate_profile_data(data):
     if 'mbti' in data:
         if data['mbti'] not in VALID_MBTI:
             errors.append(f"mbti must be one of the 16 MBTI types")
+
+    if 'college' in data:
+        from OrbitServer.utils.colleges import COLLEGES
+        if data['college'] != '' and data['college'] not in COLLEGES:
+            errors.append("college must be empty or a valid college id")
+
+    if 'max_distance_miles' in data:
+        try:
+            miles = int(data['max_distance_miles'])
+            if miles < 0 or miles > 50:
+                errors.append("max_distance_miles must be between 0 and 50")
+        except (TypeError, ValueError):
+            errors.append("max_distance_miles must be an integer")
 
     if errors:
         return False, errors

@@ -20,6 +20,11 @@ struct MissionsView: View {
     @State private var showCreatedFlexPod = false
     @State private var searchText = ""
     @State private var showRecommendations = false
+    @State private var missionPendingDelete: Mission?
+
+    private var currentUserId: Int {
+        UserDefaults.standard.integer(forKey: "orbit_user_id")
+    }
 
     private let allTags = [
         "Hiking", "Gaming", "Food", "Sports", "Study", "Hangout", "Other"
@@ -124,6 +129,17 @@ struct MissionsView: View {
                                             MissionListCard(mission: mission) {
                                                 selectedMission = mission
                                             }
+                                            .contextMenu {
+                                                if mission.creatorId == currentUserId,
+                                                   currentUserId != 0,
+                                                   (mission.creatorType ?? "user") == "user" {
+                                                    Button(role: .destructive) {
+                                                        missionPendingDelete = mission
+                                                    } label: {
+                                                        Label("Delete Mission", systemImage: "trash")
+                                                    }
+                                                }
+                                            }
                                             .padding(.horizontal, 20)
                                         }
                                     }
@@ -193,6 +209,29 @@ struct MissionsView: View {
             MissionDetailView(mission: mission, viewModel: viewModel, onJoined: {
                 selectedMission = nil
             })
+        }
+        .alert(
+            "Delete this mission?",
+            isPresented: Binding(
+                get: { missionPendingDelete != nil },
+                set: { if !$0 { missionPendingDelete = nil } }
+            )
+        ) {
+            Button("Delete", role: .destructive) {
+                if let mission = missionPendingDelete {
+                    Task {
+                        if mission.isFlexMode {
+                            await viewModel.deleteFlexMission(id: mission.id)
+                        } else {
+                            await viewModel.deleteSetMission(id: mission.id)
+                        }
+                    }
+                }
+                missionPendingDelete = nil
+            }
+            Button("Cancel", role: .cancel) { missionPendingDelete = nil }
+        } message: {
+            Text("This removes the mission and its pods for everyone.")
         }
         .sheet(isPresented: $showRecommendations) {
             RecommendationsSheet(
@@ -296,6 +335,9 @@ struct SuggestedMissionCard: View {
                         .padding(.vertical, 2)
                         .background(mission.isFlexMode ? Color.white.opacity(0.15) : OrbitTheme.purple.opacity(0.12))
                         .cornerRadius(4)
+                    if mission.isJoinedByCurrentUser {
+                        MissionBadge(text: "Joined", color: .green)
+                    }
                     Label(mission.isFlexMode ? "Flexible time" : mission.displayDate, systemImage: mission.isFlexMode ? "clock.arrow.2.circlepath" : "calendar")
                         .font(.caption)
                         .foregroundColor(.secondary)
@@ -319,6 +361,40 @@ struct SuggestedMissionCard: View {
             )
         }
         .buttonStyle(.plain)
+    }
+}
+
+// MARK: - Membership / Ownership Badges
+
+/// Small capsule badge — "Joined" on missions you're in, "Yours" on ones you created.
+struct MissionBadge: View {
+    let text: String
+    let color: Color
+    var onDark: Bool = false
+
+    var body: some View {
+        Text(text)
+            .font(.caption2)
+            .fontWeight(.bold)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 3)
+            .background(onDark ? Color.white.opacity(0.2) : color.opacity(0.15))
+            .foregroundColor(onDark ? .white : color)
+            .clipShape(Capsule())
+    }
+}
+
+extension Mission {
+    /// Whether the current user is in a pod (set) or RSVP'd (flex) for this mission.
+    var isJoinedByCurrentUser: Bool {
+        if isFlexMode { return podId != nil || userPodStatus == "in_pod" }
+        return userPodStatus == "in_pod"
+    }
+
+    /// Whether the current user created this mission.
+    var isCreatedByCurrentUser: Bool {
+        let uid = UserDefaults.standard.integer(forKey: "orbit_user_id")
+        return uid != 0 && creatorId == uid && (creatorType ?? "user") == "user"
     }
 }
 
@@ -347,6 +423,11 @@ struct MissionListCard: View {
                             .foregroundColor(mission.isFlexMode ? .white : .primary)
                             .lineLimit(2)
                         Spacer(minLength: 0)
+                        if mission.isCreatedByCurrentUser {
+                            MissionBadge(text: "Yours", color: OrbitTheme.purple, onDark: mission.isFlexMode)
+                        } else if mission.isJoinedByCurrentUser {
+                            MissionBadge(text: "Joined", color: .green, onDark: mission.isFlexMode)
+                        }
                         Text(mission.isFlexMode ? "FLEX" : "SET")
                             .font(.caption2)
                             .fontWeight(.bold)

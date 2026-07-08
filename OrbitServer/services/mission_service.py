@@ -8,11 +8,13 @@ from OrbitServer.models.models import (
 )
 from OrbitServer.services.ai_suggestion_service import score_mission_for_user
 from OrbitServer.services.embedding_service import invalidate_cache, get_or_create_mission_embedding
+from OrbitServer.utils.colleges import filter_by_distance
 
 logger = logging.getLogger(__name__)
 
-# How long after end time before auto-deletion
-_MISSION_GRACE_PERIOD = datetime.timedelta(hours=2)
+# How long after end time before auto-deletion. During this window the
+# mission stays visible to its pod members only (hidden from explore).
+_MISSION_GRACE_PERIOD = datetime.timedelta(hours=24)
 
 
 def _mission_end_datetime(mission):
@@ -64,7 +66,7 @@ def check_mission_expiration(mission):
     """Check a mission against server time and handle expiration.
 
     - If past end time: updates status to 'completed' in DB.
-    - If past end time + 2 hours: deletes mission entirely.
+    - If past end time + 24 hours: deletes mission entirely.
 
     Returns:
       'active'    — mission is still ongoing
@@ -118,6 +120,10 @@ def get_missions_for_user(user_id, filters=None):
     user = get_user(user_id) or {}
     user_interests = set(user.get('interests') or [])
 
+    # Distance filter: drop missions stamped with a college outside the
+    # user's radius (no-op when the user has no college / no limit set)
+    missions = filter_by_distance(missions, user)
+
     # Check expiration server-side and filter out deleted missions
     live = []
     for mission in missions:
@@ -132,7 +138,13 @@ def get_missions_for_user(user_id, filters=None):
 
 
 def create_new_mission(data, creator_id, creator_type='user'):
-    return create_mission(data, creator_id, creator_type)
+    # Stamp the creator's college so feeds can distance-filter without
+    # a per-mission user lookup. Seeded/AI missions keep '' (visible everywhere).
+    college = ''
+    if creator_type == 'user':
+        creator = get_user(creator_id) or {}
+        college = creator.get('college') or ''
+    return create_mission(data, creator_id, creator_type, college=college)
 
 
 def get_mission_detail(mission_id):

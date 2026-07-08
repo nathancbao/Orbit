@@ -204,7 +204,8 @@ struct Mission: Codable, Identifiable {
     /// Whether this mission has ended (past its end time in the user's local timezone).
     var isCompleted: Bool { status == "completed" }
 
-    /// The date at which this mission will be auto-deleted (end time + 2 hours).
+    /// The date at which this mission will be auto-deleted (end time + 24 hours).
+    /// After the end time only pod members can still see the mission.
     /// Times are stored in the creator's local timezone. utc_offset converts to UTC.
     var deletionDate: Date? {
         guard mode == .set, !date.isEmpty else { return nil }
@@ -239,10 +240,10 @@ struct Mission: Codable, Identifiable {
         guard let naiveEnd = endDt else { return nil }
 
         // naiveEnd is now the local end time stored as-if-GMT.
-        // Subtract utcOffset to convert creator-local → real UTC, then add 2h grace.
+        // Subtract utcOffset to convert creator-local → real UTC, then add 24h grace.
         let offsetSecs = utcOffset ?? TimeZone.current.secondsFromGMT()
         let utcEnd = naiveEnd.addingTimeInterval(TimeInterval(-offsetSecs))
-        return utcEnd.addingTimeInterval(2 * 3600)
+        return utcEnd.addingTimeInterval(24 * 3600)
     }
 
     /// Time remaining until deletion, or nil if not applicable.
