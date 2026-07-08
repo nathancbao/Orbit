@@ -95,7 +95,7 @@ def _set_mission_time_info(mission):
     Returns dict with:
       - scheduled_time: display string like "Mon, Mar 9 · 3:00 PM"
       - scheduled_end_time: ISO string of end datetime in UTC (or None)
-      - expires_at: end datetime in UTC + 2 hours (or None)
+      - expires_at: end datetime in UTC + 24 hours (or None)
     Returns None if the mission lacks a date.
     """
     date_str = mission.get('date', '')
@@ -133,18 +133,18 @@ def _set_mission_time_info(mission):
         eh, em = parsed_end
         end_dt_utc = dt.replace(hour=eh, minute=em) - offset_delta
         result['scheduled_end_time'] = end_dt_utc.isoformat() + 'Z'
-        result['expires_at'] = (end_dt_utc + datetime.timedelta(hours=2)).isoformat() + 'Z'
+        result['expires_at'] = (end_dt_utc + datetime.timedelta(hours=24)).isoformat() + 'Z'
     elif parsed_start:
         # No explicit end time — default to start + 2 hours
         sh, sm = parsed_start
         default_end_utc = dt.replace(hour=sh, minute=sm) + datetime.timedelta(hours=2) - offset_delta
         result['scheduled_end_time'] = default_end_utc.isoformat() + 'Z'
-        result['expires_at'] = (default_end_utc + datetime.timedelta(hours=2)).isoformat() + 'Z'
+        result['expires_at'] = (default_end_utc + datetime.timedelta(hours=24)).isoformat() + 'Z'
     else:
-        # Date only, no times — expire at end of day + 2 hours
+        # Date only, no times — expire at end of day + 24 hours
         end_of_day_utc = dt.replace(hour=23, minute=59) - offset_delta
         result['scheduled_end_time'] = end_of_day_utc.isoformat() + 'Z'
-        result['expires_at'] = (end_of_day_utc + datetime.timedelta(hours=2)).isoformat() + 'Z'
+        result['expires_at'] = (end_of_day_utc + datetime.timedelta(hours=24)).isoformat() + 'Z'
 
     return result
 
@@ -443,7 +443,7 @@ def get_pod_with_members(pod_id, requesting_user_id):
     if not pod:
         return None, "Pod not found", 404
 
-    # Check if pod has expired (2 hours after scheduled_end_time)
+    # Check if pod has expired (24 hours after scheduled_end_time)
     now = datetime.datetime.utcnow()
     end_time_raw = pod.get('scheduled_end_time')
     if end_time_raw:
@@ -457,7 +457,7 @@ def get_pod_with_members(pod_id, requesting_user_id):
                 end_dt = None
         elif isinstance(end_time_raw, datetime.datetime):
             end_dt = end_time_raw
-        if end_dt and now > end_dt + datetime.timedelta(hours=2):
+        if end_dt and now > end_dt + datetime.timedelta(hours=24):
             delete_pod(pod_id)
             return None, "This pod has expired and been removed", 410
 

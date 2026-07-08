@@ -6,7 +6,7 @@ from werkzeug.exceptions import HTTPException
 
 from OrbitServer.utils.rate_limit import limiter
 from OrbitServer.api.auth import auth_bp
-from OrbitServer.api.users import users_bp
+from OrbitServer.api.users import users_bp, colleges_bp
 from OrbitServer.api.missions import missions_bp
 from OrbitServer.api.pods import pods_bp
 from OrbitServer.api.chat import chat_bp
@@ -15,6 +15,7 @@ from OrbitServer.api.notifications import notifications_bp
 from OrbitServer.api.friends import friends_bp
 from OrbitServer.api.dm import dm_bp
 from OrbitServer.api.voyage import voyage_bp
+from OrbitServer.api.tasks import tasks_bp
 from OrbitServer.models.models import get_user
 
 app = Flask(__name__)
@@ -55,6 +56,7 @@ def set_security_headers(response):
 
 app.register_blueprint(auth_bp)
 app.register_blueprint(users_bp)
+app.register_blueprint(colleges_bp)
 app.register_blueprint(missions_bp)
 app.register_blueprint(pods_bp)
 app.register_blueprint(chat_bp)
@@ -63,6 +65,7 @@ app.register_blueprint(notifications_bp)
 app.register_blueprint(friends_bp)
 app.register_blueprint(dm_bp)
 app.register_blueprint(voyage_bp)
+app.register_blueprint(tasks_bp)
 
 
 @app.route('/')

@@ -48,6 +48,13 @@ class ProfileService {
         return response.profile
     }
 
+    func getColleges() async throws -> [College] {
+        return try await APIService.shared.request(
+            endpoint: Constants.API.Endpoints.colleges,
+            authenticated: true
+        )
+    }
+
     func deleteAccount() async throws {
         let _: EmptyResponse = try await APIService.shared.request(
             endpoint: Constants.API.Endpoints.me,

@@ -1,10 +1,11 @@
 """Voyage Mode endpoints — deterministic tile-based infinite exploration."""
 
-from flask import Blueprint, request
+from flask import Blueprint, request, g
 
 from OrbitServer.utils.responses import success, error
 from OrbitServer.utils.auth import require_auth
-from OrbitServer.models.models import list_missions, _entity_to_dict, client
+from OrbitServer.utils.colleges import filter_by_distance
+from OrbitServer.models.models import list_missions, _entity_to_dict, client, get_user
 
 voyage_bp = Blueprint('voyage', __name__, url_prefix='/api/voyage')
 
@@ -67,9 +68,15 @@ def get_clusters():
     # Fetch the global content pool (cached at app level for 60s)
     missions = list_missions(filters={'status': 'open'})
     # For signals, fetch a flat list (no pagination needed for pool)
+    from OrbitServer.services.signal_service import filter_expired_signals
     sig_query = client.query(kind='Signal')
     sig_results = list(sig_query.fetch(limit=200))
-    signals = [_entity_to_dict(e) for e in sig_results]
+    signals = filter_expired_signals([_entity_to_dict(e) for e in sig_results])
+
+    # Respect the user's college distance setting in Voyage too
+    user = get_user(g.user_id) or {}
+    missions = filter_by_distance(missions, user)
+    signals = filter_by_distance(signals, user)
 
     # Tag each item with its type and normalise required fields
     pool = []

@@ -27,8 +27,12 @@ Fixed-date community events like club meetings, concerts, hikes, or study sessio
 - View AI-suggested missions with personalized match scores and reasoning
 - Create new missions with title, description, date/time, location, tags, and max group size
 - Join missions, which automatically places the user into a pod
+- Filter the feed by distance: set your college and a radius (up to 50 miles) on your profile, and missions from colleges outside that radius are hidden
+- Delete missions you created directly from the card (long-press) or the detail view
 
-Mission cards display date, time, location, tags, available spots, and a color-coded match score badge.
+Mission cards display date, time, location, tags, available spots, a color-coded match score badge, and "Joined"/"Yours" badges for missions you're in or created.
+
+After a mission's end time passes it disappears from explore for everyone except its pod members, who keep access for 24 more hours before the mission and its pods are deleted.
 
 ### Flex Missions (Spontaneous Activities)
 Informal "anyone down?" requests for immediate or near-term hangouts. Users can:
@@ -50,7 +54,7 @@ Small groups formed around set or flex missions. Once in a pod, members can:
 - **Manage the pod** — rename it, confirm attendance, or leave
 - **Kick voting** — members can vote to remove someone from the pod
 
-Pods progress through statuses: forming, full, meeting confirmed, and completed. Pods expire 14 days after creation.
+Pods progress through statuses: forming, full, meeting confirmed, and completed. Pods expire 14 days after creation, or 24 hours after their scheduled activity ends. Flex missions likewise expire 24 hours after their last availability date. A daily cron sweep cleans up anything lazy deletion missed.
 
 ### Post-Activity Survey
 After a pod's activity ends, members complete a survey:
@@ -70,6 +74,7 @@ After a pod's activity ends, members complete a survey:
 User profiles include:
 
 - Name, college year, and .edu email (verified)
+- College (picked from a UC/CSU + nearby California list) and a mission distance radius of up to 50 miles that filters all discovery feeds
 - Profile photo and gallery (up to 6 photos)
 - Bio (up to 250 characters)
 - Interests (3–10 tags)

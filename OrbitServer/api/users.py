@@ -9,8 +9,18 @@ from OrbitServer.services.user_service import (
 )
 from OrbitServer.services.signal_service import get_rsvped_signals
 from OrbitServer.models.models import get_user_pods
+from OrbitServer.utils.colleges import college_list
 
 users_bp = Blueprint('users', __name__, url_prefix='/api/users')
+
+colleges_bp = Blueprint('colleges', __name__, url_prefix='/api/colleges')
+
+
+@colleges_bp.route('', methods=['GET'])
+@require_auth
+def list_colleges():
+    """GET /api/colleges — the selectable college directory with coordinates."""
+    return success(college_list())
 
 
 @users_bp.route('/me', methods=['GET'])

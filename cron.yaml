@@ -1,0 +1,4 @@
+cron:
+  - description: "Daily sweep of expired missions, signals, and pods"
+    url: /api/tasks/cleanup
+    schedule: every 24 hours

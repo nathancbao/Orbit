@@ -58,6 +58,8 @@ Merged User + Profile. API returns it wrapped as `{profile: {...}, profile_compl
 | `links` | list[string] | `[]` | |
 | `gender` | string | `''` | |
 | `mbti` | string | `''` | |
+| `college` | string | `''` | key into `utils/colleges.py` `COLLEGES`; `''` = not set |
+| `max_distance_miles` | int | `0` | mission distance filter radius; `0` = no limit, max 50 |
 | `trust_score` | float | `0.0` | clamped to `[0.0, 5.0]`; +0.5 confirm, −0.2 no-show |
 | `created_at` | datetime | now | |
 | `updated_at` | datetime | now | |
@@ -79,6 +81,7 @@ Fixed-date activities, browseable in the discovery feed.
 | `description` | string | `''` | |
 | `tags` | list[string] | `[]` | |
 | `location` | string | `''` | |
+| `college` | string | `''` | creator's college at creation time; `''` = visible everywhere |
 | `date` | string | `''` | `YYYY-MM-DD` |
 | `start_time` | string \| null | `None` | |
 | `end_time` | string \| null | `None` | |
@@ -122,8 +125,10 @@ A small group attached to a Mission **or** a Signal. Signal-linked pods are crea
 | `created_at` | datetime | now | |
 | `expires_at` | datetime | now + 14 days | |
 
-> Pods auto-expire 2 hours after `scheduled_end_time` (deleted lazily on read in
-> `get_user_pods`).
+> Pods auto-expire 24 hours after `scheduled_end_time` (deleted lazily on read in
+> `get_user_pods`, matching the mission grace period). A daily cron sweep
+> (`cron.yaml` → `GET /api/tasks/cleanup`) also removes expired missions,
+> signals, and pods that nobody reads.
 
 ---
 
@@ -203,6 +208,7 @@ Spontaneous "anyone down?" activity requests → RSVP → auto-pod formation.
 | Field | Type | Default | Notes |
 |---|---|---|---|
 | `creator_id` | int | — | → `User` |
+| `college` | string | `''` | creator's college at creation time; `''` = visible everywhere |
 | `title` | string | `''` | |
 | `description` | string | `''` | |
 | `activity_category` | string | `'Custom'` | matches Swift `ActivityCategory` raw values |
@@ -219,6 +225,10 @@ Spontaneous "anyone down?" activity requests → RSVP → auto-pod formation.
 | `status` | string | `'pending'` | `pending` \| `active` (flips at `min_group_size`) |
 | `created_at` | datetime | now | |
 | `updated_at` | datetime | — | set via `update_signal` |
+
+> Signals auto-expire 24 hours after their latest `availability` date ends
+> (fallback: `created_at` + 14 days when no date parses). Deleted lazily on
+> read in `signal_service.check_signal_expiration` and by the daily cron sweep.
 
 ---
 

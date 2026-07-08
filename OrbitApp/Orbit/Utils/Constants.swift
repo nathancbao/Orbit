@@ -31,6 +31,7 @@ enum Constants {
             static let uploadPhoto = "/users/me/photo"
             static let uploadGalleryPhoto = "/users/me/gallery"
             static func deleteGalleryPhoto(_ index: Int) -> String { "/users/me/gallery/\(index)" }
+            static let colleges = "/colleges"
 
             // Missions (fixed-date events)
             static let missions = "/missions"
