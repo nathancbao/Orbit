@@ -2,10 +2,9 @@
 
 import datetime
 import math
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 
 import numpy as np
-import pytest
 
 
 class TestJaccard:
@@ -149,7 +148,6 @@ class TestGetSuggestedMissions:
     # Shared mocks -- degrade all learned signals to 0.0 so tests focus on pipeline logic
     _emb_patches = [
         patch('OrbitServer.services.ai_suggestion_service.get_user_embedding', return_value=None),
-        patch('OrbitServer.services.ai_suggestion_service.get_or_create_mission_embedding', return_value=None),
         patch('OrbitServer.services.ai_suggestion_service.get_lightfm_scores', return_value={}),
     ]
 
@@ -293,7 +291,7 @@ class TestGetSuggestedMissions:
     def test_semantic_score_raises_match_score(self, mock_user, mock_history, mock_list,
                                                mock_user_emb, mock_preload):
         """A non-None semantic embedding should produce a higher score than None (all else equal)."""
-        from OrbitServer.services.ai_suggestion_service import get_suggested_missions, W_SEMANTIC
+        from OrbitServer.services.ai_suggestion_service import get_suggested_missions
         mock_user.return_value = {'interests': ['hiking'], 'trust_score': 0.0}
         mock_history.return_value = []
         mock_list.return_value = [self._make_mission(1, [])]  # no tags -> tfidf=0, behav=0

@@ -1,8 +1,6 @@
 """Tests for utils/auth.py — JWT token creation and decoding."""
 
 import os
-import time
-import datetime
 
 # Ensure test secret is set before importing
 os.environ['JWT_SECRET'] = 'test-secret-key'
@@ -79,24 +77,20 @@ class TestJwtSecretLoading:
     """_load_jwt_secret must refuse the insecure dev default in production."""
 
     def test_missing_secret_in_production_raises(self, monkeypatch):
+        import pytest
         from OrbitServer.utils import auth
         monkeypatch.setenv('GAE_ENV', 'standard')
         monkeypatch.delenv('JWT_SECRET', raising=False)
-        try:
+        with pytest.raises(RuntimeError, match="JWT_SECRET"):
             auth._load_jwt_secret()
-            assert False, "expected RuntimeError for missing prod secret"
-        except RuntimeError as e:
-            assert "JWT_SECRET" in str(e)
 
     def test_dev_default_in_production_raises(self, monkeypatch):
+        import pytest
         from OrbitServer.utils import auth
         monkeypatch.setenv('GAE_ENV', 'standard')
         monkeypatch.setenv('JWT_SECRET', auth._DEV_SECRET_FALLBACK)
-        try:
+        with pytest.raises(RuntimeError, match="JWT_SECRET"):
             auth._load_jwt_secret()
-            assert False, "expected RuntimeError for dev-default prod secret"
-        except RuntimeError as e:
-            assert "JWT_SECRET" in str(e)
 
     def test_real_secret_in_production_ok(self, monkeypatch):
         from OrbitServer.utils import auth

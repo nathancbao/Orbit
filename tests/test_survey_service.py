@@ -1,6 +1,6 @@
 """Tests for services/survey_service.py — post-activity survey logic."""
 
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 
 
 class TestSubmitSurvey:

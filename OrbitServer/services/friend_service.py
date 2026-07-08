@@ -1,5 +1,5 @@
 from OrbitServer.models.models import (
-    get_user, search_users as ds_search_users,
+    get_user, get_users_batch, search_users as ds_search_users,
     create_friend_request, get_friend_request, update_friend_request_status,
     delete_friend_request as ds_delete_friend_request,
     list_incoming_friend_requests, list_outgoing_friend_requests,
@@ -28,9 +28,9 @@ def _friend_profile(user):
 def get_friends(user_id):
     """Return all accepted friends with enriched profiles."""
     friendships = list_friendships(user_id)
+    users = get_users_batch([f['friend_id'] for f in friendships])
     for f in friendships:
-        friend = get_user(int(f['friend_id']))
-        f['friend'] = _friend_profile(friend)
+        f['friend'] = _friend_profile(users.get(str(f['friend_id'])))
     return friendships, None
 
 
@@ -65,8 +65,9 @@ def send_friend_request(from_user_id, to_user_id):
 
 def get_incoming_requests(user_id):
     requests = list_incoming_friend_requests(user_id)
+    users = get_users_batch([r['from_user_id'] for r in requests])
     for r in requests:
-        r['from_user'] = _friend_profile(get_user(int(r['from_user_id'])))
+        r['from_user'] = _friend_profile(users.get(str(r['from_user_id'])))
     return requests, None
 
 
@@ -74,8 +75,9 @@ def get_incoming_requests(user_id):
 
 def get_outgoing_requests(user_id):
     requests = list_outgoing_friend_requests(user_id)
+    users = get_users_batch([r['to_user_id'] for r in requests])
     for r in requests:
-        r['to_user'] = _friend_profile(get_user(int(r['to_user_id'])))
+        r['to_user'] = _friend_profile(users.get(str(r['to_user_id'])))
     return requests, None
 
 

@@ -1,0 +1,5 @@
+# Dev/CI-only tooling (not installed on App Engine).
+-r requirements.txt
+pytest==9.0.3
+pytest-cov==7.1.0
+ruff==0.15.20

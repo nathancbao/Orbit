@@ -68,7 +68,6 @@ def get_clusters():
     # Fetch the global content pool (cached at app level for 60s)
     missions = list_missions(filters={'status': 'open'})
     # For signals, fetch a flat list (no pagination needed for pool)
-    from google.cloud.datastore.query import PropertyFilter
     from OrbitServer.services.signal_service import filter_expired_signals
     sig_query = client.query(kind='Signal')
     sig_results = list(sig_query.fetch(limit=200))

@@ -3,8 +3,8 @@ import logging
 
 from OrbitServer.models.models import (
     get_mission, get_pod, update_pod, create_pod,
-    find_open_pod_for_mission, get_user_pod_for_mission,
-    list_pods, get_user, record_action,
+    get_user_pod_for_mission,
+    list_pods, get_user, get_users_batch, record_action,
     adjust_trust_score, transactional_pod_update, delete_pod,
     create_notification, get_signal,
 )
@@ -467,9 +467,10 @@ def get_pod_with_members(pod_id, requesting_user_id):
     if uid not in member_ids:
         return None, "You are not a member of this pod", 403
 
+    users = get_users_batch(member_ids)
     members = []
     for member_uid in member_ids:
-        user = get_user(member_uid) or {}
+        user = users.get(str(member_uid)) or {}
         members.append({
             'user_id': member_uid,
             'name': user.get('name', ''),
@@ -587,8 +588,7 @@ def _find_replacement(mission_id, pod_id, current_members):
     This is a simple FIFO replacement.
     Returns user_id of replacement or None if no suitable candidate found.
     """
-    from OrbitServer.models.models import list_pods
-    from google.cloud import datastore
+    from OrbitServer.models.models import list_pods, client
     from google.cloud.datastore.query import PropertyFilter
 
     # Get all members across all pods for this mission
@@ -598,7 +598,6 @@ def _find_replacement(mission_id, pod_id, current_members):
     occupied.update(current_members)
 
     # Query UserHistory for users who joined this mission but aren't in any pod
-    client = datastore.Client()
     query = client.query(kind='UserHistory')
     query.add_filter(filter=PropertyFilter('mission_id', '=', int(mission_id)))
     query.add_filter(filter=PropertyFilter('action', '=', 'joined'))

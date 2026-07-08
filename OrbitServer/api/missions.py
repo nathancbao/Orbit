@@ -156,12 +156,16 @@ def create():
     mission = create_new_mission(data, g.user_id, creator_type='user')
 
     # Generate embedding asynchronously so the HTTP response isn't blocked.
+    # NOTE: this is best-effort — on App Engine an instance can be reclaimed
+    # after the response and kill this thread. A missing embedding just means
+    # the mission falls back to tag-based scoring until it's regenerated. Log
+    # failures so dropped work is visible; a Cloud Tasks queue is the proper fix.
     mission_id = mission['id']
     def _generate_embedding():
         try:
             get_or_create_mission_embedding(mission_id)
         except Exception:
-            pass
+            logger.exception("Async embedding generation failed for mission %s", mission_id)
     threading.Thread(target=_generate_embedding, daemon=True).start()
 
     return success(_strip_embedding(mission), 201)
