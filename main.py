@@ -1,6 +1,8 @@
+import logging
 import os
 
 from flask import Flask, jsonify, render_template_string
+from werkzeug.exceptions import HTTPException
 
 from OrbitServer.utils.rate_limit import limiter
 from OrbitServer.api.auth import auth_bp
@@ -18,7 +20,39 @@ from OrbitServer.models.models import get_user
 
 app = Flask(__name__)
 
+logger = logging.getLogger(__name__)
+
 limiter.init_app(app)
+
+
+# ── Consistent JSON error responses ─────────────────────────────────────────
+# Keep the {"success": false, "error": "..."} envelope for every error, and
+# never leak a stack trace or internal exception text to clients.
+
+@app.errorhandler(HTTPException)
+def handle_http_exception(e):
+    """Return known HTTP errors (404, 405, 429, aborts) as JSON, not HTML."""
+    return jsonify({"success": False, "error": e.description}), e.code
+
+
+@app.errorhandler(Exception)
+def handle_unexpected_exception(e):
+    """Any unhandled exception becomes a generic 500 — details go to the log."""
+    logger.exception("Unhandled exception on %s", getattr(e, "__class__", type(e)).__name__)
+    return jsonify({"success": False, "error": "Something went wrong"}), 500
+
+
+# ── Baseline security headers ────────────────────────────────────────────────
+
+@app.after_request
+def set_security_headers(response):
+    response.headers.setdefault('X-Content-Type-Options', 'nosniff')
+    response.headers.setdefault('X-Frame-Options', 'DENY')
+    response.headers.setdefault('Referrer-Policy', 'no-referrer')
+    response.headers.setdefault(
+        'Strict-Transport-Security', 'max-age=31536000; includeSubDomains'
+    )
+    return response
 
 app.register_blueprint(auth_bp)
 app.register_blueprint(users_bp)

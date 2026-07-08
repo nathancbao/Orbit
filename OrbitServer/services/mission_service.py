@@ -154,9 +154,9 @@ def get_missions_for_user(user_id, filters=None):
         open_missions = list_missions(filters={'status': 'open', **(filters or {})})
         completed_missions = list_missions(filters={'status': 'completed', **(filters or {})})
         missions = open_missions + completed_missions
-    except Exception as e:
+    except Exception:
         logger.exception("Failed to list missions")
-        return [], str(e)
+        return [], "Failed to load missions"
 
     user = get_user(user_id) or {}
     user_interests = set(user.get('interests') or [])

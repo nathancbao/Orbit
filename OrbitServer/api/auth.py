@@ -1,3 +1,5 @@
+import logging
+
 from flask import Blueprint, request
 
 from OrbitServer.utils.responses import success, error
@@ -9,6 +11,8 @@ from OrbitServer.services.auth_service import (
     refresh_access_token,
     logout,
 )
+
+logger = logging.getLogger(__name__)
 
 auth_bp = Blueprint('auth', __name__, url_prefix='/api/auth')
 
@@ -26,8 +30,9 @@ def send_code():
     email = result  # cleaned email
     try:
         send_verification_code(email)
-    except Exception as e:
-        return error(f"Failed to send verification code: {str(e)}", 500)
+    except Exception:
+        logger.exception("Failed to send verification code to %s", email)
+        return error("Failed to send verification code", 500)
 
     return success({"message": "Verification code sent"})
 

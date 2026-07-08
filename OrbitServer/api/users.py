@@ -123,8 +123,12 @@ def list_my_rsvps():
 
 
 @users_bp.route('/<user_id>', methods=['GET'])
+@require_auth
 def get_user_public(user_id):
-    profile, err = get_user_profile(user_id)
+    # Authenticated, but this returns *another* user's profile — strip private
+    # fields (email) unless the caller is asking for their own record.
+    include_private = str(user_id) == str(g.user_id)
+    profile, err = get_user_profile(user_id, include_private=include_private)
     if err:
         return error(err, 404)
     return success(profile)

@@ -73,19 +73,34 @@ class TestUpdateMe:
 
 
 class TestGetPublicUser:
+    def test_rejects_unauthenticated(self, client):
+        # The endpoint used to be public and leak emails; it now requires auth.
+        resp = client.get('/api/users/42')
+        assert resp.status_code == 401
+
     @patch('OrbitServer.api.users.get_user_profile')
-    def test_returns_public_profile(self, mock_get_profile, client):
+    def test_other_user_omits_private_fields(self, mock_get_profile, client):
         mock_get_profile.return_value = (
             {"profile": {"name": "Public User"}, "profile_complete": True},
             None
         )
-        resp = client.get('/api/users/42')
-        body = json.loads(resp.data)
+        resp = client.get('/api/users/42', headers=auth_header(1))
         assert resp.status_code == 200
-        assert body["success"] is True
+        # Caller (1) is viewing another user (42): private fields must be stripped.
+        mock_get_profile.assert_called_once_with('42', include_private=False)
+
+    @patch('OrbitServer.api.users.get_user_profile')
+    def test_self_via_id_includes_private_fields(self, mock_get_profile, client):
+        mock_get_profile.return_value = (
+            {"profile": {"name": "Me", "email": "me@x.edu"}, "profile_complete": True},
+            None
+        )
+        resp = client.get('/api/users/1', headers=auth_header(1))
+        assert resp.status_code == 200
+        mock_get_profile.assert_called_once_with('1', include_private=True)
 
     @patch('OrbitServer.api.users.get_user_profile')
     def test_returns_404_for_missing_user(self, mock_get_profile, client):
         mock_get_profile.return_value = (None, "User not found")
-        resp = client.get('/api/users/999')
+        resp = client.get('/api/users/999', headers=auth_header(1))
         assert resp.status_code == 404

@@ -1,6 +1,40 @@
 """Tests for services/user_service.py — pure business logic, no mocking needed."""
 
-from OrbitServer.services.user_service import _format_profile, _is_profile_complete, DEFAULT_PROFILE
+from unittest.mock import patch
+
+from OrbitServer.services.user_service import (
+    _format_profile, _is_profile_complete, DEFAULT_PROFILE, get_user_profile,
+)
+
+
+class TestGetUserProfilePrivacy:
+    """get_user_profile strips owner-only fields for other users."""
+
+    _RAW = {'id': 7, 'name': 'Ada', 'email': 'ada@school.edu',
+            'college_year': 'junior', 'interests': ['a', 'b', 'c']}
+
+    @patch('OrbitServer.services.user_service.get_user')
+    def test_includes_email_for_self(self, mock_get):
+        mock_get.return_value = dict(self._RAW)
+        result, err = get_user_profile(7, include_private=True)
+        assert err is None
+        assert result['profile']['email'] == 'ada@school.edu'
+
+    @patch('OrbitServer.services.user_service.get_user')
+    def test_strips_email_for_others(self, mock_get):
+        mock_get.return_value = dict(self._RAW)
+        result, err = get_user_profile(7, include_private=False)
+        assert err is None
+        assert 'email' not in result['profile']
+        # Non-private fields are still present.
+        assert result['profile']['name'] == 'Ada'
+
+    @patch('OrbitServer.services.user_service.get_user')
+    def test_missing_user_returns_error(self, mock_get):
+        mock_get.return_value = None
+        result, err = get_user_profile(7, include_private=False)
+        assert result is None
+        assert err == "User not found"
 
 
 # ── _format_profile ─────────────────────────────────────────────────────────
