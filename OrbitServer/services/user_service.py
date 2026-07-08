@@ -217,7 +217,17 @@ def delete_user_account(user_id):
     except Exception:
         logger.exception("Error cleaning up missions for user %s", user_id)
 
-    # 5. Delete the user entity itself
+    # 5. Delete the user's analytics events (GDPR/CCPA deletion cascade).
+    # Analytics is pseudonymized, so recompute the same deterministic pseudo id
+    # from the user id to find exactly this user's slice of the event stream.
+    try:
+        from OrbitServer.models.models import delete_analytics_events_for_pseudo
+        from OrbitServer.utils.analytics_id import pseudonymize
+        delete_analytics_events_for_pseudo(pseudonymize(uid))
+    except Exception:
+        logger.exception("Error cleaning up analytics events for user %s", user_id)
+
+    # 6. Delete the user entity itself
     delete_user(uid)
 
     return True, None

@@ -7,6 +7,8 @@ from OrbitServer.models.models import (
     create_friendship, get_friendship, list_friendships,
     find_friendship, delete_friendship,
 )
+from OrbitServer.services.analytics_service import emit as emit_event
+from OrbitServer.utils.analytics_id import pseudonymize
 
 
 def _friend_profile(user):
@@ -58,6 +60,9 @@ def send_friend_request(from_user_id, to_user_id):
     req = create_friend_request(from_user_id, to_user_id)
     req['from_user'] = _friend_profile(get_user(int(from_user_id)))
     req['to_user'] = _friend_profile(target)
+    emit_event('friend_request_sent', from_user_id, {
+        'target_pseudo_id': pseudonymize(to_user_id),
+    })
     return req, None
 
 
@@ -100,6 +105,9 @@ def accept_friend_request(request_id, user_id):
 
     friend = get_user(int(req['from_user_id']))
     friendship['friend'] = _friend_profile(friend)
+    emit_event('friend_accepted', user_id, {
+        'target_pseudo_id': pseudonymize(req['from_user_id']),
+    })
     return friendship, None, None
 
 

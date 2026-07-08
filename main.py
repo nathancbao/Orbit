@@ -16,6 +16,7 @@ from OrbitServer.api.friends import friends_bp
 from OrbitServer.api.dm import dm_bp
 from OrbitServer.api.voyage import voyage_bp
 from OrbitServer.api.tasks import tasks_bp
+from OrbitServer.api.analytics import analytics_bp
 from OrbitServer.models.models import get_user
 
 app = Flask(__name__)
@@ -66,6 +67,7 @@ app.register_blueprint(friends_bp)
 app.register_blueprint(dm_bp)
 app.register_blueprint(voyage_bp)
 app.register_blueprint(tasks_bp)
+app.register_blueprint(analytics_bp)
 
 
 @app.route('/')

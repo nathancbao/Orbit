@@ -984,6 +984,49 @@ def mark_notifications_read(user_id):
     return len(updated)
 
 
+# ── AnalyticsEvent ────────────────────────────────────────────────────────────
+# Append-only behavioral event stream (see docs/analytics-and-metrics.md).
+# Keyed by the client-supplied event_id so a retried/duplicated event resolves
+# to the same key and overwrites rather than double-counting — the whole
+# ingestion path is idempotent. Never stores raw user_id/email: only the
+# pseudonymous user_pseudo_id.
+
+def create_analytics_event(event):
+    """Persist a single analytics event envelope (idempotent by event_id).
+
+    ``event`` is the fully-built envelope dict from analytics_service. The
+    envelope's ``properties`` map is excluded from indexes (arbitrary shape,
+    never filtered on); the top-level columns stay indexed for rollup queries.
+    """
+    event_id = event['event_id']
+    key = client.key('AnalyticsEvent', event_id)
+    entity = datastore.Entity(key=key, exclude_from_indexes=['properties'])
+    entity.update(event)
+    client.put(entity)
+    return event_id
+
+
+def delete_analytics_events_for_pseudo(user_pseudo_id, batch_limit=500):
+    """Delete every analytics event for a pseudonymous id (deletion cascade).
+
+    Returns the number of events deleted. Pages through the user's events in
+    batches so a heavy account still purges fully.
+    """
+    deleted = 0
+    while True:
+        query = client.query(kind='AnalyticsEvent')
+        query.add_filter(filter=PropertyFilter('user_pseudo_id', '=', user_pseudo_id))
+        query.keys_only()
+        keys = [e.key for e in query.fetch(limit=batch_limit)]
+        if not keys:
+            break
+        client.delete_multi(keys)
+        deleted += len(keys)
+        if len(keys) < batch_limit:
+            break
+    return deleted
+
+
 # ── RefreshToken ──────────────────────────────────────────────────────────────
 
 def store_refresh_token(token, user_id):

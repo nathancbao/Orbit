@@ -9,8 +9,31 @@ from OrbitServer.models.models import (
     create_notification, get_signal,
 )
 from OrbitServer.utils.helpers import safe_int as _safe_int
+from OrbitServer.services.analytics_service import emit as emit_event
 
 logger = logging.getLogger(__name__)
+
+
+def _emit_mission_joined(mission, pod, user_id):
+    """Best-effort analytics for a successful mission join.
+
+    match_score is the interest-overlap score logged at join time so the
+    recommender can later evaluate predicted-vs-actual outcomes. Computed
+    best-effort; emit() itself swallows any failure.
+    """
+    match_score = None
+    try:
+        from OrbitServer.services.ai_suggestion_service import score_mission_for_user
+        user = get_user(user_id) or {}
+        match_score = score_mission_for_user(mission, set(user.get('interests') or []))
+    except Exception:
+        match_score = None
+    emit_event('mission_joined', user_id, {
+        'mission_id': str(mission.get('id') or ''),
+        'pod_id': str(pod.get('id') or ''),
+        'mode': mission.get('mode') or 'set',
+        'match_score': match_score,
+    })
 
 ATTENDANCE_CONFIRM_POINTS = 50
 NO_SHOW_PENALTY = -20
@@ -241,6 +264,7 @@ def join_mission(mission_id, user_id, preferred_pod_id=None):
 
     record_action(user_id, mission_id, 'joined', pod_id=pod['id'],
                    tags_snapshot=mission.get('tags') or [])
+    _emit_mission_joined(mission, pod, user_id)
     return pod, None
 
 
@@ -264,6 +288,10 @@ def leave_mission(mission_id, user_id):
         entity['status'] = 'open' if len(member_ids) < entity.get('max_size', 4) else entity.get('status', 'open')
 
     transactional_pod_update(pod['id'], _remove_member)
+    emit_event('mission_left', user_id, {
+        'mission_id': str(mission_id),
+        'pod_id': str(pod.get('id') or ''),
+    })
     return True, None
 
 
