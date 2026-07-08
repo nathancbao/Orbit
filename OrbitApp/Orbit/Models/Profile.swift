@@ -18,6 +18,10 @@ struct Profile: Codable, Identifiable, Equatable {
     var gender: String
     var mbti: String
 
+    // Location settings
+    var college: String           // id from GET /colleges; "" = not set
+    var maxDistanceMiles: Int     // 0 = no limit, max 50
+
     // Computed in discover flow
     var matchScore: Double?
 
@@ -33,13 +37,16 @@ struct Profile: Codable, Identifiable, Equatable {
         case links
         case gender
         case mbti
+        case college
+        case maxDistanceMiles = "max_distance_miles"
         case matchScore = "match_score"
     }
 
     init(name: String, collegeYear: String, interests: [String],
          photo: String? = nil, trustScore: Double? = nil, email: String? = nil,
          galleryPhotos: [String] = [], bio: String = "", links: [String] = [],
-         gender: String = "", mbti: String = "", matchScore: Double? = nil) {
+         gender: String = "", mbti: String = "", college: String = "",
+         maxDistanceMiles: Int = 0, matchScore: Double? = nil) {
         self.name = name
         self.collegeYear = collegeYear
         self.interests = interests
@@ -51,6 +58,8 @@ struct Profile: Codable, Identifiable, Equatable {
         self.links = links
         self.gender = gender
         self.mbti = mbti
+        self.college = college
+        self.maxDistanceMiles = maxDistanceMiles
         self.matchScore = matchScore
     }
 
@@ -67,6 +76,8 @@ struct Profile: Codable, Identifiable, Equatable {
         links = try container.decodeIfPresent([String].self, forKey: .links) ?? []
         gender = try container.decodeIfPresent(String.self, forKey: .gender) ?? ""
         mbti = try container.decodeIfPresent(String.self, forKey: .mbti) ?? ""
+        college = try container.decodeIfPresent(String.self, forKey: .college) ?? ""
+        maxDistanceMiles = try container.decodeIfPresent(Int.self, forKey: .maxDistanceMiles) ?? 0
         matchScore = try container.decodeIfPresent(Double.self, forKey: .matchScore)
     }
 

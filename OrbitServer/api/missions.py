@@ -106,6 +106,10 @@ def list_all():
 
     _annotate_pod_status_batch(missions, g.user_id)
 
+    # Ended missions are only visible to their pod members (24h window)
+    missions = [m for m in missions
+                if m.get('status') != 'completed' or m.get('user_pod_status') == 'in_pod']
+
     return success([_strip_embedding(m) for m in missions])
 
 
