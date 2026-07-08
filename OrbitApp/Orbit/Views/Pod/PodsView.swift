@@ -42,6 +42,20 @@ struct PodsView: View {
     @State private var recommendedMissionForDetail: Mission? = nil
     @State private var unreadPodIds: Set<String> = []
     @State private var signalPendingDelete: Mission?
+    @State private var notifications: [AppNotification] = []
+
+    private var hasUnreadNotifications: Bool {
+        notifications.contains { !$0.read }
+    }
+
+    /// How many pods the user occupies (max 15) — pods plus flex RSVPs
+    /// that haven't been matched into a pod yet.
+    private var joinedPodCount: Int {
+        let rsvpPodIds = Set(rsvpedFlexMissions.compactMap { $0.podId })
+        return pods.filter { !rsvpPodIds.contains($0.id) }.count + rsvpedFlexMissions.count
+    }
+
+    private var atPodLimit: Bool { joinedPodCount >= Constants.Validation.maxPods }
 
     private var currentUserId: Int {
         UserDefaults.standard.integer(forKey: "orbit_user_id")
@@ -132,15 +146,30 @@ struct PodsView: View {
                         }
                         .padding(.vertical, 12)
 
-                        // Search bar
-                        HStack {
-                            Image(systemName: "magnifyingglass")
-                                .foregroundColor(.secondary)
-                            TextField("Search pods", text: $searchText)
+                        // Search bar + pod count (max 15 pods per person)
+                        HStack(spacing: 10) {
+                            HStack {
+                                Image(systemName: "magnifyingglass")
+                                    .foregroundColor(.secondary)
+                                TextField("Search pods", text: $searchText)
+                            }
+                            .padding(10)
+                            .background(Color(.systemGray6))
+                            .cornerRadius(12)
+
+                            HStack(spacing: 4) {
+                                Image(systemName: "person.3.fill")
+                                    .font(.caption2)
+                                Text("\(joinedPodCount)/\(Constants.Validation.maxPods)")
+                                    .font(.system(.caption, design: .monospaced))
+                                    .fontWeight(.semibold)
+                            }
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 8)
+                            .background(atPodLimit ? Color.orange.opacity(0.15) : Color(.systemGray6))
+                            .foregroundColor(atPodLimit ? .orange : .secondary)
+                            .clipShape(Capsule())
                         }
-                        .padding(10)
-                        .background(Color(.systemGray6))
-                        .cornerRadius(12)
                         .padding(.horizontal, 20)
                         .padding(.bottom, 8)
 
@@ -214,6 +243,7 @@ struct PodsView: View {
                             if recommendedMissions.isEmpty {
                                 recommendedMissions = (try? await MissionService.shared.suggestedMissions()) ?? []
                             }
+                            notifications = (try? await NotificationService.shared.getNotifications()) ?? notifications
                             showRecommendations = true
                         }
                     } label: {
@@ -223,7 +253,7 @@ struct PodsView: View {
                                 .fontWeight(.medium)
                                 .foregroundStyle(Color.primary)
                                 .padding(4)
-                            if !recommendedMissions.isEmpty {
+                            if !recommendedMissions.isEmpty || hasUnreadNotifications {
                                 Circle()
                                     .fill(OrbitTheme.pink)
                                     .frame(width: 8, height: 8)
@@ -246,9 +276,16 @@ struct PodsView: View {
                 onProfileUpdated: { updated in userProfile = updated }
             )
         }
-        .sheet(isPresented: $showRecommendations) {
-            RecommendationsSheet(
-                items: recommendedMissions.map { .recommendedMission($0) },
+        .sheet(isPresented: $showRecommendations, onDismiss: {
+            // Viewing the inbox marks everything read.
+            if hasUnreadNotifications {
+                Task { try? await NotificationService.shared.markAllRead() }
+                notifications = notifications.map { var n = $0; n.read = true; return n }
+            }
+        }) {
+            PodInboxSheet(
+                notifications: notifications,
+                recommendations: recommendedMissions,
                 onSelectMission: { mission in
                     showRecommendations = false
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
@@ -304,6 +341,7 @@ struct PodsView: View {
         )
         async let rsvpsResult: [Mission]? = try? MissionService.shared.rsvpedFlexMissions()
         async let conversationsResult = try? ChatService.shared.getPodConversations()
+        async let notificationsResult = try? NotificationService.shared.getNotifications()
         if let newPods = await podsResult {
             pods = newPods
         }
@@ -312,6 +350,9 @@ struct PodsView: View {
         }
         if let conversations = await conversationsResult {
             refreshUnread(from: conversations)
+        }
+        if let newNotifications = await notificationsResult {
+            notifications = newNotifications
         }
         isLoading = false
     }
@@ -383,13 +424,31 @@ struct PodRowCard: View {
                         }
                     }
 
-                    HStack(spacing: 4) {
-                        Image(systemName: "person.3")
-                            .font(.caption2)
-                        Text("\(pod.memberIds.count) members")
-                            .font(.caption)
+                    HStack(spacing: 8) {
+                        HStack(spacing: 4) {
+                            Image(systemName: "person.3")
+                                .font(.caption2)
+                            Text("\(pod.memberIds.count) members")
+                                .font(.caption)
+                        }
+                        .foregroundColor(.secondary)
+
+                        // Below minimum size — compact "+N" chip (N more needed).
+                        if pod.membersNeededForMinimum > 0 {
+                            HStack(spacing: 2) {
+                                Image(systemName: "person.fill.badge.plus")
+                                    .font(.caption2)
+                                Text("+\(pod.membersNeededForMinimum)")
+                                    .font(.caption)
+                                    .fontWeight(.semibold)
+                            }
+                            .padding(.horizontal, 7)
+                            .padding(.vertical, 2)
+                            .background(Color.orange.opacity(0.15))
+                            .foregroundColor(.orange)
+                            .clipShape(Capsule())
+                        }
                     }
-                    .foregroundColor(.secondary)
 
                     if let time = pod.displayTime {
                         HStack(spacing: 4) {
@@ -536,6 +595,89 @@ struct FlexMissionRsvpCard: View {
             } else {
                 MissionDetailView(mission: mission, onJoined: { onDismiss?() })
             }
+        }
+    }
+}
+
+// MARK: - Pod Inbox Sheet (notifications + recommendations)
+
+struct PodInboxSheet: View {
+    let notifications: [AppNotification]
+    let recommendations: [Mission]
+    let onSelectMission: (Mission) -> Void
+
+    var body: some View {
+        NavigationStack {
+            List {
+                if !notifications.isEmpty {
+                    Section("Notifications") {
+                        ForEach(notifications) { notif in
+                            HStack(alignment: .top, spacing: 12) {
+                                Image(systemName: notif.type == "pod_deleted" ? "trash.circle.fill" : "bell.circle.fill")
+                                    .font(.title2)
+                                    .foregroundStyle(OrbitTheme.gradient)
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(notif.title)
+                                        .font(.subheadline)
+                                        .fontWeight(notif.read ? .medium : .semibold)
+                                    Text(notif.body)
+                                        .font(.caption)
+                                        .foregroundColor(.secondary)
+                                }
+                                Spacer()
+                                if !notif.read {
+                                    Circle()
+                                        .fill(OrbitTheme.pink)
+                                        .frame(width: 8, height: 8)
+                                        .padding(.top, 6)
+                                }
+                            }
+                            .padding(.vertical, 2)
+                        }
+                    }
+                }
+
+                Section("Recommended for you") {
+                    if recommendations.isEmpty {
+                        Text("No recommendations yet. Check back soon!")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    } else {
+                        ForEach(recommendations) { mission in
+                            Button {
+                                onSelectMission(mission)
+                            } label: {
+                                HStack(spacing: 12) {
+                                    Image(systemName: mission.logo ?? "sparkles")
+                                        .font(.title2)
+                                        .foregroundStyle(OrbitTheme.gradient)
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        Text(mission.displayTitle)
+                                            .font(.subheadline)
+                                            .fontWeight(.semibold)
+                                            .foregroundColor(.primary)
+                                        if let reason = mission.suggestionReason {
+                                            Text(reason)
+                                                .font(.caption)
+                                                .foregroundColor(.secondary)
+                                        }
+                                    }
+                                    Spacer()
+                                    if let score = mission.matchScore {
+                                        MatchScoreBadge(score: score)
+                                    }
+                                    Image(systemName: "chevron.right")
+                                        .font(.caption)
+                                        .foregroundColor(.secondary)
+                                }
+                                .padding(.vertical, 2)
+                            }
+                        }
+                    }
+                }
+            }
+            .navigationTitle("Inbox")
+            .navigationBarTitleDisplayMode(.inline)
         }
     }
 }

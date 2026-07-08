@@ -54,7 +54,9 @@
       "Bash(ls requirements*.txt)",
       "Bash(ls -d venv .venv env)",
       "Bash(grep -i \"profanity\\\\|pytest\" requirements*.txt)",
-      "PowerShell(\\(Get-Content \"C:\\\\Users\\\\rashm\\\\OneDrive\\\\Desktop\\\\DAEMON\\\\ECS_191\\\\Orbit\\\\OrbitServer\\\\models\\\\models.py\" | Measure-Object -Line\\).Lines)"
+      "PowerShell(\\(Get-Content \"C:\\\\Users\\\\rashm\\\\OneDrive\\\\Desktop\\\\DAEMON\\\\ECS_191\\\\Orbit\\\\OrbitServer\\\\models\\\\models.py\" | Measure-Object -Line\\).Lines)",
+      "Bash(swiftc -parse Views/Missions/MissionsView.swift)",
+      "Bash(env DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer xcodebuild -scheme Orbit -destination 'generic/platform=iOS Simulator' -configuration Debug build CODE_SIGNING_ALLOWED=NO)"
     ]
   }
 }

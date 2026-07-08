@@ -16,10 +16,11 @@ struct PodView: View {
     @State private var showScheduleSheet = false
     @State private var showKickSheet = false
     @State private var kickTarget: PodMember?
-    @State private var showRenameAlert = false
-    @State private var renameText = ""
+    @State private var showEditPodSheet = false
     @State private var showLeaveAlert = false
+    @State private var showDeleteAlert = false
     @State private var showInviteSheet = false
+    @State private var showMissionSheet = false
     @State private var selectedMember: (profile: Profile, userId: Int)?
     @State private var isLoadingProfile = false
     @Environment(\.dismiss) private var dismiss
@@ -36,6 +37,17 @@ struct PodView: View {
 
     private var displayTitle: String {
         viewModel.pod?.name ?? title
+    }
+
+    /// Whether the signed-in user is the pod leader (first member in join order).
+    private var isLeader: Bool {
+        viewModel.pod?.leaderId == currentUserId
+    }
+
+    /// Display name for a pod member (falls back to "Someone").
+    private func memberName(_ userId: Int) -> String {
+        if userId == currentUserId { return "You" }
+        return viewModel.pod?.members?.first(where: { $0.userId == userId })?.name ?? "Someone"
     }
 
     init(podId: String, title: String, missionMode: MissionMode = .set, onPodNotFound: (() -> Void)? = nil) {
@@ -158,6 +170,25 @@ struct PodView: View {
                     currentMemberIds: viewModel.pod?.memberIds ?? []
                 )
             }
+            .sheet(isPresented: $showEditPodSheet) {
+                EditPodSheet(
+                    initialName: viewModel.pod?.name ?? "",
+                    initialPlace: viewModel.pod?.scheduledPlace ?? "",
+                    onSave: { name, place in
+                        Task {
+                            await viewModel.editPod(
+                                name: name.isEmpty ? nil : name,
+                                place: place
+                            )
+                        }
+                    }
+                )
+            }
+            .sheet(isPresented: $showMissionSheet) {
+                if let mission = viewModel.mission {
+                    MissionDetailView(mission: mission, onJoined: {})
+                }
+            }
             .sheet(isPresented: $showScheduleSheet) {
                 if let pod = viewModel.pod, let svm = scheduleVM {
                     NavigationStack {
@@ -180,17 +211,6 @@ struct PodView: View {
                 .navigationTitle(displayTitle)
                 .navigationBarTitleDisplayMode(.inline)
                 .toolbar { toolbarContent }
-        }
-        .alert("Rename Pod", isPresented: $showRenameAlert) {
-            TextField("Pod name", text: $renameText)
-            Button("Save") {
-                let trimmed = renameText.trimmingCharacters(in: .whitespaces)
-                guard !trimmed.isEmpty else { return }
-                Task { await viewModel.renamePod(name: trimmed) }
-            }
-            Button("Cancel", role: .cancel) {}
-        } message: {
-            Text("Give your pod a name")
         }
         .alert(
             "Kick \(kickTarget?.name ?? "member")?",
@@ -217,6 +237,14 @@ struct PodView: View {
         } message: {
             Text("You will no longer be able to see this pod's chat or votes.")
         }
+        .alert("Delete Pod?", isPresented: $showDeleteAlert) {
+            Button("Delete", role: .destructive) {
+                Task { await viewModel.deletePod() }
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("This permanently deletes the pod for everyone. All members will be notified.")
+        }
     }
 
     // MARK: - Main Content (broken out for type-checker)
@@ -238,14 +266,16 @@ struct PodView: View {
         ToolbarItem(placement: .navigationBarLeading) {
             Button("Close") { dismiss() }
         }
-        ToolbarItem(placement: .navigationBarTrailing) {
-            Button {
-                renameText = viewModel.pod?.name ?? ""
-                showRenameAlert = true
-            } label: {
-                Image(systemName: "pencil")
-                    .font(.subheadline)
-                    .foregroundStyle(OrbitTheme.gradient)
+        // Only the pod leader can edit the pod (name + meeting place).
+        if isLeader {
+            ToolbarItem(placement: .navigationBarTrailing) {
+                Button {
+                    showEditPodSheet = true
+                } label: {
+                    Image(systemName: "pencil")
+                        .font(.subheadline)
+                        .foregroundStyle(OrbitTheme.gradient)
+                }
             }
         }
     }
@@ -282,6 +312,9 @@ struct PodView: View {
 
             Divider()
 
+            // Waiting for minimum members banner
+            waitingForMembersBanner
+
             // Confirmed time/place banner (flex pods)
             if missionMode == .flex {
                 confirmedDetailsBanner
@@ -289,6 +322,9 @@ struct PodView: View {
 
             // Activity completed banner (set missions after end time)
             activityCompletedBanner
+
+            // Pinned message (leader-pinned, Discord-style)
+            pinnedMessageBanner
 
             // Action bar
             actionBar
@@ -333,6 +369,12 @@ struct PodView: View {
     private var actionBar: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 10) {
+                // Direct link to the mission this pod belongs to.
+                if viewModel.mission != nil {
+                    ActionChip(icon: "scope", label: "Mission") {
+                        showMissionSheet = true
+                    }
+                }
                 if missionMode == .flex {
                     ActionChip(icon: "calendar.badge.plus", label: "Availability") {
                         showScheduleSheet = true
@@ -352,17 +394,88 @@ struct PodView: View {
                     }
                 }
 
-                ActionChip(icon: "person.badge.plus", label: "Invite") {
-                    showInviteSheet = true
+                // Only the pod leader can invite people or delete the pod.
+                if isLeader {
+                    ActionChip(icon: "person.badge.plus", label: "Invite") {
+                        showInviteSheet = true
+                    }
                 }
                 ActionChip(icon: "rectangle.portrait.and.arrow.right", label: "Leave Pod") {
                     showLeaveAlert = true
+                }
+                if isLeader {
+                    ActionChip(icon: "trash", label: "Delete Pod") {
+                        showDeleteAlert = true
+                    }
                 }
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 10)
         }
         .background(Color(.systemBackground))
+    }
+
+    // MARK: - Waiting For Members Banner
+
+    /// Pods need a minimum number of people (3+) before the activity is a go.
+    /// Compact: "👤+ +2 to launch".
+    @ViewBuilder
+    private var waitingForMembersBanner: some View {
+        if let pod = viewModel.pod, pod.membersNeededForMinimum > 0 {
+            HStack(spacing: 6) {
+                Text("needs +\(pod.membersNeededForMinimum)")
+                    .font(.subheadline)
+                    .fontWeight(.bold)
+                    .foregroundColor(.orange)
+                Image(systemName: "person.fill.badge.plus")
+                    .font(.subheadline)
+                    .foregroundColor(.orange)
+                Text("needs +\(pod.membersNeededForMinimum)")
+                    .font(.subheadline)
+                    .fontWeight(.bold)
+                    .foregroundColor(.orange)
+                Text("to launch")
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
+                Spacer()
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 8)
+            .background(Color.orange.opacity(0.08))
+
+            Divider()
+        }
+    }
+
+    // MARK: - Pinned Message Banner
+
+    /// Shows the most recently pinned message, like Discord's pin bar.
+    @ViewBuilder
+    private var pinnedMessageBanner: some View {
+        if let pinnedMsg = viewModel.messages.last(where: { $0.pinned }) {
+            HStack(spacing: 10) {
+                Image(systemName: "pin.fill")
+                    .font(.caption)
+                    .foregroundStyle(OrbitTheme.gradient)
+
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(memberName(pinnedMsg.userId))
+                        .font(.caption2)
+                        .fontWeight(.semibold)
+                        .foregroundColor(.secondary)
+                    Text(pinnedMsg.content)
+                        .font(.caption)
+                        .lineLimit(2)
+                }
+
+                Spacer()
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 8)
+            .background(Color(.systemGray6))
+
+            Divider()
+        }
     }
 
     // MARK: - Confirmed Details Banner
@@ -490,7 +603,19 @@ struct PodView: View {
                             ChatBubble(
                                 message: message,
                                 isCurrentUser: message.userId == currentUserId,
-                                senderName: viewModel.pod?.members?.first(where: { $0.userId == message.userId })?.name ?? "?"
+                                senderName: viewModel.pod?.members?.first(where: { $0.userId == message.userId })?.name ?? "?",
+                                currentUserId: currentUserId,
+                                isLeader: isLeader,
+                                nameFor: { uid in memberName(uid) },
+                                onReact: { reaction in
+                                    Task { await viewModel.reactToMessage(messageId: message.id, reaction: reaction) }
+                                },
+                                onTogglePin: {
+                                    Task { await viewModel.togglePin(message: message) }
+                                },
+                                onDelete: {
+                                    Task { await viewModel.deleteMessage(messageId: message.id) }
+                                }
                             )
                             .id(message.id)
                         }
@@ -617,11 +742,22 @@ struct MemberStripView: View {
 }
 
 // MARK: - Chat Bubble
+// Discord-style: hold a message to react (👍 👎 ❤️), pin (leader only), or
+// delete (own messages only). Reaction counts show under the bubble; hold the
+// reactions to see who reacted with what.
 
 struct ChatBubble: View {
     let message: ChatMessage
     let isCurrentUser: Bool
     let senderName: String
+    var currentUserId: Int = 0
+    var isLeader: Bool = false
+    var nameFor: (Int) -> String = { _ in "Someone" }
+    var onReact: ((String) -> Void)? = nil
+    var onTogglePin: (() -> Void)? = nil
+    var onDelete: (() -> Void)? = nil
+
+    @State private var showReactors = false
 
     var body: some View {
         HStack(alignment: .bottom, spacing: 8) {
@@ -634,25 +770,114 @@ struct ChatBubble: View {
                         .foregroundColor(.secondary)
                         .padding(.leading, 4)
                 }
-                Text(message.content)
-                    .font(.body)
-                    .padding(.horizontal, 14)
-                    .padding(.vertical, 10)
-                    .background(
-                        isCurrentUser
-                        ? AnyShapeStyle(OrbitTheme.gradient)
-                        : AnyShapeStyle(Color(.systemGray5))
-                    )
-                    .foregroundColor(isCurrentUser ? .white : .primary)
-                    .clipShape(
-                        RoundedRectangle(cornerRadius: 18)
-                    )
+                bubbleContent
+                    .contextMenu { messageActions }
+
+                if !message.activeReactions.isEmpty {
+                    reactionChips
+                }
             }
 
             if !isCurrentUser { Spacer(minLength: 60) }
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 2)
+        .alert("Reactions", isPresented: $showReactors) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(reactorSummary)
+        }
+    }
+
+    private var bubbleContent: some View {
+        HStack(spacing: 4) {
+            if message.pinned {
+                Image(systemName: "pin.fill")
+                    .font(.caption2)
+                    .foregroundColor(isCurrentUser ? .white.opacity(0.85) : .secondary)
+            }
+            Text(message.content)
+                .font(.body)
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 10)
+        .background(
+            isCurrentUser
+            ? AnyShapeStyle(OrbitTheme.gradient)
+            : AnyShapeStyle(Color(.systemGray5))
+        )
+        .foregroundColor(isCurrentUser ? .white : .primary)
+        .clipShape(
+            RoundedRectangle(cornerRadius: 18)
+        )
+    }
+
+    // Long-press menu: emoji reactions row + pin (leader) + delete (own).
+    @ViewBuilder
+    private var messageActions: some View {
+        ControlGroup {
+            ForEach(ChatMessage.reactionOptions, id: \.key) { option in
+                Button(option.emoji) { onReact?(option.key) }
+            }
+        }
+        .controlGroupStyle(.compactMenu)
+
+        if isLeader {
+            Button {
+                onTogglePin?()
+            } label: {
+                Label(message.pinned ? "Unpin" : "Pin", systemImage: "pin")
+            }
+        }
+
+        if isCurrentUser {
+            Button(role: .destructive) {
+                onDelete?()
+            } label: {
+                Label("Delete", systemImage: "trash")
+            }
+        }
+    }
+
+    /// Reaction chips under the bubble — tap to toggle, hold to see who reacted.
+    private var reactionChips: some View {
+        HStack(spacing: 6) {
+            ForEach(message.activeReactions, id: \.key) { reaction in
+                let mine = reaction.userIds.contains(currentUserId)
+                HStack(spacing: 4) {
+                    Text(reaction.emoji)
+                        .font(.caption)
+                    Text("\(reaction.userIds.count)")
+                        .font(.caption2)
+                        .fontWeight(.semibold)
+                }
+                .padding(.horizontal, 8)
+                .padding(.vertical, 4)
+                .background(
+                    mine
+                    ? AnyShapeStyle(OrbitTheme.gradient.opacity(0.18))
+                    : AnyShapeStyle(Color(.systemGray6))
+                )
+                .overlay(
+                    Capsule().stroke(
+                        mine ? AnyShapeStyle(OrbitTheme.gradient) : AnyShapeStyle(Color.clear),
+                        lineWidth: 1
+                    )
+                )
+                .clipShape(Capsule())
+                .onTapGesture { onReact?(reaction.key) }
+                .onLongPressGesture { showReactors = true }
+            }
+        }
+        .padding(.horizontal, 4)
+        .padding(.top, 2)
+    }
+
+    /// e.g. "👍 You, Alex\n❤️ Sam" — shown when holding the reaction chips.
+    private var reactorSummary: String {
+        message.activeReactions.map { reaction in
+            "\(reaction.emoji) " + reaction.userIds.map { nameFor($0) }.joined(separator: ", ")
+        }.joined(separator: "\n")
     }
 }
 
@@ -704,6 +929,94 @@ struct ActionChip: View {
             .clipShape(Capsule())
         }
         .buttonStyle(.plain)
+    }
+}
+
+// MARK: - Edit Pod Sheet (leader only)
+// Edits the whole pod, not just the name — e.g. the group agrees a different
+// spot works better, the leader updates it, and everyone sees the change
+// (a system message announces it in the chat).
+
+struct EditPodSheet: View {
+    let initialName: String
+    let initialPlace: String
+    let onSave: (String, String) -> Void
+
+    @Environment(\.dismiss) private var dismiss
+    @State private var name: String
+    @State private var place: String
+    @State private var showLocationSearch = false
+
+    init(initialName: String, initialPlace: String, onSave: @escaping (String, String) -> Void) {
+        self.initialName = initialName
+        self.initialPlace = initialPlace
+        self.onSave = onSave
+        _name = State(initialValue: initialName)
+        _place = State(initialValue: initialPlace)
+    }
+
+    private var hasChanges: Bool {
+        name.trimmingCharacters(in: .whitespaces) != initialName
+            || place.trimmingCharacters(in: .whitespaces) != initialPlace
+    }
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section("Pod name") {
+                    TextField("Pod name", text: $name)
+                }
+
+                Section {
+                    Button {
+                        showLocationSearch = true
+                    } label: {
+                        HStack(spacing: 10) {
+                            Image(systemName: "mappin.and.ellipse")
+                                .foregroundStyle(OrbitTheme.gradient)
+                            Text(place.isEmpty ? "Add a meeting place" : place)
+                                .foregroundColor(place.isEmpty ? .secondary : .primary)
+                                .lineLimit(2)
+                            Spacer()
+                            Image(systemName: "chevron.right")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                    }
+                    .buttonStyle(.plain)
+
+                    if !place.isEmpty {
+                        Button("Clear meeting place", role: .destructive) {
+                            place = ""
+                        }
+                    }
+                } header: {
+                    Text("Meeting place")
+                } footer: {
+                    Text("Changes are announced in the pod chat so everyone sees them.")
+                }
+            }
+            .navigationTitle("Edit Pod")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") { dismiss() }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Save") {
+                        onSave(
+                            name.trimmingCharacters(in: .whitespaces),
+                            place.trimmingCharacters(in: .whitespaces)
+                        )
+                        dismiss()
+                    }
+                    .disabled(!hasChanges)
+                }
+            }
+            .sheet(isPresented: $showLocationSearch) {
+                LocationSearchView(locationName: $place)
+            }
+        }
     }
 }
 

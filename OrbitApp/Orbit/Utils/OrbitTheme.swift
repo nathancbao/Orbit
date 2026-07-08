@@ -29,13 +29,37 @@ enum OrbitTheme {
         endPoint: .bottomTrailing
     )
 
-    /// Dark card background
+    /// Dark card background — used for missions with a locked-in time (scheduled).
     static let cardGradient = LinearGradient(
         colors: [Color(red: 0.08, green: 0.08, blue: 0.18),
                  Color(red: 0.13, green: 0.08, blue: 0.24)],
         startPoint: .topLeading,
         endPoint: .bottomTrailing
     )
+
+    /// Lighter card background — used for missions still being scheduled
+    /// (flex missions whose group hasn't picked a time yet).
+    static let cardGradientScheduling = LinearGradient(
+        colors: [Color(red: 0.22, green: 0.21, blue: 0.38),
+                 Color(red: 0.31, green: 0.22, blue: 0.46)],
+        startPoint: .topLeading,
+        endPoint: .bottomTrailing
+    )
+
+    /// Deterministic, stable color for a mission tag.
+    ///
+    /// Tags that match one of the user's interests render vivid (so the user
+    /// can spot a good match at a glance); all other tags use a muted neutral.
+    /// The hue is derived from a stable hash of the lowercased tag so the same
+    /// tag always gets the same color across launches and devices.
+    static func color(forTag tag: String, matchesUser: Bool) -> Color {
+        guard matchesUser else { return Color(.systemGray) }
+        let key = tag.lowercased()
+        var hash: UInt64 = 5381
+        for byte in key.utf8 { hash = (hash &* 33) &+ UInt64(byte) }
+        let hue = Double(hash % 360) / 360.0
+        return Color(hue: hue, saturation: 0.62, brightness: 0.82)
+    }
 }
 
 // MARK: - Tag Chip
@@ -102,12 +126,23 @@ struct TagFlowLayout: Layout {
 
 struct OrbitSectionHeader: View {
     let title: String
+    /// Marks the section as optional with a small, low-key suffix — keeps
+    /// required vs. optional obvious without adding visual weight.
+    var optional: Bool = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 5) {
-            Text(title)
-                .font(.headline)
-                .foregroundColor(.primary)
+            HStack(alignment: .firstTextBaseline, spacing: 6) {
+                Text(title)
+                    .font(.headline)
+                    .foregroundColor(.primary)
+                if optional {
+                    Text("optional")
+                        .font(.caption2)
+                        .italic()
+                        .foregroundColor(.secondary)
+                }
+            }
             Capsule()
                 .fill(OrbitTheme.gradient)
                 .frame(width: 28, height: 2.5)

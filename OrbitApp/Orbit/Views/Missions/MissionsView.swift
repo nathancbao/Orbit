@@ -19,97 +19,56 @@ struct MissionsView: View {
     @State private var createdFlexPodId: String? = nil
     @State private var showCreatedFlexPod = false
     @State private var searchText = ""
-    @State private var showRecommendations = false
+    @State private var showFilterSheet = false
+    @State private var podToOpen: String?
     @State private var missionPendingDelete: Mission?
 
     private var currentUserId: Int {
         UserDefaults.standard.integer(forKey: "orbit_user_id")
     }
 
-    private let allTags = [
-        "Hiking", "Gaming", "Food", "Sports", "Study", "Hangout", "Other"
-    ]
-
     var body: some View {
         NavigationStack {
             ZStack(alignment: .bottomTrailing) {
                 Color(.systemBackground).ignoresSafeArea()
+                OrbitRingsBackground()
+                FloatingCurvesBackground()
 
                 VStack(spacing: 0) {
-                    // Search bar
-                    HStack {
-                        Image(systemName: "magnifyingglass")
-                            .foregroundColor(.secondary)
-                        TextField("Search missions", text: $searchText)
+                    // Search bar + filter button
+                    HStack(spacing: 10) {
+                        HStack {
+                            Image(systemName: "magnifyingglass")
+                                .foregroundColor(.secondary)
+                            TextField("Search missions", text: $searchText)
+                        }
+                        .padding(10)
+                        .background(Color(.systemGray6))
+                        .cornerRadius(12)
+
+                        Button {
+                            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                            showFilterSheet = true
+                        } label: {
+                            Image(systemName: "slider.horizontal.3")
+                                .font(.system(size: 18, weight: .semibold))
+                                .foregroundColor(viewModel.hasActiveFilter ? .white : .primary)
+                                .frame(width: 42, height: 42)
+                                .background(
+                                    viewModel.hasActiveFilter
+                                        ? AnyShapeStyle(OrbitTheme.gradientFill)
+                                        : AnyShapeStyle(Color(.systemGray6))
+                                )
+                                .clipShape(RoundedRectangle(cornerRadius: 12))
+                        }
                     }
-                    .padding(10)
-                    .background(Color(.systemGray6))
-                    .cornerRadius(12)
                     .padding(.horizontal, 20)
                     .padding(.bottom, 8)
 
                     ScrollView {
                         VStack(alignment: .leading, spacing: 24) {
-                            // Filters: type + topic (single row)
-                            ScrollView(.horizontal, showsIndicators: false) {
-                                HStack(spacing: 8) {
-                                    TagFilterChip(label: "All", isSelected: viewModel.filterTag == nil && !viewModel.showMyYearOnly && viewModel.filterMode == nil) {
-                                        Task {
-                                            viewModel.applyModeFilter(nil)
-                                            if viewModel.showMyYearOnly { await viewModel.toggleYearFilter() }
-                                            await viewModel.applyTag(nil)
-                                        }
-                                    }
-                                    TagFilterChip(label: "Set", isSelected: viewModel.filterMode == .set) {
-                                        viewModel.applyModeFilter(viewModel.filterMode == .set ? nil : .set)
-                                    }
-                                    TagFilterChip(label: "Flex", isSelected: viewModel.filterMode == .flex) {
-                                        viewModel.applyModeFilter(viewModel.filterMode == .flex ? nil : .flex)
-                                    }
-                                    TagFilterChip(label: "My Year", isSelected: viewModel.showMyYearOnly) {
-                                        Task { await viewModel.toggleYearFilter() }
-                                    }
-                                    ForEach(allTags, id: \.self) { tag in
-                                        TagFilterChip(
-                                            label: tag,
-                                            isSelected: viewModel.filterTag == tag
-                                        ) {
-                                            Task { await viewModel.applyTag(viewModel.filterTag == tag ? nil : tag) }
-                                        }
-                                    }
-                                }
-                                .padding(.horizontal, 20)
-                            }
-
-                            // AI Suggested Section
-                            if !viewModel.suggestedMissions.isEmpty && searchText.isEmpty {
-                                VStack(alignment: .leading, spacing: 10) {
-                                    HStack(spacing: 6) {
-                                        Image(systemName: "sparkles")
-                                            .font(.subheadline)
-                                            .foregroundStyle(OrbitTheme.gradient)
-                                        Text("Recommended for You")
-                                            .font(.subheadline)
-                                            .fontWeight(.semibold)
-                                    }
-                                    .padding(.horizontal, 20)
-
-                                    ScrollView(.horizontal, showsIndicators: false) {
-                                        HStack(spacing: 12) {
-                                            ForEach(viewModel.suggestedMissions) { mission in
-                                                SuggestedMissionCard(mission: mission) {
-                                                    selectedMission = mission
-                                                }
-                                            }
-                                        }
-                                        .padding(.horizontal, 20)
-                                    }
-                                }
-                                .padding(.bottom, 8)
-                            }
-
                             // Missions List
-                            if viewModel.isLoading && viewModel.allMissions.isEmpty && viewModel.allFlexMissions.isEmpty {
+                            if viewModel.isLoading && viewModel.allMissions.isEmpty {
                                 HStack { Spacer(); ProgressView(); Spacer() }
                                     .padding(.vertical, 40)
                             } else {
@@ -126,9 +85,12 @@ struct MissionsView: View {
                                 } else {
                                     VStack(spacing: 14) {
                                         ForEach(displayedMissions) { mission in
-                                            MissionListCard(mission: mission) {
-                                                selectedMission = mission
-                                            }
+                                            MissionListCard(
+                                                mission: mission,
+                                                userInterests: userProfile.interests,
+                                                onTap: { selectedMission = mission },
+                                                onOpenPod: { podId in podToOpen = podId }
+                                            )
                                             .contextMenu {
                                                 if mission.creatorId == currentUserId,
                                                    currentUserId != 0,
@@ -179,23 +141,6 @@ struct MissionsView: View {
             .navigationTitle("Missions")
             .navigationBarTitleDisplayMode(.large)
             .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) {
-                    Button { showRecommendations = true } label: {
-                        ZStack(alignment: .topTrailing) {
-                            Image(systemName: "bell")
-                                .font(.system(size: 18))
-                                .fontWeight(.medium)
-                                .foregroundStyle(Color.primary)
-                                .padding(4)
-                            if !viewModel.suggestedMissions.isEmpty {
-                                Circle()
-                                    .fill(OrbitTheme.pink)
-                                    .frame(width: 8, height: 8)
-                                    .offset(x: 2, y: 0)
-                            }
-                        }
-                    }
-                }
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button { showProfile = true } label: {
                         ProfileAvatarView(photo: userProfile.photo, size: 34, name: userProfile.name)
@@ -233,17 +178,15 @@ struct MissionsView: View {
         } message: {
             Text("This removes the mission and its pods for everyone.")
         }
-        .sheet(isPresented: $showRecommendations) {
-            RecommendationsSheet(
-                items: viewModel.suggestedMissions.map { .recommendedMission($0) },
-                onSelectMission: { mission in
-                    showRecommendations = false
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
-                        selectedMission = mission
-                    }
-                }
-            )
-            .presentationDetents([.medium, .large])
+        .sheet(isPresented: $showFilterSheet) {
+            MissionFilterSheet(viewModel: viewModel)
+                .presentationDetents([.medium, .large])
+        }
+        .sheet(item: Binding(
+            get: { podToOpen.map { IdentifiablePodID(id: $0) } },
+            set: { podToOpen = $0?.id }
+        )) { wrapper in
+            PodView(podId: wrapper.id, title: "Mission", missionMode: .flex)
         }
         .sheet(isPresented: $showCreate) {
             MissionCreateView(
@@ -302,68 +245,6 @@ struct MissionsView: View {
     }
 }
 
-// MARK: - Suggested Mission Card
-
-struct SuggestedMissionCard: View {
-    let mission: Mission
-    let onTap: () -> Void
-
-    var body: some View {
-        Button(action: onTap) {
-            VStack(alignment: .leading, spacing: 10) {
-                // AI reason — the key value-add
-                HStack(spacing: 5) {
-                    Image(systemName: "sparkles")
-                        .font(.caption2)
-                    Text(mission.suggestionReason ?? "picked for you")
-                        .font(.caption2)
-                        .fontWeight(.medium)
-                        .lineLimit(1)
-                }
-                .foregroundStyle(OrbitTheme.gradient)
-
-                Text(mission.isFlexMode ? mission.displayTitle : mission.title)
-                    .font(.headline)
-                    .fontWeight(.bold)
-                    .foregroundColor(.primary)
-                    .lineLimit(2)
-
-                HStack(spacing: 4) {
-                    Text(mission.isFlexMode ? "FLEX" : "SET")
-                        .font(.system(size: 9, weight: .bold))
-                        .padding(.horizontal, 5)
-                        .padding(.vertical, 2)
-                        .background(mission.isFlexMode ? Color.white.opacity(0.15) : OrbitTheme.purple.opacity(0.12))
-                        .cornerRadius(4)
-                    if mission.isJoinedByCurrentUser {
-                        MissionBadge(text: "Joined", color: .green)
-                    }
-                    Label(mission.isFlexMode ? "Flexible time" : mission.displayDate, systemImage: mission.isFlexMode ? "clock.arrow.2.circlepath" : "calendar")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                }
-
-                MissionSpotsLabel(mission: mission)
-            }
-            .padding(16)
-            .frame(width: 190)
-            .background(
-                LinearGradient(
-                    colors: [OrbitTheme.pink.opacity(0.07), OrbitTheme.blue.opacity(0.07)],
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
-                )
-            )
-            .cornerRadius(16)
-            .overlay(
-                RoundedRectangle(cornerRadius: 16)
-                    .stroke(OrbitTheme.purple.opacity(0.15), lineWidth: 1)
-            )
-        }
-        .buttonStyle(.plain)
-    }
-}
-
 // MARK: - Membership / Ownership Badges
 
 /// Small capsule badge — "Joined" on missions you're in, "Yours" on ones you created.
@@ -402,170 +283,253 @@ extension Mission {
 
 struct MissionListCard: View {
     let mission: Mission
+    var userInterests: [String] = []
     let onTap: () -> Void
+    var onOpenPod: ((String) -> Void)? = nil
+
+    private var lowerInterests: Set<String> {
+        Set(userInterests.map { $0.lowercased() })
+    }
+
+    /// Subtitle line: a confirmed/fixed time, or the scheduling summary.
+    private var subtitle: String {
+        if mission.isFlexMode {
+            if let t = mission.scheduledTime { return t }
+            if let summary = mission.flexAvailabilitySummary { return summary }
+            return "Schedule together"
+        }
+        return mission.displayDate.isEmpty ? "Time TBD" : mission.displayDate
+    }
+
+    private var subtitleIcon: String {
+        if mission.isFlexMode {
+            return mission.scheduledTime != nil ? "calendar.badge.checkmark" : "calendar.badge.clock"
+        }
+        return "calendar"
+    }
+
+    /// A mission is "scheduled" when it has a locked-in time: set missions always
+    /// do, flex missions only once the group has picked a time.
+    private var isScheduled: Bool {
+        mission.isFlexMode ? mission.scheduledTime != nil : true
+    }
+
+    /// Scheduled missions get the darker card; missions still being scheduled
+    /// (flex, no time yet) get a lighter one.
+    private var cardBackground: LinearGradient {
+        isScheduled ? OrbitTheme.cardGradient : OrbitTheme.cardGradientScheduling
+    }
+
+    /// Uppercase eyebrow describing the scheduling style + state.
+    private var eyebrow: String {
+        if !mission.isFlexMode { return "SET · FIXED TIME" }
+        return isScheduled ? "FLEX · TIME LOCKED" : "FLEX · GROUP PICKS TIME"
+    }
+
+    /// Whether the signed-in user created this mission (→ pod leader).
+    private var isCreator: Bool {
+        guard let creatorId = mission.creatorId else { return false }
+        let uid = UserDefaults.standard.integer(forKey: "orbit_user_id")
+        return uid != 0 && creatorId == uid
+    }
+
+    /// Allowed group-size range, e.g. "3 to 5".
+    private var sizeRangeText: String {
+        let maxSize = capacity
+        if let min = mission.effectiveMinPodSize, min < maxSize {
+            return "\(min) to \(maxSize)"
+        }
+        return "\(maxSize)"
+    }
+
+    /// Open-spot summary, e.g. "1 open spot" / "3 open spots" / "full".
+    private var openSpotsText: String {
+        let spots = displayPod?.spotsLeft ?? max(0, capacity - memberCount)
+        if spots == 0 { return "full" }
+        return "\(spots) open spot\(spots == 1 ? "" : "s")"
+    }
 
     var body: some View {
         Button(action: onTap) {
             HStack(alignment: .top, spacing: 14) {
-                Rectangle()
-                    .fill(
-                        mission.isFlexMode
-                            ? LinearGradient(colors: [.white.opacity(0.5), .white.opacity(0.2)], startPoint: .top, endPoint: .bottom)
-                            : LinearGradient(colors: [OrbitTheme.pink, OrbitTheme.blue], startPoint: .top, endPoint: .bottom)
-                    )
-                    .frame(width: 4)
-                    .cornerRadius(2)
+                missionLogo
 
-                VStack(alignment: .leading, spacing: 6) {
-                    HStack(alignment: .top, spacing: 8) {
-                        Text(mission.isFlexMode ? mission.displayTitle : mission.title)
-                            .font(.headline)
-                            .foregroundColor(mission.isFlexMode ? .white : .primary)
-                            .lineLimit(2)
+                VStack(alignment: .leading, spacing: 7) {
+                    // Mode eyebrow — uppercase, tracked, gradient accent —
+                    // plus Yours/Joined membership badge
+                    HStack(spacing: 8) {
+                        Text(eyebrow)
+                            .font(.system(size: 10, weight: .heavy, design: .rounded))
+                            .tracking(1.4)
+                            .foregroundStyle(OrbitTheme.gradient)
                         Spacer(minLength: 0)
                         if mission.isCreatedByCurrentUser {
-                            MissionBadge(text: "Yours", color: OrbitTheme.purple, onDark: mission.isFlexMode)
+                            MissionBadge(text: "Yours", color: OrbitTheme.purple, onDark: true)
                         } else if mission.isJoinedByCurrentUser {
-                            MissionBadge(text: "Joined", color: .green, onDark: mission.isFlexMode)
+                            MissionBadge(text: "Joined", color: .green, onDark: true)
                         }
-                        Text(mission.isFlexMode ? "FLEX" : "SET")
+                    }
+
+                    // Title — rounded display weight for a bolder, less "default" feel
+                    Text(mission.displayTitle)
+                        .font(.system(size: 19, weight: .bold, design: .rounded))
+                        .foregroundColor(.white)
+                        .lineLimit(2)
+                        .fixedSize(horizontal: false, vertical: true)
+
+                    // Time / schedule line — monospaced for typographic contrast
+                    HStack(spacing: 5) {
+                        Image(systemName: subtitleIcon)
                             .font(.caption2)
-                            .fontWeight(.bold)
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 3)
-                            .background(
-                                mission.isFlexMode
-                                    ? Color.white.opacity(0.15)
-                                    : OrbitTheme.pink.opacity(0.15)
-                            )
-                            .foregroundColor(mission.isFlexMode ? .white : OrbitTheme.pink)
-                            .clipShape(Capsule())
+                        Text(subtitle)
+                            .font(.system(.caption, design: .monospaced))
+                            .lineLimit(1)
                     }
+                    .foregroundColor(.white.opacity(0.72))
+                    .padding(.top, 1)
 
-                    if mission.isFlexMode {
-                        // Flex mode info
-                        HStack(spacing: 12) {
-                            HStack(spacing: 4) {
-                                if let confirmedTime = mission.scheduledTime {
-                                    Image(systemName: "calendar.badge.checkmark")
-                                        .font(.caption2)
-                                    Text(confirmedTime)
-                                        .font(.caption)
-                                } else {
-                                    Image(systemName: "antenna.radiowaves.left.and.right")
-                                        .font(.caption2)
-                                    Text("Flex \u{00B7} group picks time")
-                                        .font(.caption)
+                    // Tag chips with consistent per-tag colors
+                    if !mission.tags.isEmpty {
+                        ScrollView(.horizontal, showsIndicators: false) {
+                            HStack(spacing: 6) {
+                                ForEach(mission.tags.prefix(4), id: \.self) { tag in
+                                    let matches = lowerInterests.contains(tag.lowercased())
+                                    let color = OrbitTheme.color(forTag: tag, matchesUser: matches)
+                                    Text(tag.lowercased())
+                                        .font(.system(size: 11, weight: matches ? .bold : .medium, design: .rounded))
+                                        .padding(.horizontal, 9)
+                                        .padding(.vertical, 4)
+                                        .background((matches ? color : Color.white).opacity(matches ? 0.22 : 0.1))
+                                        .clipShape(Capsule())
+                                        .foregroundColor(matches ? color : .white.opacity(0.8))
                                 }
-                            }
-                        }
-                        .foregroundColor(.white.opacity(0.6))
-
-                        if let summary = mission.flexAvailabilitySummary {
-                            HStack(spacing: 4) {
-                                Image(systemName: "calendar")
-                                    .font(.caption2)
-                                Text(summary)
-                                    .font(.caption)
-                            }
-                            .foregroundColor(.white.opacity(0.6))
-                        }
-
-                        if !mission.tags.isEmpty {
-                            ScrollView(.horizontal, showsIndicators: false) {
-                                HStack(spacing: 6) {
-                                    ForEach(mission.tags.prefix(4), id: \.self) { tag in
-                                        Text(tag.capitalized)
-                                            .font(.caption2)
-                                            .padding(.horizontal, 8)
-                                            .padding(.vertical, 3)
-                                            .background(Color.white.opacity(0.12))
-                                            .clipShape(Capsule())
-                                            .foregroundColor(.white.opacity(0.7))
-                                    }
-                                }
-                            }
-                        }
-
-                        HStack(spacing: 8) {
-                            if let label = mission.flexGroupSizeLabel {
-                                HStack(spacing: 4) {
-                                    Image(systemName: "person.2.fill")
-                                        .font(.caption2)
-                                    Text(label)
-                                        .font(.caption)
-                                }
-                                .foregroundColor(.white.opacity(0.6))
-                            }
-                            if let status = mission.signalStatus {
-                                FlexStatusBadge(status: status)
-                            }
-                        }
-                    } else {
-                        // Set mode info (unchanged)
-                        HStack(spacing: 12) {
-                            HStack(spacing: 4) {
-                                Image(systemName: "calendar")
-                                    .font(.caption2)
-                                Text(mission.displayDate)
-                                    .font(.caption)
-                            }
-                            HStack(spacing: 4) {
-                                Image(systemName: "mappin")
-                                    .font(.caption2)
-                                Text(mission.location.isEmpty ? "TBD" : mission.location)
-                                    .font(.caption)
-                                    .lineLimit(1)
-                            }
-                        }
-                        .foregroundColor(.secondary)
-
-                        if !mission.tags.isEmpty {
-                            ScrollView(.horizontal, showsIndicators: false) {
-                                HStack(spacing: 6) {
-                                    ForEach(mission.tags.prefix(4), id: \.self) { tag in
-                                        Text(tag.capitalized)
-                                            .font(.caption2)
-                                            .padding(.horizontal, 8)
-                                            .padding(.vertical, 3)
-                                            .background(OrbitTheme.blue.opacity(0.12))
-                                            .clipShape(Capsule())
-                                            .foregroundColor(OrbitTheme.blue)
-                                    }
-                                }
-                            }
-                        }
-
-                        HStack(spacing: 8) {
-                            MissionSpotsLabel(mission: mission)
-                            if let score = mission.matchScore {
-                                MatchScoreBadge(score: score)
                             }
                         }
                     }
 
-                    // Member avatars (shared for both modes)
-                    memberAvatarsRow
+                    // People count + match + joined indicator
+                    HStack(spacing: 10) {
+                        peopleCountLabel
+                        if mission.isJoined {
+                            joinedBadge
+                        } else if let score = mission.matchScore, score > 0 {
+                            MatchScoreBadge(score: score)
+                        }
+                        Spacer(minLength: 0)
+                    }
+                    .padding(.top, 2)
                 }
+                // Reserve room so a long title never slides under the leader badge.
+                .padding(.trailing, isCreator ? 26 : 0)
 
-                Spacer()
-
-                Image(systemName: "chevron.right")
-                    .font(.caption)
-                    .foregroundColor(mission.isFlexMode ? .white.opacity(0.5) : .secondary)
+                Spacer(minLength: 0)
             }
-            .padding(16)
-            .background(mission.isFlexMode ? Color(red: 0.1, green: 0.1, blue: 0.14) : Color.white)
-            .cornerRadius(16)
-            .shadow(color: .black.opacity(mission.isFlexMode ? 0.15 : 0.06), radius: 8, x: 0, y: 2)
-            .opacity(mission.isCompleted ? 0.6 : 1.0)
+            .padding(18)
+            .background(cardBackground)
+            .clipShape(RoundedRectangle(cornerRadius: 20))
+            .overlay(
+                RoundedRectangle(cornerRadius: 20)
+                    .stroke(
+                        mission.isJoined
+                            ? AnyShapeStyle(OrbitTheme.gradient)
+                            : AnyShapeStyle(Color.white.opacity(0.08)),
+                        lineWidth: mission.isJoined ? 2 : 1
+                    )
+            )
+            // Pod-leader astronaut helmet — only on missions you created.
+            .overlay(alignment: .topTrailing) {
+                if isCreator {
+                    PodLeaderBadge()
+                        .padding(12)
+                }
+            }
+            .shadow(color: .black.opacity(0.28), radius: 12, x: 0, y: 5)
+            .opacity(mission.isCompleted ? 0.55 : 1.0)
         }
         .buttonStyle(.plain)
     }
 
-    // MARK: - Member Avatars Row
+    // MARK: - Logo
 
-    // MARK: - Pod Member Display (user's pod, compact, right-aligned)
+    private var missionLogo: some View {
+        ZStack {
+            Circle()
+                .fill(OrbitTheme.gradientFill.opacity(0.28))
+                .frame(width: 50, height: 50)
+            Circle()
+                .stroke(Color.white.opacity(0.12), lineWidth: 1)
+                .frame(width: 50, height: 50)
+            Image(systemName: mission.logo ?? "sparkles")
+                .font(.system(size: 21, weight: .semibold))
+                .foregroundColor(.white)
+        }
+    }
+
+    // MARK: - People Count
+
+    private var memberCount: Int {
+        displayPod?.memberCount ?? (mission.isJoined ? 1 : 0)
+    }
+
+    private var capacity: Int {
+        max(displayPod?.maxSize ?? 0, mission.maxPodSize)
+    }
+
+    private var peopleCountLabel: some View {
+        HStack(spacing: 6) {
+            // Overlapping avatar stack
+            if !podPreviews.isEmpty {
+                HStack(spacing: -6) {
+                    ForEach(Array(podPreviews.prefix(3).enumerated()), id: \.element.id) { index, member in
+                        ProfileAvatarView(photo: member.photo, size: 20)
+                            .zIndex(Double(3 - index))
+                    }
+                }
+            } else {
+                Image(systemName: "person.2.fill")
+                    .font(.caption2)
+                    .foregroundColor(.white.opacity(0.7))
+            }
+            // Allowed group-size range, e.g. "3 to 5"
+            Text(sizeRangeText)
+                .font(.system(.caption2, design: .monospaced))
+                .fontWeight(.semibold)
+                .foregroundColor(.white.opacity(0.85))
+            // Remaining capacity, e.g. "· 1 open spot"
+            Text("· \(openSpotsText)")
+                .font(.caption2)
+                .fontWeight(.medium)
+                .foregroundColor(openSpotsText == "full" ? .white.opacity(0.45) : OrbitTheme.pink)
+        }
+    }
+
+    /// "· in" badge shown when the user is in this mission's pod. Tappable to
+    /// jump straight into the pod.
+    private var joinedBadge: some View {
+        Button {
+            if let podId = mission.userPodId ?? mission.podId {
+                onOpenPod?(podId)
+            } else {
+                onTap()
+            }
+        } label: {
+            HStack(spacing: 3) {
+                Image(systemName: "checkmark.circle.fill")
+                    .font(.caption2)
+                Text("In")
+                    .font(.caption2)
+                    .fontWeight(.semibold)
+            }
+            .padding(.horizontal, 8)
+            .padding(.vertical, 3)
+            .background(Color.green.opacity(0.18))
+            .foregroundColor(.green)
+            .clipShape(Capsule())
+        }
+        .buttonStyle(.plain)
+    }
+
+    // MARK: - Pod Member Display
 
     /// The pod to display: user's pod if joined, otherwise first open pod.
     private var displayPod: PodSummary? {
@@ -580,51 +544,147 @@ struct MissionListCard: View {
     private var podPreviews: [MemberPreview] {
         displayPod?.memberPreviews ?? []
     }
+}
 
-    private var podMemberCount: Int {
-        displayPod?.memberCount ?? 0
+// MARK: - Pod Leader Badge (gradient astronaut helmet)
+// SF Symbols has no astronaut helmet, so we compose one: a gradient dome with a
+// dark visor and a glint. Shown on the top-right of missions you created.
+
+struct PodLeaderBadge: View {
+    private let visorColor = Color(red: 0.09, green: 0.09, blue: 0.20)
+
+    var body: some View {
+        ZStack {
+            // Backing ring so the helmet reads on any card shade
+            Circle()
+                .fill(visorColor)
+                .frame(width: 30, height: 30)
+
+            // Helmet dome
+            Circle()
+                .fill(OrbitTheme.gradientFill)
+                .frame(width: 26, height: 26)
+
+            // Visor (dark glass)
+            RoundedRectangle(cornerRadius: 6, style: .continuous)
+                .fill(visorColor.opacity(0.92))
+                .frame(width: 15, height: 11)
+                .offset(y: 1.5)
+
+            // Visor glint
+            RoundedRectangle(cornerRadius: 1.5, style: .continuous)
+                .fill(Color.white.opacity(0.55))
+                .frame(width: 3.5, height: 3)
+                .offset(x: -3, y: -0.5)
+        }
+        .shadow(color: .black.opacity(0.3), radius: 3, y: 1)
+        .accessibilityLabel("You're the pod leader")
+    }
+}
+
+// MARK: - Floating Curves Background
+// A handful of gradient "squiggle" curves drifting slowly near the screen edges.
+// Low opacity + slow motion keep it ambient rather than distracting.
+
+struct FloatingCurvesBackground: View {
+    private struct CurveSpec: Identifiable {
+        let id = UUID()
+        let asset: String
+        let unitX: CGFloat      // 0…1 position across the screen
+        let unitY: CGFloat
+        let widthFraction: CGFloat
+        let rotation: Double
+        let opacity: Double
+        let drift: CGSize       // half-amplitude of the slow drift
+        let duration: Double
     }
 
-    private var podMaxSize: Int {
-        max(displayPod?.maxSize ?? 0, mission.maxPodSize)
+    // Generated once per view instance (SwiftUI keeps the first @State value),
+    // so positions stay put across re-renders but vary between launches.
+    @State private var curves: [CurveSpec] = FloatingCurvesBackground.generate()
+    @State private var animate = false
+
+    private static func generate() -> [CurveSpec] {
+        let assets = ["squiggle2", "squiggle3", "squiggle4"]
+        // 4 curves, each pinned toward an edge so the center stays clear.
+        let edgeAnchors: [(CGFloat, CGFloat)] = [
+            (CGFloat.random(in: 0.02...0.18), CGFloat.random(in: 0.05...0.30)),   // top-left
+            (CGFloat.random(in: 0.82...0.98), CGFloat.random(in: 0.10...0.35)),   // top-right
+            (CGFloat.random(in: 0.04...0.20), CGFloat.random(in: 0.70...0.92)),   // bottom-left
+            (CGFloat.random(in: 0.80...0.96), CGFloat.random(in: 0.68...0.90))    // bottom-right
+        ]
+        return edgeAnchors.map { anchor in
+            CurveSpec(
+                asset: assets.randomElement() ?? "squiggle2",
+                unitX: anchor.0,
+                unitY: anchor.1,
+                widthFraction: CGFloat.random(in: 0.34...0.52),
+                rotation: Double.random(in: -35...35),
+                opacity: Double.random(in: 0.05...0.10),
+                drift: CGSize(width: CGFloat.random(in: 6...16), height: CGFloat.random(in: 8...20)),
+                duration: Double.random(in: 7...12)
+            )
+        }
     }
 
-    private var memberAvatarsRow: some View {
-        Group {
-            if podMemberCount > 0 {
-                HStack(spacing: 0) {
-                    Spacer()
-                    HStack(spacing: 4) {
-                        // Overlapping avatar stack (small: 20pt, max 3)
-                        HStack(spacing: -6) {
-                            if !podPreviews.isEmpty {
-                                ForEach(Array(podPreviews.prefix(3).enumerated()), id: \.element.id) { index, member in
-                                    ProfileAvatarView(photo: member.photo, size: 20)
-                                        .zIndex(Double(3 - index))
-                                }
-                            } else {
-                                // Placeholder circles when previews aren't available
-                                ForEach(0..<min(podMemberCount, 3), id: \.self) { index in
-                                    Circle()
-                                        .fill(Color(.systemGray4))
-                                        .frame(width: 20, height: 20)
-                                        .overlay(
-                                            Image(systemName: "person.fill")
-                                                .font(.system(size: 9))
-                                                .foregroundColor(.white)
-                                        )
-                                        .zIndex(Double(3 - index))
-                                }
-                            }
-                        }
-
-                        Text("\(podMemberCount)/\(podMaxSize)")
-                            .font(.caption2)
-                            .fontWeight(.medium)
-                            .foregroundColor(mission.isFlexMode ? .white.opacity(0.6) : .secondary)
-                    }
+    var body: some View {
+        GeometryReader { geo in
+            ZStack {
+                ForEach(curves) { curve in
+                    Image(curve.asset)
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: geo.size.width * curve.widthFraction)
+                        .rotationEffect(.degrees(curve.rotation))
+                        .opacity(curve.opacity)
+                        .position(x: geo.size.width * curve.unitX,
+                                  y: geo.size.height * curve.unitY)
+                        .offset(x: animate ? curve.drift.width : -curve.drift.width,
+                                y: animate ? curve.drift.height : -curve.drift.height)
+                        .animation(
+                            .easeInOut(duration: curve.duration).repeatForever(autoreverses: true),
+                            value: animate
+                        )
                 }
             }
+            .blur(radius: 0.5)
+        }
+        .allowsHitTesting(false)
+        .ignoresSafeArea()
+        .onAppear { animate = true }
+    }
+}
+
+// MARK: - Orbit Rings Background
+// A single large "ringStars" graphic that slowly spins in one direction and
+// drifts a little — fainter than the squiggles, sitting deepest for depth.
+// Template-rendered + tinted so it reads in both light and dark mode.
+
+struct OrbitRingsBackground: View {
+    @State private var spin = false
+    @State private var drift = false
+
+    var body: some View {
+        GeometryReader { geo in
+            Image("ringStars")
+                .resizable()
+                .renderingMode(.template)
+                .scaledToFit()
+                .frame(width: geo.size.width * 1.25)
+                .foregroundColor(OrbitTheme.purple)
+                .opacity(0.045)
+                // Anchored toward the upper-right, bleeding off the corner.
+                .position(x: geo.size.width * 0.80, y: geo.size.height * 0.20)
+                .rotationEffect(.degrees(spin ? 360 : 0))
+                .offset(x: drift ? 20 : -20, y: drift ? 16 : -16)
+                .animation(.linear(duration: 130).repeatForever(autoreverses: false), value: spin)
+                .animation(.easeInOut(duration: 28).repeatForever(autoreverses: true), value: drift)
+        }
+        .allowsHitTesting(false)
+        .ignoresSafeArea()
+        .onAppear {
+            spin = true
+            drift = true
         }
     }
 }
@@ -715,6 +775,84 @@ struct MissionSpotsLabel: View {
         }
         .font(.caption)
         .fontWeight(.medium)
+    }
+}
+
+// MARK: - Pod ID Wrapper (for item-based sheet)
+
+struct IdentifiablePodID: Identifiable {
+    let id: String
+}
+
+// MARK: - Mission Filter Sheet
+
+struct MissionFilterSheet: View {
+    @ObservedObject var viewModel: MissionsViewModel
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section("Sort by") {
+                    ForEach(MissionSort.allCases) { option in
+                        Button {
+                            viewModel.sort = option
+                        } label: {
+                            HStack {
+                                Image(systemName: option.icon)
+                                    .foregroundStyle(OrbitTheme.gradient)
+                                    .frame(width: 24)
+                                Text(option.rawValue)
+                                    .foregroundColor(.primary)
+                                Spacer()
+                                if viewModel.sort == option {
+                                    Image(systemName: "checkmark")
+                                        .foregroundStyle(OrbitTheme.gradient)
+                                        .fontWeight(.semibold)
+                                }
+                            }
+                        }
+                    }
+                }
+
+                Section("Filter") {
+                    Toggle(isOn: $viewModel.createdByMeOnly) {
+                        Label("Created by me", systemImage: "person.crop.circle")
+                    }
+
+                    Picker(selection: Binding(
+                        get: { viewModel.filterTag ?? "" },
+                        set: { viewModel.filterTag = $0.isEmpty ? nil : $0 }
+                    )) {
+                        Text("Any tag").tag("")
+                        ForEach(viewModel.availableTags, id: \.self) { tag in
+                            Text(tag.capitalized).tag(tag)
+                        }
+                    } label: {
+                        Label("Tag", systemImage: "tag")
+                    }
+                }
+
+                if viewModel.hasActiveFilter {
+                    Section {
+                        Button(role: .destructive) {
+                            viewModel.sort = .bestMatch
+                            viewModel.createdByMeOnly = false
+                            viewModel.filterTag = nil
+                        } label: {
+                            Text("Reset filters")
+                        }
+                    }
+                }
+            }
+            .navigationTitle("Sort & Filter")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Done") { dismiss() }
+                }
+            }
+        }
     }
 }
 
@@ -810,17 +948,26 @@ struct MissionCreateView: View {
     @State private var date = Date().addingTimeInterval(86400)
     @State private var startTime = Calendar.current.date(from: DateComponents(hour: 12, minute: 0))!
     @State private var endTime = Calendar.current.date(from: DateComponents(hour: 13, minute: 0))!
+    @State private var minPodSize = 3
     @State private var maxPodSize = 4
+    @State private var hasEndTime = false   // set mode: end time is optional
 
     // Flex mode fields
     @State private var minGroupSize = 3
     @State private var maxGroupSize = 10
+    @State private var schedulingWindowDays = 7   // today … +14d; default 1 week
+
+    // Images (up to 3, shared) — existing URLs (edit) + newly picked
+    @State private var existingImageUrls: [String] = []
+    @State private var pickedImages: [UIImage] = []
+    @State private var showImagePicker = false
+    @State private var showAvailabilityPicker = false
     @State private var selectedDays: Set<Int> = []
     @State private var selectedHours: Set<HourSlotKey> = []
     @State private var timeRangeStart: Int = 9
     @State private var timeRangeEnd: Int = 21
-    @State private var link1 = ""
-    @State private var link2 = ""
+    // Optional links (both modes, max 3) — fields appear one at a time via a + button
+    @State private var links: [String] = []
 
     // Creator availability (flex mode — filled during creation)
     @State private var creatorSlots: Set<TimeSlot> = []
@@ -864,8 +1011,12 @@ struct MissionCreateView: View {
             _description = State(initialValue: m.description)
             _location = State(initialValue: m.location)
             _tags = State(initialValue: m.tags)
+            _minPodSize = State(initialValue: m.effectiveMinPodSize ?? 3)
             _maxPodSize = State(initialValue: m.maxPodSize)
             _selectedLogo = State(initialValue: m.logo)
+            _existingImageUrls = State(initialValue: m.images ?? [])
+            _schedulingWindowDays = State(initialValue: m.schedulingWindowDays ?? 7)
+            _hasEndTime = State(initialValue: m.endTime != nil && !(m.endTime?.isEmpty ?? true))
 
             // Set mode fields
             let dateFmt = DateFormatter()
@@ -885,9 +1036,7 @@ struct MissionCreateView: View {
             _timeRangeStart = State(initialValue: m.timeRangeStart ?? 9)
             _timeRangeEnd = State(initialValue: m.timeRangeEnd ?? 21)
 
-            let links = m.links ?? []
-            _link1 = State(initialValue: links.count > 0 ? links[0] : "")
-            _link2 = State(initialValue: links.count > 1 ? links[1] : "")
+            _links = State(initialValue: Array((m.links ?? []).prefix(3)))
         } else {
             _title = State(initialValue: prefillTitle)
             _tags = State(initialValue: prefillTags)
@@ -907,16 +1056,14 @@ struct MissionCreateView: View {
 
     private var canSubmit: Bool {
         if isOverWordLimit { return false }
-        if mode == .set {
-            return !title.trimmingCharacters(in: .whitespaces).isEmpty
-        } else {
-            if !isEditing && creatorSlots.isEmpty { return false }
-            return true
-        }
+        if title.trimmingCharacters(in: .whitespaces).isEmpty { return false }
+        // Schedule-later missions need the creator's availability before posting.
+        if mode == .flex && !isEditing && creatorSlots.isEmpty { return false }
+        return true
     }
 
     private var linksArray: [String] {
-        [link1, link2]
+        links
             .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
             .filter { !$0.isEmpty }
     }
@@ -928,34 +1075,18 @@ struct MissionCreateView: View {
 
     private var sortedDays: [Int] { selectedDays.sorted() }
 
+    /// Missions can be scheduled today through 2 weeks out — never further.
+    private var maxScheduleDate: Date {
+        Calendar.current.date(byAdding: .day, value: 14, to: Date()) ?? Date()
+    }
+
     // MARK: - Body
 
     var body: some View {
         NavigationStack {
             ScrollView {
                 VStack(spacing: 24) {
-                    // Mode segmented control
-                    Picker("", selection: $mode) {
-                        Text("Set").tag(MissionMode.set)
-                        Text("Flex").tag(MissionMode.flex)
-                    }
-                    .pickerStyle(.segmented)
-                    .disabled(isEditing)
-
-                    Text(mode == .set
-                         ? "Plan an event with a set date, time, and place."
-                         : "Throw out a hangout idea and let your group vote on when to meet.")
-                        .font(.footnote)
-                        .foregroundColor(.secondary)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-
-                    logoPickerSection
-
-                    if mode == .set {
-                        setModeForm
-                    } else {
-                        flexModeForm
-                    }
+                    unifiedForm
 
                     if let error = errorMessage {
                         Text(error)
@@ -983,6 +1114,92 @@ struct MissionCreateView: View {
                 LogoPickerSheet(selected: $selectedLogo)
                     .presentationDetents([.medium, .large])
             }
+            .sheet(isPresented: $showImagePicker) {
+                PhotoLibraryPicker(selectedImage: Binding(
+                    get: { nil },
+                    set: { newImage in
+                        if let img = newImage, totalImageCount < 3 {
+                            pickedImages.append(img)
+                        }
+                    }
+                ))
+            }
+            .sheet(isPresented: $showAvailabilityPicker) {
+                AvailabilityPickerSheet(
+                    selectedSlots: $creatorSlots,
+                    startDate: Date(),
+                    totalDays: schedulingWindowDays,
+                    memberColor: MemberColor.pink.color
+                )
+            }
+        }
+    }
+
+    private var totalImageCount: Int { existingImageUrls.count + pickedImages.count }
+
+    // MARK: - Image Picker (shared, up to 3)
+
+    private var imagePickerSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                OrbitSectionHeader(title: "Photos", optional: true)
+                Spacer()
+                Text("\(totalImageCount)/3")
+                    .font(.caption2)
+                    .foregroundColor(totalImageCount >= 3 ? .orange : .secondary)
+            }
+            Text("Add a flyer or photos so people know what to expect.")
+                .font(.caption)
+                .foregroundColor(.secondary)
+
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 10) {
+                    ForEach(Array(existingImageUrls.enumerated()), id: \.offset) { index, url in
+                        imageThumb(url: url) { existingImageUrls.remove(at: index) }
+                    }
+                    ForEach(Array(pickedImages.enumerated()), id: \.offset) { index, img in
+                        imageThumb(image: img) { pickedImages.remove(at: index) }
+                    }
+                    if totalImageCount < 3 {
+                        Button { showImagePicker = true } label: {
+                            ZStack {
+                                RoundedRectangle(cornerRadius: 12)
+                                    .stroke(Color(.systemGray4), style: StrokeStyle(lineWidth: 1.5, dash: [5]))
+                                    .frame(width: 72, height: 72)
+                                Image(systemName: "plus")
+                                    .font(.title3)
+                                    .foregroundStyle(OrbitTheme.gradient)
+                            }
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+            }
+        }
+    }
+
+    private func imageThumb(url: String? = nil, image: UIImage? = nil, onRemove: @escaping () -> Void) -> some View {
+        ZStack(alignment: .topTrailing) {
+            Group {
+                if let image {
+                    Image(uiImage: image).resizable().scaledToFill()
+                } else if let url, let parsed = URL(string: url) {
+                    AsyncImage(url: parsed) { img in
+                        img.resizable().scaledToFill()
+                    } placeholder: {
+                        Color(.systemGray5)
+                    }
+                }
+            }
+            .frame(width: 72, height: 72)
+            .clipShape(RoundedRectangle(cornerRadius: 12))
+
+            Button(action: onRemove) {
+                Image(systemName: "xmark.circle.fill")
+                    .font(.system(size: 18))
+                    .foregroundStyle(.white, .black.opacity(0.5))
+            }
+            .offset(x: 6, y: -6)
         }
     }
 
@@ -990,7 +1207,7 @@ struct MissionCreateView: View {
 
     private var logoPickerSection: some View {
         VStack(alignment: .leading, spacing: 10) {
-            OrbitSectionHeader(title: "Logo")
+            OrbitSectionHeader(title: "Logo", optional: true)
             Button {
                 showLogoPicker = true
             } label: {
@@ -1036,7 +1253,7 @@ struct MissionCreateView: View {
     private var tagPickerSection: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack {
-                OrbitSectionHeader(title: "Tags")
+                OrbitSectionHeader(title: "Tags", optional: true)
                 Spacer()
                 Text("\(tags.count)/\(maxTagCount)")
                     .font(.caption2)
@@ -1083,6 +1300,347 @@ struct MissionCreateView: View {
                     }
                 }
             }
+        }
+    }
+
+    // MARK: - Unified Form (single page; toggle switches scheduling style)
+    // Field order: name, logo (+ photos), description, tags, pod size, location,
+    // mission type, time/availability, links.
+
+    private var unifiedForm: some View {
+        VStack(spacing: 24) {
+            titleField
+            logoPickerSection
+            imagePickerSection
+            descriptionField
+            tagPickerSection
+            customTagSection
+            podSizeSection
+            locationSection
+
+            scheduleToggle
+
+            if mode == .set {
+                whenSection
+            } else {
+                schedulingWindowSection
+                availabilitySection
+            }
+
+            // Links are optional for both set and flex missions — always last.
+            linksSection
+        }
+    }
+
+    private var titleField: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            OrbitSectionHeader(title: "Mission name")
+            TextField("e.g. Study Time", text: $title)
+                .textFieldStyle(.roundedBorder)
+        }
+    }
+
+    private var descriptionField: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            OrbitSectionHeader(title: "Description", optional: true)
+            TextField("What's this about?", text: $description, axis: .vertical)
+                .textFieldStyle(.roundedBorder)
+                .lineLimit(2...5)
+            HStack {
+                Spacer()
+                Text("\(wordCount)/250 words")
+                    .font(.caption2)
+                    .foregroundColor(isOverWordLimit ? .red : .secondary)
+            }
+        }
+    }
+
+    private var customTagSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 8) {
+                TextField("Add a custom tag", text: $customTagText)
+                    .textFieldStyle(.roundedBorder)
+                    .submitLabel(.done)
+                    .onSubmit { addCustomTag() }
+                    .disabled(tags.count >= maxTagCount)
+                Button(action: addCustomTag) {
+                    Image(systemName: "plus.circle.fill")
+                        .font(.title3)
+                        .foregroundStyle(OrbitTheme.gradient)
+                }
+                .disabled(customTagText.trimmingCharacters(in: .whitespaces).isEmpty || tags.count >= maxTagCount)
+            }
+
+            let customTags = tags.filter { !availableTags.contains($0) }
+            if !customTags.isEmpty {
+                FlowLayout(spacing: 8) {
+                    ForEach(customTags, id: \.self) { tag in
+                        HStack(spacing: 4) {
+                            Text(tag)
+                                .font(.caption)
+                                .fontWeight(.medium)
+                            Button {
+                                tags.removeAll { $0 == tag }
+                            } label: {
+                                Image(systemName: "xmark.circle.fill")
+                                    .font(.caption2)
+                            }
+                        }
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 6)
+                        .background(OrbitTheme.gradient.opacity(0.15))
+                        .foregroundColor(OrbitTheme.purple)
+                        .clipShape(Capsule())
+                    }
+                }
+            }
+        }
+    }
+
+    private var podSizeSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            OrbitSectionHeader(title: "Pod size")
+            VStack(spacing: 0) {
+                HStack {
+                    Label("Min \(minPodSize) people", systemImage: "person.2")
+                        .font(.subheadline)
+                        .foregroundColor(.primary)
+                    Spacer()
+                    Stepper("", value: $minPodSize, in: 3...maxPodSize)
+                        .labelsHidden()
+                        .fixedSize()
+                }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 14)
+
+                Divider().padding(.leading, 16)
+
+                HStack {
+                    Label("Max \(maxPodSize) people", systemImage: "person.2.fill")
+                        .font(.subheadline)
+                        .foregroundColor(.primary)
+                    Spacer()
+                    Stepper("", value: $maxPodSize, in: max(3, minPodSize)...10)
+                        .labelsHidden()
+                        .fixedSize()
+                }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 14)
+            }
+            .background(Color(.systemGray6))
+            .clipShape(RoundedRectangle(cornerRadius: 14))
+
+            Text("Pods need at least 3 people so no one meets up one-on-one with a stranger.")
+                .font(.caption)
+                .foregroundColor(.secondary)
+        }
+    }
+
+    private var locationSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            OrbitSectionHeader(title: "Location", optional: true)
+            if location.isEmpty {
+                Button { showLocationSearch = true } label: {
+                    HStack(spacing: 10) {
+                        Image(systemName: "mappin.and.ellipse")
+                            .foregroundStyle(OrbitTheme.gradient)
+                        Text("Add location")
+                            .foregroundColor(.secondary)
+                        Spacer()
+                        Image(systemName: "chevron.right")
+                            .font(.caption)
+                            .foregroundColor(Color(.tertiaryLabel))
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 14)
+                    .background(Color(.systemGray6))
+                    .clipShape(RoundedRectangle(cornerRadius: 14))
+                }
+                .buttonStyle(.plain)
+            } else {
+                HStack(spacing: 10) {
+                    Image(systemName: "mappin.and.ellipse")
+                        .foregroundStyle(OrbitTheme.gradient)
+                    Text(location)
+                        .foregroundColor(.primary)
+                        .lineLimit(2)
+                    Spacer()
+                    Button { location = "" } label: {
+                        Image(systemName: "xmark.circle.fill")
+                            .foregroundColor(Color(.tertiaryLabel))
+                    }
+                    .buttonStyle(.plain)
+                }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 14)
+                .background(Color(.systemGray6))
+                .clipShape(RoundedRectangle(cornerRadius: 14))
+                Button("Change location") { showLocationSearch = true }
+                    .font(.subheadline)
+                    .foregroundStyle(OrbitTheme.gradient)
+            }
+        }
+    }
+
+    /// The schedule-now-vs-later control: a single switch-style card that lights
+    /// up when the group schedules together. When on, the date/time inputs are
+    /// replaced by the scheduling window + availability picker.
+    private var scheduleToggle: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            OrbitSectionHeader(title: "Scheduling")
+            Button {
+                guard !isEditing else { return }
+                UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                withAnimation(.spring(duration: 0.3)) {
+                    mode = (mode == .flex) ? .set : .flex
+                }
+            } label: {
+                HStack(spacing: 12) {
+                    Image(systemName: "person.3.sequence.fill")
+                        .font(.system(size: 18))
+                        .foregroundColor(mode == .flex ? .white : OrbitTheme.purple)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Schedule as a group")
+                            .font(.subheadline).fontWeight(.semibold)
+                            .foregroundColor(mode == .flex ? .white : .primary)
+                        Text(mode == .flex
+                             ? "Your pod picks a time from everyone's availability."
+                             : "Off — you'll set a specific date and time below.")
+                            .font(.caption)
+                            .foregroundColor(mode == .flex ? .white.opacity(0.85) : .secondary)
+                    }
+                    Spacer()
+                    // Switch-style knob
+                    ZStack(alignment: mode == .flex ? .trailing : .leading) {
+                        Capsule()
+                            .fill(mode == .flex ? AnyShapeStyle(Color.white.opacity(0.5)) : AnyShapeStyle(Color(.systemGray3)))
+                            .frame(width: 44, height: 26)
+                        Circle()
+                            .fill(.white)
+                            .frame(width: 22, height: 22)
+                            .padding(2)
+                            .shadow(color: .black.opacity(0.15), radius: 2, y: 1)
+                    }
+                }
+                .padding(14)
+                .background(
+                    mode == .flex
+                        ? AnyShapeStyle(OrbitTheme.gradientFill)
+                        : AnyShapeStyle(Color(.systemGray6))
+                )
+                .clipShape(RoundedRectangle(cornerRadius: 14))
+            }
+            .buttonStyle(.plain)
+            .opacity(isEditing ? 0.6 : 1.0)
+        }
+    }
+
+    /// Set-mode date + time inputs.
+    private var whenSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            OrbitSectionHeader(title: "When")
+            VStack(spacing: 0) {
+                HStack {
+                    Label("Date", systemImage: "calendar")
+                        .font(.subheadline)
+                        .foregroundColor(.primary)
+                    Spacer()
+                    DatePicker("", selection: $date, in: Date()...maxScheduleDate, displayedComponents: .date)
+                        .datePickerStyle(.compact)
+                        .labelsHidden()
+                }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 14)
+
+                Divider().padding(.leading, 16)
+
+                HStack {
+                    Label("Starts", systemImage: "clock")
+                        .font(.subheadline)
+                        .foregroundColor(.primary)
+                    Spacer()
+                    DatePicker("", selection: $startTime, displayedComponents: .hourAndMinute)
+                        .labelsHidden()
+                }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 14)
+
+                Divider().padding(.leading, 16)
+
+                HStack {
+                    Toggle(isOn: $hasEndTime) {
+                        Label("Add end time", systemImage: "clock.fill")
+                            .font(.subheadline)
+                            .foregroundColor(.primary)
+                    }
+                    .tint(OrbitTheme.purple)
+                }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 14)
+
+                if hasEndTime {
+                    Divider().padding(.leading, 16)
+
+                    HStack {
+                        Label("Ends", systemImage: "clock.fill")
+                            .font(.subheadline)
+                            .foregroundColor(.primary)
+                        Spacer()
+                        DatePicker("", selection: $endTime, in: startTime..., displayedComponents: .hourAndMinute)
+                            .labelsHidden()
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 14)
+                }
+            }
+            .background(Color(.systemGray6))
+            .clipShape(RoundedRectangle(cornerRadius: 14))
+
+            Text("Pick the day and a start time. An end time is optional.")
+                .font(.caption)
+                .foregroundColor(.secondary)
+        }
+        .onChange(of: startTime) { _, newStart in
+            if endTime <= newStart { endTime = newStart.addingTimeInterval(3600) }
+        }
+        .onChange(of: endTime) { _, newEnd in
+            if newEnd <= startTime { endTime = startTime.addingTimeInterval(3600) }
+        }
+    }
+
+    /// Flex-mode availability entry: a button that opens the no-scroll picker.
+    private var availabilitySection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            OrbitSectionHeader(title: "Your availability")
+            Button {
+                showAvailabilityPicker = true
+            } label: {
+                HStack(spacing: 12) {
+                    Image(systemName: "calendar.badge.clock")
+                        .font(.system(size: 18))
+                        .foregroundStyle(OrbitTheme.gradient)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(creatorSlots.isEmpty ? "Input your availability" : "Edit your availability")
+                            .font(.subheadline).fontWeight(.medium)
+                            .foregroundColor(.primary)
+                        Text(creatorSlots.isEmpty
+                             ? "Tap to mark the hours you're free"
+                             : "\(creatorSlots.count) hour\(creatorSlots.count == 1 ? "" : "s") selected")
+                            .font(.caption)
+                            .foregroundColor(creatorSlots.isEmpty ? .secondary : OrbitTheme.purple)
+                    }
+                    Spacer()
+                    Image(systemName: "chevron.right")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+                .padding(14)
+                .background(
+                    RoundedRectangle(cornerRadius: 14)
+                        .stroke(creatorSlots.isEmpty ? Color(.systemGray4) : OrbitTheme.purple.opacity(0.5), lineWidth: 1.5)
+                )
+            }
+            .buttonStyle(.plain)
         }
     }
 
@@ -1250,18 +1808,34 @@ struct MissionCreateView: View {
             }
 
             VStack(alignment: .leading, spacing: 10) {
-                OrbitSectionHeader(title: "Max Pod Size")
-                HStack {
-                    Label("\(maxPodSize) people per pod", systemImage: "person.2.fill")
-                        .font(.subheadline)
-                        .foregroundColor(.primary)
-                    Spacer()
-                    Stepper("", value: $maxPodSize, in: 2...10)
-                        .labelsHidden()
-                        .fixedSize()
+                OrbitSectionHeader(title: "Pod Size")
+                VStack(spacing: 0) {
+                    HStack {
+                        Label("Min \(minPodSize) people", systemImage: "person.2")
+                            .font(.subheadline)
+                            .foregroundColor(.primary)
+                        Spacer()
+                        Stepper("", value: $minPodSize, in: 2...maxPodSize)
+                            .labelsHidden()
+                            .fixedSize()
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 14)
+
+                    Divider().padding(.leading, 16)
+
+                    HStack {
+                        Label("Max \(maxPodSize) people", systemImage: "person.2.fill")
+                            .font(.subheadline)
+                            .foregroundColor(.primary)
+                        Spacer()
+                        Stepper("", value: $maxPodSize, in: minPodSize...10)
+                            .labelsHidden()
+                            .fixedSize()
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 14)
                 }
-                .padding(.horizontal, 16)
-                .padding(.vertical, 14)
                 .background(Color(.systemGray6))
                 .clipShape(RoundedRectangle(cornerRadius: 14))
             }
@@ -1389,6 +1963,9 @@ struct MissionCreateView: View {
 
             // Links
             linksSection
+
+            // Scheduling window
+            schedulingWindowSection
 
             // Creator availability grid
             VStack(alignment: .leading, spacing: 12) {
@@ -1629,21 +2206,68 @@ struct MissionCreateView: View {
         }
     }
 
+    // MARK: - Scheduling Window
+
+    private var schedulingWindowSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            OrbitSectionHeader(title: "Scheduling window")
+            HStack {
+                Label("Within \(schedulingWindowDays) day\(schedulingWindowDays == 1 ? "" : "s")",
+                      systemImage: "calendar.badge.clock")
+                    .font(.subheadline)
+                    .foregroundColor(.primary)
+                Spacer()
+                Stepper("", value: $schedulingWindowDays, in: 1...14)
+                    .labelsHidden()
+                    .fixedSize()
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 14)
+            .background(Color(.systemGray6))
+            .clipShape(RoundedRectangle(cornerRadius: 14))
+
+            Text("Missions can be scheduled from today up to 2 weeks out. Default is 1 week so missions don't linger.")
+                .font(.caption)
+                .foregroundColor(.secondary)
+        }
+    }
+
     // MARK: - Links
+    // Up to 3 links. Fields appear one at a time via a + button so the form
+    // doesn't waste space on empty inputs.
 
     private var linksSection: some View {
         VStack(alignment: .leading, spacing: 12) {
-            OrbitSectionHeader(title: "Links (optional)")
-            TextField("Paste a link", text: $link1)
-                .textFieldStyle(.roundedBorder)
-                .keyboardType(.URL)
-                .textInputAutocapitalization(.never)
-                .autocorrectionDisabled()
-            TextField("Paste a second link", text: $link2)
-                .textFieldStyle(.roundedBorder)
-                .keyboardType(.URL)
-                .textInputAutocapitalization(.never)
-                .autocorrectionDisabled()
+            OrbitSectionHeader(title: "Links", optional: true)
+
+            ForEach(links.indices, id: \.self) { index in
+                HStack(spacing: 8) {
+                    TextField("Paste a link", text: $links[index])
+                        .textFieldStyle(.roundedBorder)
+                        .keyboardType(.URL)
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled()
+                    Button {
+                        links.remove(at: index)
+                    } label: {
+                        Image(systemName: "xmark.circle.fill")
+                            .foregroundColor(Color(.tertiaryLabel))
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+
+            if links.count < 3 {
+                Button {
+                    links.append("")
+                } label: {
+                    Label(links.isEmpty ? "Add a link" : "Add another link",
+                          systemImage: "plus.circle.fill")
+                        .font(.subheadline)
+                        .foregroundStyle(OrbitTheme.gradient)
+                }
+                .buttonStyle(.plain)
+            }
         }
     }
 
@@ -1652,11 +2276,7 @@ struct MissionCreateView: View {
     private var submitButton: some View {
         Button {
             UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-            if mode == .set {
-                submitSetMission()
-            } else {
-                submitFlexMission()
-            }
+            submit()
         } label: {
             ZStack {
                 if isSubmitting || viewModel.isSubmitting {
@@ -1681,139 +2301,88 @@ struct MissionCreateView: View {
         .padding(.top, 8)
     }
 
-    // MARK: - Submit Helpers
+    // MARK: - Submit
 
-    private func submitSetMission() {
-        guard canSubmit else { return }
+    private func submit() {
+        guard canSubmit, !isSubmitting, !viewModel.isSubmitting else { return }
         isSubmitting = true
+
+        let trimmedTitle = title.trimmingCharacters(in: .whitespaces)
+        let trimmedDesc = description.trimmingCharacters(in: .whitespaces)
+        let trimmedLoc = location.trimmingCharacters(in: .whitespaces)
+
         let dateFormatter = DateFormatter()
         dateFormatter.dateFormat = "yyyy-MM-dd"
-        let dateString = dateFormatter.string(from: date)
-
         let timeFormatter = DateFormatter()
         timeFormatter.dateFormat = "HH:mm"
+
+        // Set-mode values (single day, required start, optional end)
+        let dateString = dateFormatter.string(from: date)
         let startTimeString = timeFormatter.string(from: startTime)
-        let endTimeString = timeFormatter.string(from: endTime)
+        let endTimeString: String? = hasEndTime ? timeFormatter.string(from: endTime) : nil
+
+        // Flex-mode placeholder availability — the pod picks the real time later.
+        let defaultSlot = AvailabilitySlot(date: Date(), timeBlocks: TimeBlock.allCases, hours: [])
+        let slotsToSave = creatorSlots
 
         Task {
-            if let editing = editingMission {
-                // Update existing mission
-                if let updated = await viewModel.updateSetMission(
-                    id: editing.id,
-                    title: title.trimmingCharacters(in: .whitespaces),
-                    description: description.trimmingCharacters(in: .whitespaces),
-                    tags: tags,
-                    location: location.trimmingCharacters(in: .whitespaces),
-                    date: dateString,
-                    startTime: startTimeString,
-                    endTime: endTimeString,
-                    maxPodSize: maxPodSize,
-                    logo: selectedLogo
-                ) {
-                    await MainActor.run {
-                        isSubmitting = false
-                        onUpdated?(updated)
-                        dismiss()
-                    }
-                } else {
-                    await MainActor.run {
-                        isSubmitting = false
-                        errorMessage = viewModel.errorMessage ?? "Update failed."
-                    }
-                }
-            } else {
-                // Create new mission
-                do {
-                    var created = try await MissionService.shared.createMission(
-                        title: title.trimmingCharacters(in: .whitespaces),
-                        description: description.trimmingCharacters(in: .whitespaces),
-                        tags: tags,
-                        location: location.trimmingCharacters(in: .whitespaces),
-                        date: dateString,
-                        startTime: startTimeString,
-                        endTime: endTimeString,
-                        maxPodSize: maxPodSize,
-                        logo: selectedLogo
-                    )
-                    if let pod = try? await MissionService.shared.joinMission(id: created.id) {
-                        created.userPodStatus = "in_pod"
-                        created.userPodId = pod.id
-                    }
-                    await MainActor.run {
-                        isSubmitting = false
-                        onCreated?(created)
-                        dismiss()
-                    }
-                } catch {
-                    await MainActor.run {
-                        isSubmitting = false
-                        errorMessage = error.localizedDescription
-                    }
+            // 1. Upload any newly-picked images, collect all image URLs.
+            var imageUrls = existingImageUrls
+            for image in pickedImages {
+                if let url = try? await MissionService.shared.uploadMissionImage(image) {
+                    imageUrls.append(url)
                 }
             }
-        }
-    }
+            imageUrls = Array(imageUrls.prefix(3))
 
-    private func submitFlexMission() {
-        guard canSubmit, !viewModel.isSubmitting else { return }
-        // Send "today, all day" as a placeholder — the group will pick the actual time later.
-        // The backend requires at least one slot, so we send all three time blocks for today.
-        let defaultSlot = AvailabilitySlot(
-            date: Date(),
-            timeBlocks: TimeBlock.allCases,
-            hours: []
-        )
-        let slotsToSave = creatorSlots
-        Task {
+            let minSize = minPodSize
+            let maxSize = maxPodSize
+
+            // 2. Create or update via the unified Mission kind.
+            let result: Mission?
             if let editing = editingMission {
-                // Update existing flex mission
-                if let updated = await viewModel.updateFlexMission(
-                    id: editing.id,
-                    title: title.trimmingCharacters(in: .whitespaces),
-                    minGroupSize: minGroupSize,
-                    maxGroupSize: maxGroupSize,
-                    availability: [defaultSlot],
-                    description: description.trimmingCharacters(in: .whitespaces),
-                    links: linksArray,
-                    tags: tags,
-                    timeRangeStart: timeRangeStart,
-                    timeRangeEnd: timeRangeEnd,
-                    logo: selectedLogo
-                ) {
-                    onUpdated?(updated)
-                    dismiss()
-                } else {
-                    errorMessage = viewModel.errorMessage ?? "Update failed."
-                }
+                result = await viewModel.updateMission(
+                    id: editing.id, mode: mode, title: trimmedTitle, description: trimmedDesc,
+                    tags: tags, logo: selectedLogo, images: imageUrls,
+                    minPodSize: minSize, maxPodSize: maxSize, location: trimmedLoc,
+                    date: dateString, startTime: startTimeString, endTime: endTimeString,
+                    availability: [defaultSlot], timeRangeStart: timeRangeStart,
+                    timeRangeEnd: timeRangeEnd, links: linksArray,
+                    schedulingWindowDays: schedulingWindowDays
+                )
             } else {
-                // Create new flex mission
-                if let created = await viewModel.createFlexMission(
-                    title: title.trimmingCharacters(in: .whitespaces),
-                    minGroupSize: minGroupSize,
-                    maxGroupSize: maxGroupSize,
-                    availability: [defaultSlot],
-                    description: description.trimmingCharacters(in: .whitespaces),
-                    links: linksArray,
-                    tags: tags,
-                    logo: selectedLogo
-                ) {
-                    // Save creator availability to ScheduleService so PodView loads it pre-populated
-                    if let podId = created.podId, !slotsToSave.isEmpty {
-                        let userId = UserDefaults.standard.integer(forKey: "orbit_user_id")
-                        let userName = UserDefaults.standard.string(forKey: "orbit_user_name") ?? "You"
-                        ScheduleService.shared.saveAvailability(
-                            podId: podId,
-                            userId: userId,
-                            name: userName,
-                            joinIndex: 0,
-                            slots: slotsToSave
-                        )
-                    }
-                    onCreated?(created)
-                    dismiss()
-                } else {
+                result = await viewModel.createMission(
+                    mode: mode, title: trimmedTitle, description: trimmedDesc,
+                    tags: tags, logo: selectedLogo, images: imageUrls,
+                    minPodSize: minSize, maxPodSize: maxSize, location: trimmedLoc,
+                    date: dateString, startTime: startTimeString, endTime: endTimeString,
+                    availability: [defaultSlot], timeRangeStart: timeRangeStart,
+                    timeRangeEnd: timeRangeEnd, links: linksArray,
+                    schedulingWindowDays: schedulingWindowDays
+                )
+            }
+
+            await MainActor.run {
+                isSubmitting = false
+                guard let result else {
                     errorMessage = viewModel.errorMessage ?? "Something went wrong. Try again."
+                    return
                 }
+                // Seed the creator's availability into the pod for flex missions.
+                if mode == .flex, editingMission == nil,
+                   let podId = result.podId ?? result.userPodId, !slotsToSave.isEmpty {
+                    let userId = UserDefaults.standard.integer(forKey: "orbit_user_id")
+                    let userName = UserDefaults.standard.string(forKey: "orbit_user_name") ?? "You"
+                    ScheduleService.shared.saveAvailability(
+                        podId: podId, userId: userId, name: userName, joinIndex: 0, slots: slotsToSave
+                    )
+                }
+                if editingMission != nil {
+                    onUpdated?(result)
+                } else {
+                    onCreated?(result)
+                }
+                dismiss()
             }
         }
     }
@@ -1841,8 +2410,7 @@ struct MissionCreateView: View {
         creatorSlots = []
         selectedDays = []
         selectedHours = []
-        link1 = ""
-        link2 = ""
+        links = []
         customTagText = ""
         errorMessage = nil
     }

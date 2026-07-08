@@ -29,10 +29,33 @@ class PodService {
         )
     }
 
+    /// Delete the pod entirely (pod leader only). Other members are notified.
+    func deletePod(podId: String) async throws {
+        let _: EmptyResponse = try await APIService.shared.request(
+            endpoint: Constants.API.Endpoints.pod(podId),
+            method: "DELETE",
+            authenticated: true
+        )
+    }
+
     func renamePod(podId: String, name: String) async throws -> Pod {
         let body: [String: Any] = ["name": name]
         return try await APIService.shared.request(
             endpoint: Constants.API.Endpoints.podRename(podId),
+            method: "PUT",
+            body: body,
+            authenticated: true
+        )
+    }
+
+    /// Edit the pod's name and/or meeting place (leader only).
+    /// Pass an empty `place` to clear it; pass nil to leave a field unchanged.
+    func editPod(podId: String, name: String?, place: String?) async throws -> Pod {
+        var body: [String: Any] = [:]
+        if let name { body["name"] = name }
+        if let place { body["scheduled_place"] = place }
+        return try await APIService.shared.request(
+            endpoint: Constants.API.Endpoints.pod(podId),
             method: "PUT",
             body: body,
             authenticated: true

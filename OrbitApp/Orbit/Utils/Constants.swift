@@ -40,6 +40,7 @@ enum Constants {
             static func joinMission(_ id: String) -> String { "/missions/\(id)/join" }
             static func leaveMission(_ id: String) -> String { "/missions/\(id)/leave" }
             static func skipMission(_ id: String) -> String { "/missions/\(id)/skip" }
+            static let uploadMissionImage = "/missions/upload-image"
 
             // Pods
             static func pod(_ id: String) -> String { "/pods/\(id)" }
@@ -73,6 +74,15 @@ enum Constants {
             // Chat
             static let podConversations = "/pods/conversations"
             static func podMessages(_ id: String) -> String { "/pods/\(id)/messages" }
+            static func podMessage(_ podId: String, _ messageId: String) -> String {
+                "/pods/\(podId)/messages/\(messageId)"
+            }
+            static func podMessageReact(_ podId: String, _ messageId: String) -> String {
+                "/pods/\(podId)/messages/\(messageId)/react"
+            }
+            static func podMessagePin(_ podId: String, _ messageId: String) -> String {
+                "/pods/\(podId)/messages/\(messageId)/pin"
+            }
             static func podVotes(_ id: String) -> String { "/pods/\(id)/votes" }
             static func podVoteRespond(_ podId: String, _ voteId: String) -> String {
                 "/pods/\(podId)/votes/\(voteId)/respond"
@@ -85,6 +95,10 @@ enum Constants {
             // Voyage
             static let voyageClusters = "/voyage/clusters"
             static let voyageHeartbeat = "/voyage/heartbeat"
+
+            // Notifications
+            static let notifications = "/notifications"
+            static let notificationsRead = "/notifications/read"
 
             // Pod Invites
             static func podInvite(_ podId: String) -> String { "/pods/\(podId)/invite" }
@@ -112,5 +126,6 @@ enum Constants {
         static let maxBioLength = 250
         static let maxGalleryPhotos = 6
         static let maxLinks = 3
+        static let maxPods = 15
     }
 }

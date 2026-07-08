@@ -170,6 +170,17 @@ def edit_signal(signal_id, data, user_id):
 
 def rsvp_signal(signal_id, user_id):
     """RSVP to a signal and create/join its pod. Returns (signal_dict, error_string)."""
+    from OrbitServer.services.pod_service import at_pod_limit, MAX_PODS_PER_USER
+
+    # Enforce the pod cap for new RSVPs only — re-RSVPs fall through so the
+    # frontend can recover the existing pod.
+    existing_signal = get_signal(signal_id)
+    if not existing_signal:
+        return None, "Signal not found"
+    already_rsvped = int(user_id) in (existing_signal.get('rsvps') or [])
+    if not already_rsvped and at_pod_limit(user_id):
+        return None, f"You can only be in {MAX_PODS_PER_USER} pods at a time"
+
     signal, err = transactional_signal_rsvp(signal_id, user_id)
     if err:
         # For "already RSVP'd", still return the signal with pod_id so the

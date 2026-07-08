@@ -13,6 +13,7 @@ from OrbitServer.services.mission_service import (
 from OrbitServer.services.pod_service import join_mission, leave_mission
 from OrbitServer.services.ai_suggestion_service import get_suggested_missions
 from OrbitServer.services.embedding_service import get_or_create_mission_embedding
+from OrbitServer.services.storage_service import upload_file
 from OrbitServer.models.models import (
     list_pods, get_user_pod_for_mission, record_action,
 )
@@ -164,6 +165,31 @@ def create():
     threading.Thread(target=_generate_embedding, daemon=True).start()
 
     return success(_strip_embedding(mission), 201)
+
+
+# ── POST /missions/upload-image ──────────────────────────────────────────────
+
+@missions_bp.route('/upload-image', methods=['POST'])
+@require_auth
+def upload_image():
+    """Upload a single mission image (e.g. a flyer). Returns its public URL.
+
+    The client uploads each image separately and then sends the collected
+    URLs in the `images` field of the create/update payload.
+    """
+    if 'photo' not in request.files:
+        return error("No photo file provided", 400)
+    file = request.files['photo']
+    if file.filename == '':
+        return error("No file selected", 400)
+    try:
+        url = upload_file(file, folder='missions')
+    except ValueError as e:
+        return error(str(e), 400)
+    except Exception:
+        logger.exception("Mission image upload failed")
+        return error("Failed to upload image", 500)
+    return success({"url": url})
 
 
 # ── GET /missions/<id> ──────────────────────────────────────────────────────

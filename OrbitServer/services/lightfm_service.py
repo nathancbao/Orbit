@@ -100,13 +100,23 @@ def _train():
         item_features=all_item_feats or None,
     )
 
-    # Build interaction triples (user_id, mission_id, weight)
+    # Build interaction triples (user_id, mission_id, weight).
+    # Only include interactions whose user AND mission are part of the fitted
+    # dataset. History can reference deleted missions or pre-migration IDs that
+    # aren't in the current mission set; passing those to build_interactions
+    # raises "... not in item id mapping. Make sure you call the fit method."
     triples = []
     for h in history:
         uid = h.get('user_id')
         mid = h.get('mission_id')
         action = h.get('action', '')
         if uid is None or mid is None:
+            continue
+        try:
+            uid_i, mid_i = int(uid), int(mid)
+        except (TypeError, ValueError):
+            continue  # e.g. legacy UUID signal IDs — not in the fitted set
+        if uid_i not in user_ids or mid_i not in mission_ids:
             continue
         w = INTERACTION_WEIGHTS.get(action, 0.0)
         if action == 'joined' and h.get('attended') is True:
@@ -115,7 +125,7 @@ def _train():
         if enjoyment is not None:
             w += ENJOYMENT_WEIGHT_BONUS.get(int(enjoyment), 0.0)
         if w > 0:
-            triples.append((int(uid), int(mid), w))
+            triples.append((uid_i, mid_i, w))
 
     if not triples:
         logger.info("LightFM: no positive interactions found, skipping training")

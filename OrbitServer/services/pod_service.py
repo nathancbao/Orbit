@@ -1,16 +1,27 @@
 import datetime
+import logging
 
 from OrbitServer.models.models import (
     get_mission, get_pod, update_pod, create_pod,
     find_open_pod_for_mission, get_user_pod_for_mission,
     list_pods, get_user, record_action,
     adjust_trust_score, transactional_pod_update, delete_pod,
+    create_notification, get_signal,
 )
 from OrbitServer.utils.helpers import safe_int as _safe_int
+
+logger = logging.getLogger(__name__)
 
 ATTENDANCE_CONFIRM_POINTS = 50
 NO_SHOW_PENALTY = -20
 KICK_MAJORITY_THRESHOLD = 0.5  # >50% of other members
+MAX_PODS_PER_USER = 15
+
+
+def at_pod_limit(user_id):
+    """Whether the user is already in the maximum number of pods."""
+    from OrbitServer.models.models import get_user_pods
+    return len(get_user_pods(user_id)) >= MAX_PODS_PER_USER
 
 
 def _compute_pod_compatibility(user_interests: set, pod_members: list) -> float:
@@ -157,6 +168,9 @@ def join_mission(mission_id, user_id, preferred_pod_id=None):
     if existing:
         return existing, None
 
+    if at_pod_limit(user_id):
+        return None, f"You can only be in {MAX_PODS_PER_USER} pods at a time"
+
     max_pod_size = mission.get('max_pod_size', 4)
 
     # If caller requested a specific pod, try to use it
@@ -302,6 +316,118 @@ def leave_pod(pod_id, user_id):
     return True, None
 
 
+def edit_pod(pod_id, user_id, data):
+    """
+    Leader-only pod edit: name and/or meeting place. Any change is announced
+    with a system message in the pod chat so every member sees it.
+    Returns (pod, error_message, status_code).
+    """
+    from OrbitServer.models.models import create_chat_message
+
+    uid = _safe_int(user_id)
+    if uid is None:
+        return None, "Invalid user ID", 400
+
+    pod = get_pod(pod_id)
+    if not pod:
+        return None, "Pod not found", 404
+
+    member_ids = [_safe_int(m) for m in (pod.get('member_ids') or []) if _safe_int(m) is not None]
+    if uid not in member_ids:
+        return None, "You are not a member of this pod", 403
+    if member_ids[0] != uid:
+        return None, "Only the pod leader can edit the pod", 403
+
+    updates = {}
+    announcements = []
+
+    if 'name' in data:
+        name = (data.get('name') or '').strip()
+        if not name:
+            return None, "name cannot be empty", 400
+        if len(name) > 100:
+            return None, "name must be 100 characters or fewer", 400
+        if name != pod.get('name'):
+            updates['name'] = name
+            announcements.append(f'✏️ Pod renamed to "{name}"')
+
+    if 'scheduled_place' in data:
+        place = data.get('scheduled_place')
+        if place is not None and not isinstance(place, str):
+            return None, "scheduled_place must be a string", 400
+        place = (place or '').strip() or None
+        if place and len(place) > 200:
+            return None, "scheduled_place must be 200 characters or fewer", 400
+        if place != pod.get('scheduled_place'):
+            updates['scheduled_place'] = place
+            announcements.append(
+                f'\U0001f4cd Meeting place updated to {place}' if place
+                else '\U0001f4cd Meeting place cleared'
+            )
+
+    if not updates:
+        return pod, None, None
+
+    updated = update_pod(pod_id, updates)
+    for text in announcements:
+        try:
+            create_chat_message(pod_id, uid, text, message_type='system')
+        except Exception:
+            logger.exception("Failed to announce pod edit in chat for pod %s", pod_id)
+    return updated, None, None
+
+
+def delete_pod_as_leader(pod_id, user_id):
+    """
+    Delete a pod entirely. Only the pod leader (first member in join order)
+    may do this. Every other member gets an in-app notification that the pod
+    they were in was deleted.
+    Returns (True, None) on success or (False, (error_msg, status_code)) on failure.
+    """
+    uid = _safe_int(user_id)
+    if uid is None:
+        return False, ("Invalid user ID", 400)
+
+    pod = get_pod(pod_id)
+    if not pod:
+        return False, ("Pod not found", 404)
+
+    member_ids = [_safe_int(m) for m in (pod.get('member_ids') or []) if _safe_int(m) is not None]
+    if uid not in member_ids:
+        return False, ("You are not a member of this pod", 403)
+    if member_ids[0] != uid:
+        return False, ("Only the pod leader can delete the pod", 403)
+
+    # Resolve a display name for the notification body.
+    pod_name = pod.get('name')
+    if not pod_name:
+        mission_id = pod.get('mission_id')
+        signal_id = pod.get('signal_id')
+        if mission_id is not None:
+            mission = get_mission(int(mission_id))
+            pod_name = mission.get('title') if mission else None
+        elif signal_id:
+            signal = get_signal(signal_id)
+            pod_name = signal.get('title') if signal else None
+    pod_name = pod_name or 'Your pod'
+
+    for member_id in member_ids:
+        if member_id == uid:
+            continue
+        try:
+            create_notification(
+                member_id, 'pod_deleted',
+                'Pod deleted',
+                f'"{pod_name}" — the pod you were in was deleted by the pod leader.',
+                data={'pod_id': str(pod_id)},
+            )
+        except Exception:
+            logger.exception("Failed to notify user %s of pod %s deletion", member_id, pod_id)
+
+    delete_pod(pod_id)
+    return True, None
+
+
 def get_pod_with_members(pod_id, requesting_user_id):
     """
     Returns pod dict enriched with member profile stubs.
@@ -352,16 +478,24 @@ def get_pod_with_members(pod_id, requesting_user_id):
             'photo': user.get('photo'),
         })
 
-    # Enrich with mission title/tags and survey eligibility
+    # Enrich with mission title/tags, minimum size, and survey eligibility
     mission_id = pod.get('mission_id')
+    signal_id = pod.get('signal_id')
     if mission_id is not None:
         from OrbitServer.models.models import get_mission
         mission = get_mission(int(mission_id))
         pod['mission_title'] = mission.get('title', 'Untitled') if mission else 'Untitled'
         pod['mission_tags'] = mission.get('tags', []) if mission else []
+        pod['min_pod_size'] = int(mission.get('min_pod_size', 3)) if mission else 3
+    elif signal_id:
+        signal = get_signal(signal_id)
+        pod['mission_title'] = signal.get('title', 'Untitled') if signal else 'Untitled'
+        pod['mission_tags'] = signal.get('tags', []) if signal else []
+        pod['min_pod_size'] = int(signal.get('min_group_size', 3)) if signal else 3
     else:
         pod['mission_title'] = 'Untitled'
         pod['mission_tags'] = []
+        pod['min_pod_size'] = 3
 
     survey_completed_by = pod.get('survey_completed_by') or []
     completed_at_raw = pod.get('completed_at')

@@ -6,7 +6,20 @@ struct ChatMessage: Codable, Identifiable {
     var userId: Int
     var content: String
     var messageType: String   // text | vote_created | vote_result | system
+    var reactions: [String: [Int]]  // thumbs_up | thumbs_down | heart -> [user ids]
+    var pinned: Bool
     var createdAt: String
+
+    /// The three supported reactions, in display order, mapped to their emoji.
+    static let reactionOptions: [(key: String, emoji: String)] = [
+        ("thumbs_up", "👍"),
+        ("thumbs_down", "👎"),
+        ("heart", "❤️"),
+    ]
+
+    static func emoji(for reactionKey: String) -> String {
+        reactionOptions.first(where: { $0.key == reactionKey })?.emoji ?? reactionKey
+    }
 
     enum CodingKeys: String, CodingKey {
         case id
@@ -14,6 +27,7 @@ struct ChatMessage: Codable, Identifiable {
         case userId = "user_id"
         case content
         case messageType = "message_type"
+        case reactions, pinned
         case createdAt = "created_at"
     }
 
@@ -24,11 +38,22 @@ struct ChatMessage: Codable, Identifiable {
         userId = (try? container.decode(Int.self, forKey: .userId)) ?? 0
         content = (try? container.decode(String.self, forKey: .content)) ?? ""
         messageType = (try? container.decode(String.self, forKey: .messageType)) ?? "text"
+        reactions = (try? container.decode([String: [Int]].self, forKey: .reactions)) ?? [:]
+        pinned = (try? container.decode(Bool.self, forKey: .pinned)) ?? false
         createdAt = (try? container.decode(String.self, forKey: .createdAt)) ?? ""
     }
 
     var isSystemMessage: Bool {
         messageType != "text"
+    }
+
+    /// Reactions that have at least one reactor, in display order.
+    var activeReactions: [(key: String, emoji: String, userIds: [Int])] {
+        Self.reactionOptions.compactMap { option in
+            let users = reactions[option.key] ?? []
+            guard !users.isEmpty else { return nil }
+            return (option.key, option.emoji, users)
+        }
     }
 }
 

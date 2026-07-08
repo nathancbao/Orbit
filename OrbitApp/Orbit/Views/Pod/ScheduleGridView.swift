@@ -519,3 +519,227 @@ struct CreatorAvailabilityGridView: View {
         return "\(hour - 12) PM"
     }
 }
+
+// MARK: - Availability Picker Sheet
+//
+// A focused, full-screen availability editor used during mission creation.
+// Unlike the inline grid, this lives in a sheet with NO scrolling, so the
+// drag gesture never fights the page scroll. It paginates the date range into
+// pages of at most 7 days (with arrows) so each day stays large enough to tap,
+// and supports BOTH tap-to-toggle and drag-to-paint.
+
+struct AvailabilityPickerSheet: View {
+    @Binding var selectedSlots: Set<TimeSlot>
+    let startDate: Date
+    let totalDays: Int
+    var memberColor: Color = MemberColor.pink.color
+
+    @Environment(\.dismiss) private var dismiss
+
+    private let daysPerPage = 7
+    private let hours = Array(ScheduleGrid.hourRange)   // 9...21
+
+    @State private var page = 0
+    @State private var dragMode: DragMode? = nil
+    @State private var visited: Set<String> = []
+
+    private enum DragMode { case selecting, deselecting }
+
+    // Layout
+    private let hourLabelW: CGFloat = 46
+    private let headerH: CGFloat = 42
+
+    private var allDates: [Date] {
+        let cal = Calendar.current
+        let start = cal.startOfDay(for: startDate)
+        return (0..<max(1, totalDays)).compactMap { cal.date(byAdding: .day, value: $0, to: start) }
+    }
+
+    private var pageCount: Int {
+        max(1, Int(ceil(Double(allDates.count) / Double(daysPerPage))))
+    }
+
+    private var visibleDates: [Date] {
+        let startIdx = page * daysPerPage
+        let endIdx = min(startIdx + daysPerPage, allDates.count)
+        guard startIdx < endIdx else { return [] }
+        return Array(allDates[startIdx..<endIdx])
+    }
+
+    var body: some View {
+        NavigationStack {
+            VStack(spacing: 12) {
+                Text("Tap or drag across the hours you're free. Your pod schedules around everyone's availability.")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, 20)
+                    .padding(.top, 8)
+
+                HStack(spacing: 6) {
+                    pageArrow(systemName: "chevron.left", disabled: page == 0) {
+                        if page > 0 { page -= 1 }
+                    }
+
+                    GeometryReader { geo in
+                        gridBody(in: geo.size)
+                    }
+
+                    pageArrow(systemName: "chevron.right", disabled: page >= pageCount - 1) {
+                        if page < pageCount - 1 { page += 1 }
+                    }
+                }
+                .padding(.horizontal, 10)
+
+                HStack {
+                    Text("\(selectedSlots.count) hour\(selectedSlots.count == 1 ? "" : "s") selected")
+                        .font(.caption)
+                        .foregroundColor(selectedSlots.isEmpty ? .red : .secondary)
+                    Spacer()
+                    if pageCount > 1 {
+                        Text("Page \(page + 1) of \(pageCount)")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                    if !selectedSlots.isEmpty {
+                        Button("Clear") { selectedSlots.removeAll() }
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                }
+                .padding(.horizontal, 20)
+                .padding(.bottom, 8)
+            }
+            .navigationTitle("Your availability")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Done") { dismiss() }
+                        .fontWeight(.semibold)
+                }
+            }
+        }
+    }
+
+    // MARK: - Grid
+
+    private func gridBody(in size: CGSize) -> some View {
+        let dayCount = max(1, visibleDates.count)
+        let colW = (size.width - hourLabelW) / CGFloat(dayCount)
+        let rowH = max(18, (size.height - headerH) / CGFloat(hours.count))
+
+        return VStack(spacing: 0) {
+            // Header row
+            HStack(spacing: 0) {
+                Color.clear.frame(width: hourLabelW, height: headerH)
+                ForEach(visibleDates, id: \.self) { date in
+                    VStack(spacing: 2) {
+                        Text(dayLabel(for: date))
+                            .font(.system(size: 12, weight: .semibold))
+                        Text(dateLabel(for: date))
+                            .font(.system(size: 10))
+                            .foregroundColor(.secondary)
+                    }
+                    .frame(width: colW, height: headerH)
+                }
+            }
+
+            // Hour rows
+            ForEach(Array(hours.enumerated()), id: \.element) { _, hour in
+                HStack(spacing: 0) {
+                    Text(hourLabel(hour))
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundColor(.secondary)
+                        .frame(width: hourLabelW, height: rowH, alignment: .trailing)
+                        .padding(.trailing, 4)
+
+                    ForEach(visibleDates, id: \.self) { date in
+                        let slot = TimeSlot(date: date, hour: hour)
+                        let isSelected = selectedSlots.contains(slot)
+                        RoundedRectangle(cornerRadius: 4)
+                            .fill(isSelected ? memberColor.opacity(0.65) : Color(.systemGray5))
+                            .padding(1)
+                            .frame(width: colW, height: rowH)
+                    }
+                }
+            }
+        }
+        .contentShape(Rectangle())
+        .gesture(
+            DragGesture(minimumDistance: 0)
+                .onChanged { value in
+                    handlePoint(value.location, colW: colW, rowH: rowH)
+                }
+                .onEnded { _ in
+                    dragMode = nil
+                    visited = []
+                }
+        )
+    }
+
+    /// Map a touch point to a slot and apply tap-toggle / drag-paint logic.
+    private func handlePoint(_ point: CGPoint, colW: CGFloat, rowH: CGFloat) {
+        guard point.x >= hourLabelW, point.y >= headerH else { return }
+        let col = Int((point.x - hourLabelW) / colW)
+        let row = Int((point.y - headerH) / rowH)
+        guard col >= 0, col < visibleDates.count, row >= 0, row < hours.count else { return }
+
+        let slot = TimeSlot(date: visibleDates[col], hour: hours[row])
+        let key = slot.key
+        guard !visited.contains(key) else { return }
+        visited.insert(key)
+
+        if dragMode == nil {
+            // First cell of the interaction (also covers a single tap):
+            // toggle, and lock the mode so a drag paints consistently.
+            if selectedSlots.contains(slot) {
+                dragMode = .deselecting
+                selectedSlots.remove(slot)
+            } else {
+                dragMode = .selecting
+                selectedSlots.insert(slot)
+            }
+        } else if dragMode == .selecting {
+            selectedSlots.insert(slot)
+        } else {
+            selectedSlots.remove(slot)
+        }
+    }
+
+    // MARK: - Page arrow
+
+    @ViewBuilder
+    private func pageArrow(systemName: String, disabled: Bool, action: @escaping () -> Void) -> some View {
+        if pageCount > 1 {
+            Button(action: action) {
+                Image(systemName: systemName)
+                    .font(.system(size: 16, weight: .bold))
+                    .foregroundColor(disabled ? Color(.systemGray4) : .primary)
+                    .frame(width: 28, height: 44)
+            }
+            .disabled(disabled)
+        } else {
+            Color.clear.frame(width: 0)
+        }
+    }
+
+    // MARK: - Formatting
+
+    private func dayLabel(for date: Date) -> String {
+        if Calendar.current.isDateInToday(date) { return "Today" }
+        let df = DateFormatter(); df.dateFormat = "EEE"
+        return df.string(from: date)
+    }
+
+    private func dateLabel(for date: Date) -> String {
+        let df = DateFormatter(); df.dateFormat = "M/d"
+        return df.string(from: date)
+    }
+
+    private func hourLabel(_ hour: Int) -> String {
+        if hour == 0 { return "12 AM" }
+        if hour < 12 { return "\(hour) AM" }
+        if hour == 12 { return "12 PM" }
+        return "\(hour - 12) PM"
+    }
+}

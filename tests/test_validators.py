@@ -1,5 +1,7 @@
 """Tests for utils/validators.py — no mocking needed, pure logic."""
 
+import datetime
+
 from OrbitServer.utils.validators import (
     validate_edu_email,
     validate_profile_data,
@@ -7,6 +9,9 @@ from OrbitServer.utils.validators import (
     validate_message_data,
     validate_vote_data,
 )
+
+# A date guaranteed to fall inside the today…+14-day scheduling window.
+IN_WINDOW_DATE = (datetime.date.today() + datetime.timedelta(days=3)).isoformat()
 
 
 # ── Email Validation ────────────────────────────────────────────────────────
@@ -233,7 +238,7 @@ class TestValidateMissionData:
     def test_valid_event(self):
         valid, errors = validate_mission_data({
             "title": "Hike", "description": "Trail run",
-            "date": "2026-06-15", "start_time": "14:00", "end_time": "16:00"
+            "date": IN_WINDOW_DATE, "start_time": "14:00", "end_time": "16:00"
         })
         assert valid is True
 
@@ -243,7 +248,7 @@ class TestValidateMissionData:
 
     def test_accepts_missing_description(self):
         valid, errors = validate_mission_data({
-            "title": "Hike", "date": "2026-06-15",
+            "title": "Hike", "date": IN_WINDOW_DATE,
             "start_time": "14:00", "end_time": "16:00"
         })
         assert valid is True
@@ -278,7 +283,7 @@ class TestValidateMissionData:
     def test_accepts_valid_pod_size(self):
         valid, errors = validate_mission_data({
             "title": "Hike", "description": "Fun", "max_pod_size": 4,
-            "date": "2026-06-15", "start_time": "14:00", "end_time": "16:00"
+            "date": IN_WINDOW_DATE, "start_time": "14:00", "end_time": "16:00"
         })
         assert valid is True
 
@@ -290,14 +295,96 @@ class TestValidateMissionData:
 
     def test_accepts_valid_date(self):
         valid, errors = validate_mission_data({
-            "title": "Hike", "description": "Fun", "date": "2026-06-15",
+            "title": "Hike", "description": "Fun", "date": IN_WINDOW_DATE,
             "start_time": "14:00", "end_time": "16:00"
         })
         assert valid is True
 
+    def test_set_accepts_without_end_time(self):
+        # Single-day mission with a start time but no end time is valid.
+        valid, errors = validate_mission_data({
+            "title": "Hike", "date": IN_WINDOW_DATE, "start_time": "14:00",
+        })
+        assert valid is True
+
+    def test_set_still_requires_start_time(self):
+        valid, errors = validate_mission_data({
+            "title": "Hike", "date": IN_WINDOW_DATE,
+        })
+        assert valid is False
+
     def test_update_mode_skips_required_fields(self):
         valid, errors = validate_mission_data({"title": "Updated"}, is_update=True)
         assert valid is True
+
+    # ── Scheduling window (today … +14 days) ────────────────────────────────
+
+    def test_rejects_set_date_too_far_out(self):
+        far = (datetime.date.today() + datetime.timedelta(days=30)).isoformat()
+        valid, errors = validate_mission_data({
+            "title": "Hike", "date": far, "start_time": "14:00", "end_time": "16:00"
+        })
+        assert valid is False
+
+    def test_rejects_set_date_in_past(self):
+        past = (datetime.date.today() - datetime.timedelta(days=2)).isoformat()
+        valid, errors = validate_mission_data({
+            "title": "Hike", "date": past, "start_time": "14:00", "end_time": "16:00"
+        })
+        assert valid is False
+
+    # ── Pod size bounds ─────────────────────────────────────────────────────
+
+    def test_rejects_min_greater_than_max(self):
+        valid, errors = validate_mission_data({
+            "title": "Hike", "date": IN_WINDOW_DATE,
+            "start_time": "14:00", "end_time": "16:00",
+            "min_pod_size": 6, "max_pod_size": 4,
+        })
+        assert valid is False
+
+    def test_rejects_pod_size_below_three(self):
+        # A pod of two could leave two strangers alone — minimum is three.
+        valid, errors = validate_mission_data({
+            "title": "Hike", "date": IN_WINDOW_DATE, "start_time": "14:00",
+            "min_pod_size": 2, "max_pod_size": 4,
+        })
+        assert valid is False
+
+    # ── Images ──────────────────────────────────────────────────────────────
+
+    def test_rejects_too_many_images(self):
+        valid, errors = validate_mission_data({
+            "title": "Hike", "date": IN_WINDOW_DATE,
+            "start_time": "14:00", "end_time": "16:00",
+            "images": ["a", "b", "c", "d"],
+        })
+        assert valid is False
+
+    # ── Flex mode ───────────────────────────────────────────────────────────
+
+    def test_accepts_valid_flex_mission(self):
+        valid, errors = validate_mission_data({
+            "mode": "flex", "title": "Pickup ball", "description": "Fun",
+            "min_pod_size": 3, "max_pod_size": 8,
+            "availability": [{"date": IN_WINDOW_DATE, "hours": [14, 15]}],
+            "scheduling_window_days": 7,
+        })
+        assert valid is True
+
+    def test_rejects_flex_without_availability(self):
+        valid, errors = validate_mission_data({
+            "mode": "flex", "title": "Pickup ball", "availability": [],
+        })
+        assert valid is False
+
+    def test_rejects_flex_window_out_of_range(self):
+        valid, errors = validate_mission_data({
+            "mode": "flex", "title": "Pickup ball",
+            "availability": [{"date": IN_WINDOW_DATE, "hours": [14]}],
+            "scheduling_window_days": 30,
+        })
+        assert valid is False
 
 
 # ── Message Validation ───────────────────────────────────────────────────────
@@ -366,3 +453,46 @@ class TestValidateVoteData:
     def test_rejects_non_list_options(self):
         valid, errors = validate_vote_data({"vote_type": "time", "options": "not a list"})
         assert valid is False
+
+
+class TestValidateMissionLinks:
+    """Links are optional on both set and flex missions (max 3)."""
+
+    def _set_mission(self, **overrides):
+        data = {
+            'title': 'BBQ Night',
+            'mode': 'set',
+            'date': datetime.date.today().isoformat(),
+            'start_time': '18:00',
+        }
+        data.update(overrides)
+        return data
+
+    def test_set_mission_accepts_links(self):
+        valid, errors = validate_mission_data(
+            self._set_mission(links=['https://example.com/menu']))
+        assert valid, errors
+
+    def test_accepts_up_to_three_links(self):
+        valid, errors = validate_mission_data(
+            self._set_mission(links=['https://a.com', 'https://b.com', 'https://c.com']))
+        assert valid, errors
+
+    def test_rejects_four_links(self):
+        valid, errors = validate_mission_data(
+            self._set_mission(links=['a', 'b', 'c', 'd']))
+        assert not valid
+        assert any('Maximum 3 links' in e for e in errors)
+
+    def test_rejects_non_list_links(self):
+        valid, errors = validate_mission_data(self._set_mission(links='https://a.com'))
+        assert not valid
+        assert any('links must be a list' in e for e in errors)
+
+    def test_rejects_non_string_link(self):
+        valid, errors = validate_mission_data(self._set_mission(links=[123]))
+        assert not valid
+
+    def test_rejects_overlong_link(self):
+        valid, errors = validate_mission_data(self._set_mission(links=['x' * 501]))
+        assert not valid

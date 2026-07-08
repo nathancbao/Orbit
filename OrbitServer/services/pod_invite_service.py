@@ -16,6 +16,10 @@ def send_pod_invite(pod_id, from_user_id, to_user_id):
     if int(from_user_id) not in member_ids:
         return None, "You are not a member of this pod", 403
 
+    # Only the pod leader (first member in join order) can invite people.
+    if int(member_ids[0]) != int(from_user_id):
+        return None, "Only the pod leader can invite people", 403
+
     if int(to_user_id) in member_ids:
         return None, "User is already in this pod", 409
 
@@ -47,6 +51,10 @@ def accept_pod_invite(invite_id, user_id):
         return None, "Not your invite", 403
     if invite['status'] != 'pending':
         return None, "Invite is no longer pending", 409
+
+    from OrbitServer.services.pod_service import at_pod_limit, MAX_PODS_PER_USER
+    if at_pod_limit(user_id):
+        return None, f"You can only be in {MAX_PODS_PER_USER} pods at a time", 409
 
     pod_id = invite['pod_id']
 

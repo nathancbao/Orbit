@@ -144,6 +144,56 @@ class PodViewModel: ObservableObject {
         }
     }
 
+    // MARK: - Message Actions (react / pin / delete)
+
+    func reactToMessage(messageId: String, reaction: String) async {
+        do {
+            let updated = try await ChatService.shared.reactToMessage(
+                podId: podId, messageId: messageId, reaction: reaction
+            )
+            if let idx = messages.firstIndex(where: { $0.id == messageId }) {
+                messages[idx] = updated
+            }
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    func togglePin(message: ChatMessage) async {
+        do {
+            let updated = try await ChatService.shared.pinMessage(
+                podId: podId, messageId: message.id, pinned: !message.pinned
+            )
+            if let idx = messages.firstIndex(where: { $0.id == message.id }) {
+                messages[idx] = updated
+            }
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    func deleteMessage(messageId: String) async {
+        do {
+            try await ChatService.shared.deleteMessage(podId: podId, messageId: messageId)
+            messages.removeAll { $0.id == messageId }
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    // MARK: - Pod Deletion (leader only)
+
+    func deletePod() async {
+        isLeaving = true
+        do {
+            try await PodService.shared.deletePod(podId: podId)
+            didLeave = true
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+        isLeaving = false
+    }
+
     func leavePod() async {
         isLeaving = true
         do {
@@ -165,6 +215,20 @@ class PodViewModel: ObservableObject {
     func renamePod(name: String) async {
         do {
             pod = try await PodService.shared.renamePod(podId: podId, name: name)
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    /// Leader-only edit of pod name + meeting place. Re-fetches the pod (to
+    /// keep member enrichment) and messages (to show the announcement).
+    func editPod(name: String?, place: String?) async {
+        do {
+            _ = try await PodService.shared.editPod(podId: podId, name: name, place: place)
+            if let refreshed = try? await PodService.shared.getPod(id: podId) {
+                pod = refreshed
+            }
+            messages = (try? await ChatService.shared.getMessages(podId: podId)) ?? messages
         } catch {
             errorMessage = error.localizedDescription
         }

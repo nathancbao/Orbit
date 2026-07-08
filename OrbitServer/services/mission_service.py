@@ -62,6 +62,44 @@ def _mission_end_datetime(mission):
     return local_end - datetime.timedelta(seconds=utc_offset_secs)
 
 
+def _check_flex_expiration(mission):
+    """Flex missions expire at the end of their scheduling window.
+
+    `scheduleable_until` (YYYY-MM-DD) is the last day the group may schedule on.
+    The mission is deleted once we're past that day plus the grace period.
+    """
+    until = mission.get('scheduleable_until')
+    if not until:
+        return 'active'
+    try:
+        until_date = datetime.datetime.strptime(until, '%Y-%m-%d')
+    except (ValueError, TypeError):
+        return 'active'
+
+    # Treat the window as ending at end of the last schedulable day (local),
+    # converted to UTC via the creator's offset.
+    utc_offset_secs = int(mission.get('utc_offset') or 0)
+    local_end = until_date.replace(hour=23, minute=59)
+    end_dt = local_end - datetime.timedelta(seconds=utc_offset_secs)
+
+    now = datetime.datetime.utcnow()
+    if now > end_dt + _MISSION_GRACE_PERIOD:
+        try:
+            delete_mission(mission['id'])
+        except Exception:
+            logger.exception("Failed to auto-delete expired flex mission %s", mission.get('id'))
+        return 'deleted'
+    if now > end_dt:
+        if mission.get('status') != 'completed':
+            try:
+                update_mission(mission['id'], {'status': 'completed'})
+            except Exception:
+                logger.exception("Failed to mark flex mission %s as completed", mission.get('id'))
+            mission['status'] = 'completed'
+        return 'completed'
+    return 'active'
+
+
 def check_mission_expiration(mission):
     """Check a mission against server time and handle expiration.
 
@@ -74,11 +112,14 @@ def check_mission_expiration(mission):
       'deleted'   — mission was auto-deleted
       None        — no end time could be determined
     """
-    if not mission or mission.get('mode') == 'flex':
+    if not mission:
         return 'active'
 
     if mission.get('status') in ('cancelled',):
         return mission['status']
+
+    if mission.get('mode') == 'flex':
+        return _check_flex_expiration(mission)
 
     end_dt = _mission_end_datetime(mission)
     if not end_dt:
