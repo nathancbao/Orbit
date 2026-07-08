@@ -98,6 +98,7 @@ class MissionsViewModel: ObservableObject {
     }
 
     /// The filtered + sorted list shown in the Missions feed.
+    /// Includes missions the user joined or created (badged in the UI).
     var discoverMissions: [Mission] {
         var list = allMissions
         if let tag = filterTag {

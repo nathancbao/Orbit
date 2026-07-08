@@ -294,6 +294,8 @@ PUT /api/users/me
 | `personality` | object | `{ introvert_extrovert, spontaneous_planner, active_relaxed }` (0.0–1.0) |
 | `social_preferences` | object | `{ group_size, meeting_frequency, preferred_times }` |
 | `friendship_goals` | array[string] | What user is looking for |
+| `college` | string | College id from `GET /api/colleges` (e.g. `"uc_davis"`); `""` = not set |
+| `max_distance_miles` | integer | Mission distance filter radius, 0–50; `0` = no limit |
 
 **Example Request:**
 ```json
@@ -330,6 +332,33 @@ PUT /api/users/me
 |-------------|---------------|
 | 400 | "No data provided" |
 | 400 | Validation error list (e.g. `["name must be a non-empty string", "age must be a number between 18 and 100"]`) |
+
+---
+
+### List Colleges
+
+Returns the selectable college directory used for the profile college picker
+and server-side distance filtering. When a user sets both `college` and a
+nonzero `max_distance_miles`, mission/signal feeds (explore, suggested,
+discover, voyage) only include items whose creator's college is within that
+radius. Items with no college (seeded/AI/legacy) are always shown.
+
+```
+GET /api/colleges
+```
+
+**Headers:** Requires `Authorization`
+
+**Example Response:**
+```json
+{
+  "success": true,
+  "data": [
+    { "id": "uc_davis", "name": "UC Davis", "lat": 38.5382, "lng": -121.7617 },
+    { "id": "uc_berkeley", "name": "UC Berkeley", "lat": 37.8719, "lng": -122.2585 }
+  ]
+}
+```
 
 ---
 
@@ -628,6 +657,11 @@ GET /api/missions/
 ```
 
 Note: Returns a flat array of mission objects, limited to 50 results.
+
+**Visibility & expiry rules:**
+- Results are distance-filtered by the caller's `college` + `max_distance_miles` profile settings (no-op when either is unset).
+- A mission whose end time has passed is marked `completed` and is only returned to users in one of its pods; everyone else stops seeing it immediately.
+- 24 hours after the end time the mission is hard-deleted (cascading its pods, chat, and votes). Signals expire 24 hours after their latest availability date (fallback: 14 days after creation). A daily App Engine cron (`GET /api/tasks/cleanup`, cron-only) sweeps anything lazy deletion missed.
 
 ---
 

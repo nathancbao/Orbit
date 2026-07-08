@@ -267,6 +267,9 @@ def get_suggested_missions(user_id, limit=5) -> list:
 
     # Include flex missions (signals) in the candidate pool
     all_signals, _ = list_all_signals(limit=50)
+    # Local import: signal_service imports this module, so avoid a cycle
+    from OrbitServer.services.signal_service import filter_expired_signals
+    all_signals = filter_expired_signals(all_signals)
     for s in all_signals:
         s['mode'] = 'flex'
     # Exclude signals the user created or already RSVP'd to
@@ -280,6 +283,9 @@ def get_suggested_missions(user_id, limit=5) -> list:
         m for m in all_missions
         if m['id'] not in joined_ids and m['id'] not in skipped_ids
     ]
+    # Respect the user's college distance setting before spending scoring work
+    from OrbitServer.utils.colleges import filter_by_distance
+    candidates = filter_by_distance(candidates, user)
     if not candidates:
         return []
 

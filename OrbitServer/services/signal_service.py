@@ -1,3 +1,6 @@
+import datetime
+import logging
+
 from OrbitServer.models.models import (
     create_signal, get_signal, delete_signal, update_signal,
     list_signals_for_user, list_all_signals,
@@ -6,7 +9,72 @@ from OrbitServer.models.models import (
     get_user,
 )
 from OrbitServer.services.ai_suggestion_service import score_mission_for_user
+from OrbitServer.utils.colleges import filter_by_distance
 
+logger = logging.getLogger(__name__)
+
+# How long after a signal's last availability date before auto-deletion
+_SIGNAL_GRACE_PERIOD = datetime.timedelta(hours=24)
+# Fallback lifetime when availability dates can't be parsed (matches pod TTL)
+_SIGNAL_FALLBACK_TTL = datetime.timedelta(days=14)
+
+
+def _parse_availability_date(value):
+    """Parse an availability slot date -- 'YYYY-MM-DD' or full ISO 8601."""
+    if not isinstance(value, str) or not value:
+        return None
+    try:
+        return datetime.date.fromisoformat(value[:10])
+    except ValueError:
+        return None
+
+
+def signal_expiry_datetime(signal):
+    """UTC datetime after which a signal should be deleted.
+
+    24h after the end (23:59) of the latest availability date; if no
+    availability date parses, created_at + 14 days; if created_at is also
+    unusable, None (never expires).
+    """
+    latest = None
+    for slot in signal.get('availability') or []:
+        if not isinstance(slot, dict):
+            continue
+        d = _parse_availability_date(slot.get('date'))
+        if d and (latest is None or d > latest):
+            latest = d
+    if latest is not None:
+        end_of_day = datetime.datetime.combine(latest, datetime.time(23, 59))
+        return end_of_day + _SIGNAL_GRACE_PERIOD
+
+    created = signal.get('created_at')
+    if isinstance(created, str):
+        try:
+            created = datetime.datetime.fromisoformat(created.replace('Z', ''))
+        except ValueError:
+            created = None
+    if isinstance(created, datetime.datetime):
+        return created.replace(tzinfo=None) + _SIGNAL_FALLBACK_TTL
+    return None
+
+
+def check_signal_expiration(signal):
+    """Delete a signal past its expiry. Returns 'active' or 'deleted'."""
+    if not signal:
+        return 'deleted'
+    expiry = signal_expiry_datetime(signal)
+    if expiry is not None and datetime.datetime.utcnow() > expiry:
+        try:
+            delete_signal(signal['id'])
+        except Exception:
+            logger.exception("Failed to auto-delete expired signal %s", signal.get('id'))
+        return 'deleted'
+    return 'active'
+
+
+def filter_expired_signals(signals):
+    """Drop (and delete) expired signals from a list."""
+    return [s for s in signals if check_signal_expiration(s) != 'deleted']
 
 
 def _score_signals(signals, user_id):
@@ -19,7 +87,9 @@ def _score_signals(signals, user_id):
 
 def create_new_signal(data, creator_id):
     """Create and persist a signal. Returns (signal, None)."""
-    signal = create_signal(data, creator_id)
+    # Stamp the creator's college for distance filtering in the feeds
+    creator = get_user(creator_id) or {}
+    signal = create_signal(data, creator_id, college=creator.get('college') or '')
     return signal, None
 
 
@@ -31,7 +101,11 @@ def get_all_signals(user_id=None, limit=20, cursor=None, category=None, tag=None
     signals, next_cursor = list_all_signals(
         limit=limit, cursor=cursor, category=category, tag=tag,
     )
+    # Expiry + distance filtering happen after pagination, so a page can
+    # come back short of `limit` -- acceptable at this scale.
+    signals = filter_expired_signals(signals)
     if user_id is not None:
+        signals = filter_by_distance(signals, get_user(user_id) or {})
         _resolve_pod_ids(signals, user_id)
         _score_signals(signals, user_id)
     return signals, next_cursor, None
@@ -39,7 +113,7 @@ def get_all_signals(user_id=None, limit=20, cursor=None, category=None, tag=None
 
 def get_user_signals(user_id):
     """Return all signals posted by a user, newest first. Returns (list, None)."""
-    signals = list_signals_for_user(user_id)
+    signals = filter_expired_signals(list_signals_for_user(user_id))
     _resolve_pod_ids(signals, user_id)
     _score_signals(signals, user_id)
     return signals, None
@@ -47,7 +121,7 @@ def get_user_signals(user_id):
 
 def get_rsvped_signals(user_id):
     """Return all signals the user has RSVP'd to. pod_id always included."""
-    signals = list_rsvped_signals(user_id)
+    signals = filter_expired_signals(list_rsvped_signals(user_id))
     _resolve_pod_ids(signals, user_id)
     _score_signals(signals, user_id)
     return signals, None
@@ -57,6 +131,8 @@ def fetch_signal(signal_id, user_id):
     """Return a single signal by ID with pod info resolved. Returns (signal, error)."""
     signal = get_signal(signal_id)
     if not signal:
+        return None, "Signal not found"
+    if check_signal_expiration(signal) == 'deleted':
         return None, "Signal not found"
     _resolve_pod_ids([signal], user_id)
     _score_signals([signal], user_id)

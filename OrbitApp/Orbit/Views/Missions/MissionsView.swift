@@ -21,6 +21,11 @@ struct MissionsView: View {
     @State private var searchText = ""
     @State private var showFilterSheet = false
     @State private var podToOpen: String?
+    @State private var missionPendingDelete: Mission?
+
+    private var currentUserId: Int {
+        UserDefaults.standard.integer(forKey: "orbit_user_id")
+    }
 
     var body: some View {
         NavigationStack {
@@ -86,6 +91,17 @@ struct MissionsView: View {
                                                 onTap: { selectedMission = mission },
                                                 onOpenPod: { podId in podToOpen = podId }
                                             )
+                                            .contextMenu {
+                                                if mission.creatorId == currentUserId,
+                                                   currentUserId != 0,
+                                                   (mission.creatorType ?? "user") == "user" {
+                                                    Button(role: .destructive) {
+                                                        missionPendingDelete = mission
+                                                    } label: {
+                                                        Label("Delete Mission", systemImage: "trash")
+                                                    }
+                                                }
+                                            }
                                             .padding(.horizontal, 20)
                                         }
                                     }
@@ -138,6 +154,29 @@ struct MissionsView: View {
             MissionDetailView(mission: mission, viewModel: viewModel, onJoined: {
                 selectedMission = nil
             })
+        }
+        .alert(
+            "Delete this mission?",
+            isPresented: Binding(
+                get: { missionPendingDelete != nil },
+                set: { if !$0 { missionPendingDelete = nil } }
+            )
+        ) {
+            Button("Delete", role: .destructive) {
+                if let mission = missionPendingDelete {
+                    Task {
+                        if mission.isFlexMode {
+                            await viewModel.deleteFlexMission(id: mission.id)
+                        } else {
+                            await viewModel.deleteSetMission(id: mission.id)
+                        }
+                    }
+                }
+                missionPendingDelete = nil
+            }
+            Button("Cancel", role: .cancel) { missionPendingDelete = nil }
+        } message: {
+            Text("This removes the mission and its pods for everyone.")
         }
         .sheet(isPresented: $showFilterSheet) {
             MissionFilterSheet(viewModel: viewModel)
@@ -203,6 +242,40 @@ struct MissionsView: View {
                     .fill(Color(red: 0.1, green: 0.1, blue: 0.22).opacity(0.95))
             )
             .shadow(color: .black.opacity(0.18), radius: 10, y: 4)
+    }
+}
+
+// MARK: - Membership / Ownership Badges
+
+/// Small capsule badge — "Joined" on missions you're in, "Yours" on ones you created.
+struct MissionBadge: View {
+    let text: String
+    let color: Color
+    var onDark: Bool = false
+
+    var body: some View {
+        Text(text)
+            .font(.caption2)
+            .fontWeight(.bold)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 3)
+            .background(onDark ? Color.white.opacity(0.2) : color.opacity(0.15))
+            .foregroundColor(onDark ? .white : color)
+            .clipShape(Capsule())
+    }
+}
+
+extension Mission {
+    /// Whether the current user is in a pod (set) or RSVP'd (flex) for this mission.
+    var isJoinedByCurrentUser: Bool {
+        if isFlexMode { return podId != nil || userPodStatus == "in_pod" }
+        return userPodStatus == "in_pod"
+    }
+
+    /// Whether the current user created this mission.
+    var isCreatedByCurrentUser: Bool {
+        let uid = UserDefaults.standard.integer(forKey: "orbit_user_id")
+        return uid != 0 && creatorId == uid && (creatorType ?? "user") == "user"
     }
 }
 
@@ -282,11 +355,20 @@ struct MissionListCard: View {
                 missionLogo
 
                 VStack(alignment: .leading, spacing: 7) {
-                    // Mode eyebrow — uppercase, tracked, gradient accent
-                    Text(eyebrow)
-                        .font(.system(size: 10, weight: .heavy, design: .rounded))
-                        .tracking(1.4)
-                        .foregroundStyle(OrbitTheme.gradient)
+                    // Mode eyebrow — uppercase, tracked, gradient accent —
+                    // plus Yours/Joined membership badge
+                    HStack(spacing: 8) {
+                        Text(eyebrow)
+                            .font(.system(size: 10, weight: .heavy, design: .rounded))
+                            .tracking(1.4)
+                            .foregroundStyle(OrbitTheme.gradient)
+                        Spacer(minLength: 0)
+                        if mission.isCreatedByCurrentUser {
+                            MissionBadge(text: "Yours", color: OrbitTheme.purple, onDark: true)
+                        } else if mission.isJoinedByCurrentUser {
+                            MissionBadge(text: "Joined", color: .green, onDark: true)
+                        }
+                    }
 
                     // Title — rounded display weight for a bolder, less "default" feel
                     Text(mission.displayTitle)

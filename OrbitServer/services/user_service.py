@@ -9,6 +9,7 @@ logger = logging.getLogger(__name__)
 PROFILE_FIELDS = [
     'name', 'college_year', 'interests', 'photo', 'trust_score', 'email',
     'gallery_photos', 'bio', 'links', 'gender', 'mbti',
+    'college', 'max_distance_miles',
 ]
 
 DEFAULT_PROFILE = {
@@ -23,6 +24,8 @@ DEFAULT_PROFILE = {
     'links': [],
     'gender': '',
     'mbti': '',
+    'college': '',            # key into utils.colleges.COLLEGES; '' = not set
+    'max_distance_miles': 0,  # 0 = no distance limit
 }
 
 
