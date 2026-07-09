@@ -3,30 +3,6 @@ import XCTest
 
 final class MissionModelTests: XCTestCase {
 
-    // MARK: - ActivityCategory Tests
-
-    func testActivityCategoryAllCasesCount() {
-        XCTAssertEqual(ActivityCategory.allCases.count, 6)
-    }
-
-    func testActivityCategoryDisplayName() {
-        XCTAssertEqual(ActivityCategory.sports.displayName, "Sports")
-        XCTAssertEqual(ActivityCategory.food.displayName, "Food")
-        XCTAssertEqual(ActivityCategory.study.displayName, "Study")
-        XCTAssertEqual(ActivityCategory.custom.displayName, "Custom")
-    }
-
-    func testActivityCategoryIconsAreNonEmpty() {
-        for category in ActivityCategory.allCases {
-            XCTAssertFalse(category.icon.isEmpty, "\(category) should have a non-empty icon")
-        }
-    }
-
-    func testActivityCategoryIdentifiable() {
-        let category = ActivityCategory.sports
-        XCTAssertEqual(category.id, "Sports")
-    }
-
     // MARK: - TimeBlock Tests
 
     func testTimeBlockShortLabels() {
@@ -97,23 +73,16 @@ final class MissionModelTests: XCTestCase {
     func testFlexModeInit() {
         let mission = Mission(
             title: "Pickup Basketball",
-            mode: .flex,
-            activityCategory: .sports,
-            minGroupSize: 4
+            minPodSize: 4,
+            mode: .flex
         )
         XCTAssertEqual(mission.mode, .flex)
         XCTAssertTrue(mission.isFlexMode)
-        XCTAssertEqual(mission.activityCategory, .sports)
-        XCTAssertEqual(mission.minGroupSize, 4)
-    }
-
-    func testFlexModeDisplayTitleUsesCategory() {
-        let mission = Mission(title: "", mode: .flex, activityCategory: .sports)
-        XCTAssertEqual(mission.displayTitle, "Sports")
+        XCTAssertEqual(mission.minPodSize, 4)
     }
 
     func testFlexModeDisplayTitleUsesTitle() {
-        let mission = Mission(title: "Pickup Hoops", mode: .flex, activityCategory: .sports)
+        let mission = Mission(title: "Pickup Hoops", mode: .flex)
         XCTAssertEqual(mission.displayTitle, "Pickup Hoops")
     }
 
@@ -121,29 +90,23 @@ final class MissionModelTests: XCTestCase {
         let mission = Mission(
             title: "",
             mode: .flex,
-            activityCategory: .custom,
             customActivityName: "Ultimate Frisbee"
         )
         XCTAssertEqual(mission.displayTitle, "Ultimate Frisbee")
     }
 
-    func testFlexModeDisplayTitleFallsBackForEmptyCustom() {
-        let mission = Mission(
-            title: "Fallback",
-            mode: .flex,
-            activityCategory: .custom,
-            customActivityName: ""
-        )
-        XCTAssertEqual(mission.displayTitle, "Fallback")
+    func testFlexModeDisplayTitleFallsBackWhenEmpty() {
+        let mission = Mission(title: "", mode: .flex, customActivityName: "")
+        XCTAssertEqual(mission.displayTitle, "Hangout")
     }
 
     func testFlexGroupSizeLabel() {
-        let mission = Mission(title: "", maxPodSize: 8, mode: .flex, minGroupSize: 3)
+        let mission = Mission(title: "", minPodSize: 3, maxPodSize: 8, mode: .flex)
         XCTAssertEqual(mission.flexGroupSizeLabel, "3\u{2013}8 people")
     }
 
     func testFlexGroupSizeLabelEqual() {
-        let mission = Mission(title: "", maxPodSize: 5, mode: .flex, minGroupSize: 5)
+        let mission = Mission(title: "", minPodSize: 5, maxPodSize: 5, mode: .flex)
         XCTAssertEqual(mission.flexGroupSizeLabel, "5 people")
     }
 
@@ -257,8 +220,7 @@ final class MissionModelTests: XCTestCase {
             "date": "",
             "status": "open",
             "mode": "flex",
-            "activity_category": "Sports",
-            "min_group_size": 3,
+            "min_pod_size": 3,
             "max_pod_size": 8
         }
         """.data(using: .utf8)!
@@ -266,52 +228,8 @@ final class MissionModelTests: XCTestCase {
         let decoder = JSONDecoder()
         let mission = try decoder.decode(Mission.self, from: json)
         XCTAssertEqual(mission.mode, .flex)
-        XCTAssertEqual(mission.activityCategory, .sports)
-        XCTAssertEqual(mission.minGroupSize, 3)
+        XCTAssertEqual(mission.minPodSize, 3)
         XCTAssertEqual(mission.maxPodSize, 8)
-    }
-
-    // MARK: - Mission.fromSignal()
-
-    func testFromSignalConvertsCorrectly() {
-        let signal = Signal(
-            id: "sig-1",
-            title: "Pickup Basketball",
-            description: "Let's play",
-            activityCategory: .sports,
-            customActivityName: nil,
-            minGroupSize: 3,
-            maxGroupSize: 6,
-            availability: [AvailabilitySlot(date: Date(), hours: [10, 11])],
-            status: .pending,
-            creatorId: 42,
-            createdAt: "2026-03-01",
-            podId: nil,
-            scheduledTime: nil,
-            tags: ["Sports"],
-            links: ["https://example.com"],
-            timeRangeStart: 9,
-            timeRangeEnd: 17,
-            matchScore: nil,
-            suggestionReason: nil
-        )
-
-        let mission = Mission.fromSignal(signal)
-        XCTAssertEqual(mission.id, "sig-1")
-        XCTAssertEqual(mission.title, "Pickup Basketball")
-        XCTAssertEqual(mission.mode, .flex)
-        XCTAssertTrue(mission.isFlexMode)
-        XCTAssertEqual(mission.activityCategory, .sports)
-        XCTAssertEqual(mission.minGroupSize, 3)
-        XCTAssertEqual(mission.maxPodSize, 6)
-        XCTAssertEqual(mission.status, "pending")
-        XCTAssertEqual(mission.creatorId, 42)
-        XCTAssertEqual(mission.date, "")
-        XCTAssertEqual(mission.tags, ["Sports"])
-        XCTAssertEqual(mission.links, ["https://example.com"])
-        XCTAssertEqual(mission.timeRangeStart, 9)
-        XCTAssertEqual(mission.timeRangeEnd, 17)
-        XCTAssertEqual(mission.signalStatus, .pending)
     }
 
     // MARK: - Codable Round-Trip (Set Mode)
@@ -346,9 +264,8 @@ final class MissionModelTests: XCTestCase {
     func testFlexModeCodableRoundTrip() throws {
         let original = Mission(
             title: "Hoops",
+            minPodSize: 3,
             mode: .flex,
-            activityCategory: .sports,
-            minGroupSize: 3,
             availability: [
                 AvailabilitySlot(date: Date(timeIntervalSince1970: 1740000000), hours: [9, 10, 11]),
             ],
@@ -362,8 +279,7 @@ final class MissionModelTests: XCTestCase {
         XCTAssertEqual(decoded.id, original.id)
         XCTAssertEqual(decoded.title, "Hoops")
         XCTAssertEqual(decoded.mode, .flex)
-        XCTAssertEqual(decoded.activityCategory, .sports)
-        XCTAssertEqual(decoded.minGroupSize, 3)
+        XCTAssertEqual(decoded.minPodSize, 3)
         XCTAssertEqual(decoded.availability?.count, 1)
         XCTAssertEqual(decoded.availability?.first?.hours, [9, 10, 11])
     }

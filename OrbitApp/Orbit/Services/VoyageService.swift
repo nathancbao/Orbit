@@ -67,21 +67,16 @@ struct VoyageItem: Codable, Identifiable {
     let endTime: String?
     let maxPodSize: Int?
 
-    // Signal/flex fields
-    let activityCategory: String?
-    let minGroupSize: Int?
-    let maxGroupSize: Int?
+    // Flex fields
+    let mode: String?
     let creatorId: Int?
 
     enum CodingKeys: String, CodingKey {
-        case id, title, description, tags, status, date, location
+        case id, title, description, tags, status, date, location, mode
         case itemType = "item_type"
         case startTime = "start_time"
         case endTime = "end_time"
         case maxPodSize = "max_pod_size"
-        case activityCategory = "activity_category"
-        case minGroupSize = "min_group_size"
-        case maxGroupSize = "max_group_size"
         case creatorId = "creator_id"
     }
 
@@ -103,18 +98,13 @@ struct VoyageItem: Codable, Identifiable {
         startTime = try? c.decode(String.self, forKey: .startTime)
         endTime = try? c.decode(String.self, forKey: .endTime)
         maxPodSize = try? c.decode(Int.self, forKey: .maxPodSize)
-        activityCategory = try? c.decode(String.self, forKey: .activityCategory)
-        minGroupSize = try? c.decode(Int.self, forKey: .minGroupSize)
-        maxGroupSize = try? c.decode(Int.self, forKey: .maxGroupSize)
+        mode = try? c.decode(String.self, forKey: .mode)
         creatorId = try? c.decode(Int.self, forKey: .creatorId)
     }
 
-    var isMission: Bool { itemType == "mission" }
-    var isSignal: Bool { itemType == "signal" }
+    var isFlex: Bool { mode == "flex" }
 
     var displayTitle: String {
-        if !title.isEmpty { return title }
-        if let cat = activityCategory, !cat.isEmpty { return cat }
-        return "Activity"
+        title.isEmpty ? "Activity" : title
     }
 }

@@ -155,10 +155,10 @@ def remove_gallery_photo(user_id, index):
 def delete_user_account(user_id):
     """Permanently delete a user and all associated data."""
     from OrbitServer.models.models import (
-        get_user_pods, delete_mission, delete_signal,
+        get_user_pods, delete_mission,
         list_friendships, delete_friendship,
         list_incoming_friend_requests, list_outgoing_friend_requests,
-        delete_friend_request, list_signals_for_user,
+        delete_friend_request,
     )
     from OrbitServer.services.pod_service import leave_pod
 
@@ -168,7 +168,7 @@ def delete_user_account(user_id):
 
     uid = int(user_id)
 
-    # 1. Leave all pods (handles member removal, confirmed_attendees, signal RSVPs)
+    # 1. Leave all pods (handles member removal and confirmed_attendees)
     try:
         pods = get_user_pods(uid)
         for pod in pods:
@@ -197,14 +197,7 @@ def delete_user_account(user_id):
     except Exception:
         logger.exception("Error cleaning up friends for user %s", user_id)
 
-    # 3. Delete signals (flex missions) created by this user
-    try:
-        for signal in list_signals_for_user(uid):
-            delete_signal(signal['id'])
-    except Exception:
-        logger.exception("Error cleaning up signals for user %s", user_id)
-
-    # 4. Delete set missions created by this user
+    # 3. Delete missions created by this user
     try:
         from OrbitServer.models.models import client, _entity_to_dict
         from google.cloud.datastore.query import PropertyFilter
@@ -217,7 +210,7 @@ def delete_user_account(user_id):
     except Exception:
         logger.exception("Error cleaning up missions for user %s", user_id)
 
-    # 5. Delete the user's analytics events (GDPR/CCPA deletion cascade).
+    # 4. Delete the user's analytics events (GDPR/CCPA deletion cascade).
     # Analytics is pseudonymized, so recompute the same deterministic pseudo id
     # from the user id to find exactly this user's slice of the event stream.
     try:
@@ -227,7 +220,7 @@ def delete_user_account(user_id):
     except Exception:
         logger.exception("Error cleaning up analytics events for user %s", user_id)
 
-    # 6. Delete the user entity itself
+    # 5. Delete the user entity itself
     delete_user(uid)
 
     return True, None

@@ -83,7 +83,7 @@ def accept_pod_invite(invite_id, user_id):
     update_pod_invite_status(invite_id, 'accepted')
 
     # Record the join action so the mission shows in user's history
-    mission_id = pod.get('mission_id') or pod.get('signal_id')
+    mission_id = pod.get('mission_id')
     if mission_id:
         record_action(user_id, mission_id, 'joined',
                       pod_id=pod['id'],

@@ -164,13 +164,7 @@ struct MissionsView: View {
         ) {
             Button("Delete", role: .destructive) {
                 if let mission = missionPendingDelete {
-                    Task {
-                        if mission.isFlexMode {
-                            await viewModel.deleteFlexMission(id: mission.id)
-                        } else {
-                            await viewModel.deleteSetMission(id: mission.id)
-                        }
-                    }
+                    Task { await viewModel.deleteMission(id: mission.id) }
                 }
                 missionPendingDelete = nil
             }
@@ -336,7 +330,7 @@ struct MissionListCard: View {
     /// Allowed group-size range, e.g. "3 to 5".
     private var sizeRangeText: String {
         let maxSize = capacity
-        if let min = mission.effectiveMinPodSize, min < maxSize {
+        if let min = mission.minPodSize, min < maxSize {
             return "\(min) to \(maxSize)"
         }
         return "\(maxSize)"
@@ -689,30 +683,6 @@ struct OrbitRingsBackground: View {
     }
 }
 
-// MARK: - Flex Status Badge
-
-struct FlexStatusBadge: View {
-    let status: SignalStatus
-
-    private var statusColor: Color {
-        switch status {
-        case .pending: return .orange
-        case .active:  return .green
-        }
-    }
-
-    var body: some View {
-        Text(status.label)
-            .font(.caption2)
-            .fontWeight(.semibold)
-            .padding(.horizontal, 9)
-            .padding(.vertical, 4)
-            .background(statusColor.opacity(0.25))
-            .clipShape(Capsule())
-            .foregroundColor(statusColor)
-    }
-}
-
 // MARK: - Match Score Badge
 
 struct MatchScoreBadge: View {
@@ -1011,7 +981,7 @@ struct MissionCreateView: View {
             _description = State(initialValue: m.description)
             _location = State(initialValue: m.location)
             _tags = State(initialValue: m.tags)
-            _minPodSize = State(initialValue: m.effectiveMinPodSize ?? 3)
+            _minPodSize = State(initialValue: m.minPodSize ?? 3)
             _maxPodSize = State(initialValue: m.maxPodSize)
             _selectedLogo = State(initialValue: m.logo)
             _existingImageUrls = State(initialValue: m.images ?? [])
@@ -1031,7 +1001,7 @@ struct MissionCreateView: View {
                 ?? Calendar.current.date(from: DateComponents(hour: 13, minute: 0))!)
 
             // Flex mode fields
-            _minGroupSize = State(initialValue: m.minGroupSize ?? 3)
+            _minGroupSize = State(initialValue: m.minPodSize ?? 3)
             _maxGroupSize = State(initialValue: m.maxPodSize)
             _timeRangeStart = State(initialValue: m.timeRangeStart ?? 9)
             _timeRangeEnd = State(initialValue: m.timeRangeEnd ?? 21)

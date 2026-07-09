@@ -6,7 +6,7 @@ from OrbitServer.models.models import (
     get_user_pod_for_mission,
     list_pods, get_user, get_users_batch, record_action,
     adjust_trust_score, transactional_pod_update, delete_pod,
-    create_notification, get_signal,
+    create_notification,
 )
 from OrbitServer.utils.helpers import safe_int as _safe_int
 from OrbitServer.services.analytics_service import emit as emit_event
@@ -298,11 +298,8 @@ def leave_mission(mission_id, user_id):
 def leave_pod(pod_id, user_id):
     """
     Remove a user from a pod. Deletes the pod entirely if no members remain.
-    For signal pods, also removes the user from the signal's rsvps list.
     Returns (True, None) on success or (False, (error_msg, status_code)) on failure.
     """
-    from OrbitServer.models.models import remove_signal_rsvp
-
     uid = _safe_int(user_id)
     if uid is None:
         return False, ("Invalid user ID", 400)
@@ -331,15 +328,6 @@ def leave_pod(pod_id, user_id):
 
     if remaining == 0:
         delete_pod(pod_id)
-
-    # For signal pods, also remove user from the signal's rsvps so it
-    # no longer appears on their Pods tab.
-    signal_id = pod.get('signal_id')
-    if signal_id:
-        try:
-            remove_signal_rsvp(signal_id, user_id)
-        except Exception:
-            logger.exception("Failed to remove RSVP for signal %s", signal_id)
 
     return True, None
 
@@ -430,13 +418,9 @@ def delete_pod_as_leader(pod_id, user_id):
     pod_name = pod.get('name')
     if not pod_name:
         mission_id = pod.get('mission_id')
-        signal_id = pod.get('signal_id')
         if mission_id is not None:
             mission = get_mission(int(mission_id))
             pod_name = mission.get('title') if mission else None
-        elif signal_id:
-            signal = get_signal(signal_id)
-            pod_name = signal.get('title') if signal else None
     pod_name = pod_name or 'Your pod'
 
     for member_id in member_ids:
@@ -509,18 +493,12 @@ def get_pod_with_members(pod_id, requesting_user_id):
 
     # Enrich with mission title/tags, minimum size, and survey eligibility
     mission_id = pod.get('mission_id')
-    signal_id = pod.get('signal_id')
     if mission_id is not None:
         from OrbitServer.models.models import get_mission
         mission = get_mission(int(mission_id))
         pod['mission_title'] = mission.get('title', 'Untitled') if mission else 'Untitled'
         pod['mission_tags'] = mission.get('tags', []) if mission else []
         pod['min_pod_size'] = int(mission.get('min_pod_size', 3)) if mission else 3
-    elif signal_id:
-        signal = get_signal(signal_id)
-        pod['mission_title'] = signal.get('title', 'Untitled') if signal else 'Untitled'
-        pod['mission_tags'] = signal.get('tags', []) if signal else []
-        pod['min_pod_size'] = int(signal.get('min_group_size', 3)) if signal else 3
     else:
         pod['mission_title'] = 'Untitled'
         pod['mission_tags'] = []

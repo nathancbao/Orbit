@@ -279,102 +279,33 @@ def validate_mission_data(data, is_update=False):
 
     if mode == 'flex' and isinstance(data.get('availability'), list):
         for slot in data['availability']:
-            slot_date = slot.get('date') if isinstance(slot, dict) else None
-            if not slot_date:
-                continue
-            try:
-                d = datetime.date.fromisoformat(slot_date)
-            except (ValueError, TypeError):
-                errors.append("availability dates must be in YYYY-MM-DD format")
+            if not isinstance(slot, dict):
+                errors.append("Each availability slot must be an object")
                 break
-            if d < earliest_allowed or d > latest_allowed:
-                errors.append(f"availability dates must be between today and {MISSION_MAX_WINDOW_DAYS} days from now")
-                break
-
-    if errors:
-        return False, errors
-    return True, None
-
-
-# ── Signal validation ────────────────────────────────────────────────────────
-# Must match Swift ActivityCategory raw values exactly:
-#   case sports  = "Sports"
-#   case food    = "Food"
-#   case movies  = "Movies"
-#   case hangout = "Hangout"
-#   case study   = "Study"
-#   case custom  = "Custom"
-
-_ACTIVITY_CATEGORIES = {
-    'Sports', 'Food', 'Movies', 'Hangout', 'Study', 'Custom',
-}
-
-_TIME_BLOCKS = {'morning', 'afternoon', 'evening'}
-
-
-def validate_signal_data(data, is_update=False):
-    errors = []
-
-    category = data.get('activity_category')
-    if category and category not in _ACTIVITY_CATEGORIES:
-        errors.append(f"activity_category must be one of: {', '.join(sorted(_ACTIVITY_CATEGORIES))}")
-
-    if category == 'Custom':
-        name = data.get('custom_activity_name', '')
-        if name and isinstance(name, str) and len(name) > 100:
-            errors.append("custom_activity_name must be 100 characters or fewer")
-
-    desc = data.get('description', '')
-    if isinstance(desc, str) and desc.strip():
-        word_count = len(desc.split())
-        if word_count > 250:
-            errors.append("description must be 250 words or fewer")
-
-    links = data.get('links')
-    if links is not None:
-        if not isinstance(links, list):
-            errors.append("links must be a list of URL strings")
-        elif len(links) > 2:
-            errors.append("Maximum 2 links allowed")
-        else:
-            for link in links:
-                if not isinstance(link, str):
-                    errors.append("Each link must be a string")
+            slot_date = slot.get('date')
+            if slot_date:
+                try:
+                    d = datetime.date.fromisoformat(slot_date)
+                except (ValueError, TypeError):
+                    errors.append("availability dates must be in YYYY-MM-DD format")
                     break
-                if len(link) > 500:
-                    errors.append("Each link must be 500 characters or fewer")
+                if d < earliest_allowed or d > latest_allowed:
+                    errors.append(f"availability dates must be between today and {MISSION_MAX_WINDOW_DAYS} days from now")
+                    break
+            hours = slot.get('hours')
+            time_blocks = slot.get('time_blocks')
+            if isinstance(hours, list) and hours:
+                invalid = [h for h in hours if not isinstance(h, int) or h < 0 or h > 23]
+                if invalid:
+                    errors.append(f"Invalid hour(s): {invalid}. Must be integers 0-23")
+                    break
+            elif isinstance(time_blocks, list) and time_blocks:
+                invalid = [tb for tb in time_blocks if tb not in _TIME_BLOCKS]
+                if invalid:
+                    errors.append(f"Invalid time_block(s): {invalid}. Must be morning, afternoon, or evening")
                     break
 
-    tags = data.get('tags')
-    if tags is not None:
-        if not isinstance(tags, list):
-            errors.append("tags must be a list")
-        elif len(tags) > 6:
-            errors.append("Maximum 6 tags allowed")
-        else:
-            for tag in tags:
-                if not isinstance(tag, str):
-                    errors.append("Each tag must be a string")
-                    break
-                if contains_profanity(tag):
-                    errors.append("Tags contain prohibited content")
-                    break
-
-    if 'min_group_size' in data or 'max_group_size' in data or not is_update:
-        try:
-            min_gs = int(data['min_group_size'])
-            max_gs = int(data['max_group_size'])
-            if min_gs < 3:
-                errors.append("min_group_size must be at least 3")
-            if max_gs > 10:
-                errors.append("max_group_size must be at most 10")
-            if min_gs > max_gs:
-                errors.append("min_group_size cannot exceed max_group_size")
-        except (KeyError, TypeError, ValueError):
-            if not is_update:
-                errors.append("min_group_size and max_group_size must be integers")
-
-    # Optional time range for hourly scheduling (default 9-21)
+    # Optional hourly scheduling range for flex missions (default 9-21)
     for field in ('time_range_start', 'time_range_end'):
         val = data.get(field)
         if val is not None:
@@ -385,51 +316,12 @@ def validate_signal_data(data, is_update=False):
             except (TypeError, ValueError):
                 errors.append(f"{field} must be an integer (0-23)")
 
-    availability = data.get('availability')
-    if availability is None:
-        availability = []
-    if not isinstance(availability, list):
-        errors.append("availability must be a list of slots")
-    elif len(availability) == 0 and not is_update:
-        errors.append("availability cannot be empty")
-    elif len(availability) > 0:
-        for slot in availability:
-            if not isinstance(slot, dict):
-                errors.append("Each availability slot must be an object")
-                break
-            if not slot.get('date'):
-                errors.append("Each availability slot must have a 'date' field (ISO 8601 string)")
-                break
-
-            has_hours = 'hours' in slot and isinstance(slot.get('hours'), list)
-            has_time_blocks = 'time_blocks' in slot and isinstance(slot.get('time_blocks'), list)
-
-            if not has_hours and not has_time_blocks:
-                errors.append("Each slot must have 'hours' (list of ints) or 'time_blocks' (list of strings)")
-                break
-
-            if has_hours:
-                hours = slot['hours']
-                if len(hours) == 0:
-                    errors.append("Each availability slot must have at least one hour")
-                    break
-                invalid = [h for h in hours if not isinstance(h, int) or h < 0 or h > 23]
-                if invalid:
-                    errors.append(f"Invalid hour(s): {invalid}. Must be integers 0-23")
-                    break
-            elif has_time_blocks:
-                tbs = slot['time_blocks']
-                if len(tbs) == 0:
-                    errors.append("Each availability slot must have at least one time_block")
-                    break
-                invalid = [tb for tb in tbs if tb not in _TIME_BLOCKS]
-                if invalid:
-                    errors.append(f"Invalid time_block(s): {invalid}. Must be morning, afternoon, or evening")
-                    break
-
     if errors:
         return False, errors
     return True, None
+
+
+_TIME_BLOCKS = {'morning', 'afternoon', 'evening'}
 
 
 def validate_schedule_slots(slots):

@@ -5,7 +5,7 @@ from flask import Blueprint, request, g
 from OrbitServer.utils.responses import success, error
 from OrbitServer.utils.auth import require_auth
 from OrbitServer.utils.colleges import filter_by_distance
-from OrbitServer.models.models import list_missions, _entity_to_dict, client, get_user
+from OrbitServer.models.models import list_missions, get_user
 
 voyage_bp = Blueprint('voyage', __name__, url_prefix='/api/voyage')
 
@@ -44,8 +44,6 @@ def _pick_items_for_tile(all_items, x, y, count=5):
 def _strip_heavy_fields(item):
     """Remove embedding and other heavy fields from response items."""
     item.pop('embedding', None)
-    item.pop('rsvps', None)
-    item.pop('pod_ids', None)
     return item
 
 
@@ -54,7 +52,7 @@ def _strip_heavy_fields(item):
 @voyage_bp.route('/clusters', methods=['GET'])
 @require_auth
 def get_clusters():
-    """Return missions/signals deterministically assigned to tiles in a region.
+    """Return missions deterministically assigned to tiles in a region.
 
     Query params: x (int), y (int), radius (int, default 2)
     """
@@ -67,16 +65,10 @@ def get_clusters():
 
     # Fetch the global content pool (cached at app level for 60s)
     missions = list_missions(filters={'status': 'open'})
-    # For signals, fetch a flat list (no pagination needed for pool)
-    from OrbitServer.services.signal_service import filter_expired_signals
-    sig_query = client.query(kind='Signal')
-    sig_results = list(sig_query.fetch(limit=200))
-    signals = filter_expired_signals([_entity_to_dict(e) for e in sig_results])
 
     # Respect the user's college distance setting in Voyage too
     user = get_user(g.user_id) or {}
     missions = filter_by_distance(missions, user)
-    signals = filter_by_distance(signals, user)
 
     # Tag each item with its type and normalise required fields
     pool = []
@@ -84,10 +76,6 @@ def get_clusters():
         m['item_type'] = 'mission'
         _strip_heavy_fields(m)
         pool.append(m)
-    for s in signals:
-        s['item_type'] = 'signal'
-        _strip_heavy_fields(s)
-        pool.append(s)
 
     for item in pool:
         item.setdefault('id', '')

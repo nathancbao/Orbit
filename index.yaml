@@ -39,15 +39,6 @@ indexes:
       - name: user_id
       - name: read
 
-  # ── Signal (activity request) ─────────────────────────────────────────────────
-  # list_signals_for_user: filter by creator_id, ORDER BY created_at DESC
-  # Used by GET /api/signals
-  - kind: Signal
-    properties:
-      - name: creator_id
-      - name: created_at
-        direction: desc
-
   # ── Mission (fixed-date activities) ────────────────────────────────────────────
   # list_missions_for_user: filter by creator_id, ORDER BY created_at DESC
   # Used by GET /api/missions (user's own missions)

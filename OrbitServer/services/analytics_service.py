@@ -41,8 +41,6 @@ ALLOWED_EVENTS = frozenset({
     'attendance_confirmed',
     'mission_completed',
     'survey_submitted',
-    'signal_created',
-    'signal_rsvped',
     'friend_request_sent',
     'friend_accepted',
     'chat_message_sent',

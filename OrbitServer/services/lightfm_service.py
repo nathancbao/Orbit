@@ -20,6 +20,7 @@ Unknown users or missions (not in training data) degrade gracefully to 0.0.
 import logging
 import math
 import threading
+import time
 
 import numpy as np
 from lightfm import LightFM
@@ -44,6 +45,14 @@ _dataset = None
 _lock = threading.Lock()
 _trained = False
 _training_in_progress = False
+
+# Cooldown between training attempts. Training reads every UserHistory, Mission
+# and User record from Datastore, so a data-poor app (which early-returns from
+# _train without ever setting _trained) must NOT retry on every scoring call --
+# that would be three full kind-scans per /missions/suggested request. The
+# cooldown bounds attempts to once per window until training actually succeeds.
+_TRAIN_COOLDOWN_SECONDS = 900  # 15 minutes
+_last_train_attempt = 0.0
 
 
 def _sigmoid(x: float) -> float:
@@ -115,7 +124,7 @@ def _train():
         try:
             uid_i, mid_i = int(uid), int(mid)
         except (TypeError, ValueError):
-            continue  # e.g. legacy UUID signal IDs — not in the fitted set
+            continue  # e.g. legacy UUID-keyed history rows — not in the fitted set
         if uid_i not in user_ids or mid_i not in mission_ids:
             continue
         w = INTERACTION_WEIGHTS.get(action, 0.0)
@@ -165,7 +174,7 @@ def _get_model():
     Never blocks the request thread.  Returns (None, None) while training
     is in progress — callers degrade gracefully to 0.0 scores.
     """
-    global _trained, _training_in_progress
+    global _trained, _training_in_progress, _last_train_attempt
     if _trained:
         return _model, _dataset
 
@@ -174,6 +183,11 @@ def _get_model():
             return _model, _dataset
         if _training_in_progress:
             return None, None  # already training, don't block
+        # Suppress repeated attempts (incl. data-poor early returns) within the
+        # cooldown so we don't re-scan Datastore on every scoring call.
+        if time.monotonic() - _last_train_attempt < _TRAIN_COOLDOWN_SECONDS:
+            return None, None
+        _last_train_attempt = time.monotonic()
         _training_in_progress = True
 
     def _background_train():
@@ -232,12 +246,15 @@ def get_lightfm_scores(user_id: int, mission_ids: list) -> dict:
 
 def warmup():
     """Synchronous training for the GAE warmup handler. OK to block here."""
-    global _trained
+    global _trained, _last_train_attempt
     if _trained:
         return
     with _lock:
         if _trained:
             return
+        # Record the attempt so the first real request doesn't immediately
+        # re-scan Datastore when warmup finds too little data to train.
+        _last_train_attempt = time.monotonic()
         try:
             _train()
         except Exception:
@@ -248,14 +265,19 @@ def retrain():
     """
     Force a full retrain from current Datastore data.
     Call from a scheduled cron endpoint (e.g. nightly) to keep the model fresh.
+
+    Clears the trained flag and cooldown so the next scoring call rebuilds the
+    model from current data. Does not train inline -- the background path in
+    _get_model handles it without blocking the caller.
     """
-    global _trained, _training_in_progress
+    global _trained, _last_train_attempt
     with _lock:
         if _training_in_progress:
             logger.info("LightFM: retrain requested but training already in progress")
             return
         _trained = False
-        _training_in_progress = True
+        _last_train_attempt = 0.0
+    logger.info("LightFM: marked for retrain on next scoring call")
 
     def _background_retrain():
         global _training_in_progress

@@ -192,7 +192,7 @@ struct VoyageBubble: View {
                     .frame(width: bubbleSize * 1.6, height: bubbleSize * 1.6)
 
                 // Saturn-like ring for set missions
-                if item.isMission {
+                if !item.isFlex {
                     Ellipse()
                         .stroke(
                             LinearGradient(
@@ -226,7 +226,7 @@ struct VoyageBubble: View {
 
                 // Icon + label
                 VStack(spacing: 2) {
-                    Image(systemName: item.isMission ? "calendar" : "antenna.radiowaves.left.and.right")
+                    Image(systemName: item.isFlex ? "antenna.radiowaves.left.and.right" : "calendar")
                         .orbitFont(bubbleSize * 0.24)
                         .foregroundColor(.white)
 

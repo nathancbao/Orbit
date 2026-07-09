@@ -144,7 +144,6 @@ class TestDeletionCascade:
              patch('OrbitServer.models.models.list_friendships', return_value=[]), \
              patch('OrbitServer.models.models.list_incoming_friend_requests', return_value=[]), \
              patch('OrbitServer.models.models.list_outgoing_friend_requests', return_value=[]), \
-             patch('OrbitServer.models.models.list_signals_for_user', return_value=[]), \
              patch('OrbitServer.models.models.delete_analytics_events_for_pseudo') as purge:
             user_service.delete_user_account(5)
         purge.assert_called_once_with(pseudonymize(5))

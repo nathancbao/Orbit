@@ -24,8 +24,7 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity as sk_cosine
 
 from OrbitServer.models.models import (
-    list_missions, list_all_signals, list_rsvped_signals,
-    get_user, get_user_history,
+    list_missions, get_user, get_user_history,
 )
 from OrbitServer.services.embedding_service import (
     get_user_embedding, cosine_similarity,
@@ -265,23 +264,10 @@ def get_suggested_missions(user_id, limit=5) -> list:
     for m in all_missions:
         m.setdefault('mode', 'set')
 
-    # Include flex missions (signals) in the candidate pool
-    all_signals, _ = list_all_signals(limit=50)
-    # Local import: signal_service imports this module, so avoid a cycle
-    from OrbitServer.services.signal_service import filter_expired_signals
-    all_signals = filter_expired_signals(all_signals)
-    for s in all_signals:
-        s['mode'] = 'flex'
-    # Exclude signals the user created or already RSVP'd to
-    rsvped_ids = {s['id'] for s in list_rsvped_signals(user_id)}
-    created_ids = {s['id'] for s in all_signals if s.get('creator_id') == int(user_id)}
-    exclude_signal_ids = rsvped_ids | created_ids
-    all_signals = [s for s in all_signals if s['id'] not in exclude_signal_ids]
-    all_missions = all_missions + all_signals
-
     candidates = [
         m for m in all_missions
         if m['id'] not in joined_ids and m['id'] not in skipped_ids
+        and m.get('creator_id') != int(user_id)
     ]
     # Respect the user's college distance setting before spending scoring work
     from OrbitServer.utils.colleges import filter_by_distance

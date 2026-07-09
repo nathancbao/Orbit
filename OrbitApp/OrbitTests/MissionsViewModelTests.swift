@@ -9,12 +9,10 @@ final class MissionsViewModelTests: XCTestCase {
     func testInitialStateIsEmpty() async {
         let vm = MissionsViewModel()
         XCTAssertTrue(vm.allMissions.isEmpty)
-        XCTAssertTrue(vm.allFlexMissions.isEmpty)
         XCTAssertTrue(vm.suggestedMissions.isEmpty)
         XCTAssertFalse(vm.isLoading)
         XCTAssertFalse(vm.isSubmitting)
         XCTAssertNil(vm.filterTag)
-        XCTAssertNil(vm.filterMode)
         XCTAssertFalse(vm.showToast)
     }
 
@@ -26,16 +24,14 @@ final class MissionsViewModelTests: XCTestCase {
         vm.insertCreatedMission(mission)
         XCTAssertEqual(vm.allMissions.count, 1)
         XCTAssertEqual(vm.allMissions.first?.title, "Test Set")
-        XCTAssertTrue(vm.allFlexMissions.isEmpty)
     }
 
     func testInsertFlexMission() async {
         let vm = MissionsViewModel()
-        let mission = Mission(title: "Test Flex", mode: .flex, activityCategory: .sports)
+        let mission = Mission(title: "Test Flex", mode: .flex)
         vm.insertCreatedMission(mission)
-        XCTAssertEqual(vm.allFlexMissions.count, 1)
-        XCTAssertEqual(vm.allFlexMissions.first?.title, "Test Flex")
-        XCTAssertTrue(vm.allMissions.isEmpty)
+        XCTAssertEqual(vm.allMissions.count, 1)
+        XCTAssertEqual(vm.allMissions.first?.mode, .flex)
     }
 
     func testInsertCreatedMissionAtFront() async {
@@ -47,32 +43,14 @@ final class MissionsViewModelTests: XCTestCase {
         XCTAssertEqual(vm.allMissions.first?.title, "Second")
     }
 
-    // MARK: - Mode Filtering
-
-    func testFilterModeNilReturnsAll() async {
+    func testInsertCreatedMissionReplacesDuplicate() async {
         let vm = MissionsViewModel()
-        vm.insertCreatedMission(Mission(title: "Set", mode: .set))
-        vm.insertCreatedMission(Mission(title: "Flex", mode: .flex))
-        vm.applyModeFilter(nil)
-        XCTAssertEqual(vm.discoverMissions.count, 2)
-    }
-
-    func testFilterModeSetReturnsOnlySet() async {
-        let vm = MissionsViewModel()
-        vm.insertCreatedMission(Mission(title: "Set 1", mode: .set))
-        vm.insertCreatedMission(Mission(title: "Flex 1", mode: .flex, activityCategory: .sports))
-        vm.applyModeFilter(.set)
-        let discover = vm.discoverMissions
-        XCTAssertTrue(discover.allSatisfy { $0.mode == .set })
-    }
-
-    func testFilterModeFlexReturnsOnlyFlex() async {
-        let vm = MissionsViewModel()
-        vm.insertCreatedMission(Mission(title: "Set 1", mode: .set))
-        vm.insertCreatedMission(Mission(title: "Flex 1", mode: .flex, activityCategory: .food))
-        vm.applyModeFilter(.flex)
-        let discover = vm.discoverMissions
-        XCTAssertTrue(discover.allSatisfy { $0.mode == .flex })
+        let original = Mission(id: "m-1", title: "Original", mode: .set)
+        let updated = Mission(id: "m-1", title: "Updated", mode: .set)
+        vm.insertCreatedMission(original)
+        vm.insertCreatedMission(updated)
+        XCTAssertEqual(vm.allMissions.count, 1)
+        XCTAssertEqual(vm.allMissions.first?.title, "Updated")
     }
 
     // MARK: - MyMissions
@@ -85,9 +63,10 @@ final class MissionsViewModelTests: XCTestCase {
         XCTAssertEqual(vm.myMissions.count, 1)
     }
 
-    func testMyMissionsIncludesFlexWithPodId() async {
+    func testMyMissionsIncludesInPodFlex() async {
         let vm = MissionsViewModel()
-        let m = Mission(title: "Joined Flex", mode: .flex, activityCategory: .sports, podId: "pod-1")
+        var m = Mission(title: "Joined Flex", mode: .flex)
+        m.userPodStatus = "in_pod"
         vm.insertCreatedMission(m)
         XCTAssertEqual(vm.myMissions.count, 1)
     }
@@ -110,7 +89,7 @@ final class MissionsViewModelTests: XCTestCase {
 
     // MARK: - Skip Mission
 
-    func testSkipMissionRemovesFromAllArrays() async {
+    func testSkipMissionRemovesLocally() async {
         let vm = MissionsViewModel()
         let m1 = Mission(id: "skip-me", title: "To Skip", mode: .set)
         let m2 = Mission(id: "keep-me", title: "To Keep", mode: .flex)
@@ -118,10 +97,9 @@ final class MissionsViewModelTests: XCTestCase {
         vm.insertCreatedMission(m2)
 
         // skipMission calls the API, which will fail in tests, but it still removes locally
-        vm.allMissions.removeAll { $0.id == "skip-me" }
-        vm.allFlexMissions.removeAll { $0.id == "skip-me" }
+        await vm.skipMission(m1)
 
         XCTAssertFalse(vm.allMissions.contains { $0.id == "skip-me" })
-        XCTAssertTrue(vm.allFlexMissions.contains { $0.id == "keep-me" })
+        XCTAssertTrue(vm.allMissions.contains { $0.id == "keep-me" })
     }
 }

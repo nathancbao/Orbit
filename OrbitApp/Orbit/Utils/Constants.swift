@@ -27,13 +27,12 @@ enum Constants {
             static func userProfile(_ id: Int) -> String { "/users/\(id)" }
             static let me = "/users/me"
             static let myPods = "/users/me/pods"
-            static let myRsvps = "/users/me/rsvps"
             static let uploadPhoto = "/users/me/photo"
             static let uploadGalleryPhoto = "/users/me/gallery"
             static func deleteGalleryPhoto(_ index: Int) -> String { "/users/me/gallery/\(index)" }
             static let colleges = "/colleges"
 
-            // Missions (fixed-date events)
+            // Missions (set and flex modes)
             static let missions = "/missions"
             static let suggestedMissions = "/missions/suggested"
             static func mission(_ id: String) -> String { "/missions/\(id)" }
@@ -52,12 +51,6 @@ enum Constants {
             static func podScheduleConfirm(_ id: String) -> String { "/pods/\(id)/schedule/confirm" }
             static func podSurvey(_ id: String) -> String { "/pods/\(id)/survey" }
             static func podSurveyStatus(_ id: String) -> String { "/pods/\(id)/survey/status" }
-
-            // Signals (spontaneous activity requests)
-            static let signals = "/signals"
-            static let discoverSignals = "/signals/discover"
-            static func signal(_ id: String) -> String { "/signals/\(id)" }
-            static func rsvpSignal(_ id: String) -> String { "/signals/\(id)/rsvp" }
 
             // Friends
             static let friends = "/friends"

@@ -14,7 +14,6 @@ from OrbitServer.models.models import (
     list_missions, delete_pod, client, _entity_to_dict,
 )
 from OrbitServer.services.mission_service import check_mission_expiration
-from OrbitServer.services.signal_service import check_signal_expiration
 
 logger = logging.getLogger(__name__)
 
@@ -28,7 +27,7 @@ def cleanup():
     if request.headers.get('X-Appengine-Cron') != 'true':
         return error("Forbidden", 403)
 
-    deleted = {'missions': 0, 'signals': 0, 'pods': 0}
+    deleted = {'missions': 0, 'legacy_signals': 0, 'pods': 0}
 
     try:
         for status in ('open', 'completed'):
@@ -38,14 +37,17 @@ def cleanup():
     except Exception:
         logger.exception("Cleanup: mission sweep failed")
 
+    # One-time purge of the deprecated Signal kind (flex activities now live
+    # in Mission). Remove this block once Datastore shows no Signal entities.
     try:
         sig_query = client.query(kind='Signal')
-        for entity in sig_query.fetch(limit=1000):
-            signal = _entity_to_dict(entity)
-            if signal and check_signal_expiration(signal) == 'deleted':
-                deleted['signals'] += 1
+        sig_query.keys_only()
+        keys = [entity.key for entity in sig_query.fetch(limit=500)]
+        if keys:
+            client.delete_multi(keys)
+            deleted['legacy_signals'] = len(keys)
     except Exception:
-        logger.exception("Cleanup: signal sweep failed")
+        logger.exception("Cleanup: legacy Signal purge failed")
 
     try:
         now = datetime.datetime.utcnow()

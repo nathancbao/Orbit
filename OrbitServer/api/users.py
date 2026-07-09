@@ -7,7 +7,6 @@ from OrbitServer.services.user_service import (
     get_user_profile, update_user_profile, upload_photo,
     upload_gallery_photo, remove_gallery_photo, delete_user_account,
 )
-from OrbitServer.services.signal_service import get_rsvped_signals
 from OrbitServer.models.models import get_user_pods
 from OrbitServer.utils.colleges import college_list
 
@@ -108,18 +107,6 @@ def list_my_pods():
     """
     pods = get_user_pods(g.user_id)
     return success(pods)
-
-
-@users_bp.route('/me/rsvps', methods=['GET'])
-@require_auth
-def list_my_rsvps():
-    """
-    GET /api/users/me/rsvps
-    Return all Signal entities the user has RSVPed to.
-    Includes pod_id so the frontend can open the signal's pod.
-    """
-    signals, _ = get_rsvped_signals(g.user_id)
-    return success(signals)
 
 
 @users_bp.route('/<user_id>', methods=['GET'])

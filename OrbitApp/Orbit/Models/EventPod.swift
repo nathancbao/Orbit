@@ -2,7 +2,7 @@ import Foundation
 
 struct Pod: Codable, Identifiable {
     var id: String
-    var missionId: String       // Int for missions, UUID string for signals
+    var missionId: String       // Mission ID (Int on the backend, kept as String here)
     var memberIds: [Int]
     var maxSize: Int
     var minSize: Int?           // Enriched — mission min_pod_size (pods need 3+ people)
@@ -57,7 +57,7 @@ struct Pod: Codable, Identifiable {
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         id = try container.decode(String.self, forKey: .id)
-        // mission_id can be Int (missions) or String (signals)
+        // mission_id arrives as an Int; tolerate legacy string payloads
         if let intId = try? container.decode(Int.self, forKey: .missionId) {
             missionId = String(intId)
         } else {
@@ -94,7 +94,7 @@ struct Pod: Codable, Identifiable {
         leaderPickDeadline = nil
     }
 
-    /// Whether this pod belongs to a flex/signal mission.
+    /// Whether this pod belongs to a flex-mode mission.
     var isFlexPod: Bool { mode == "flex" }
 
     /// The leader of the pod (first member in join order).

@@ -1,4 +1,4 @@
-# Orbit Datastore Schema — 2026-07-06
+# Orbit Datastore Schema — 2026-07-08
 
 > **Source of truth:** `OrbitServer/models/models.py`. Google Cloud Datastore is
 > schemaless, so this document is derived from the explicit `entity.update({...})`
@@ -9,7 +9,7 @@
 > **Datastore mode** (`google.cloud.datastore`). There is no `firestore.rules`
 > file and none applies — all access is server-side via the App Engine service
 > account. This supersedes the partial `MDfiles/database_schema.md`, which
-> predates the Signal→Mission merge.
+> predates the unified Mission kind.
 
 ## Conventions
 
@@ -20,8 +20,8 @@
 - Datetimes stored as **naive UTC**, serialized ISO-8601 with a `Z` suffix.
 - **Not indexed** = excluded via `exclude_from_indexes=[...]`; stored/returned
   normally but can't be filtered or ordered on.
-- List-of-int fields (`Pod.member_ids`, `Signal.rsvps`) are stored/queried as
-  `int`; the Datastore console renders them quoted (64-bit JS precision).
+- List-of-int fields (e.g. `Pod.member_ids`) are stored/queried as `int`;
+  the Datastore console renders them quoted (64-bit JS precision).
 
 ---
 
@@ -44,6 +44,8 @@ Merged User + Profile. API returns it wrapped as
 | links | list<string> | no | ≤3 URLs |
 | gender | string | no | `male/female/non-binary/other/''` |
 | mbti | string | no | one of 16 types or `''` |
+| college | string | no | display name from the college directory; `''` until set |
+| max_distance_miles | int | no | 0 = no distance filter on feeds |
 | trust_score | float | yes | clamped [0.0, 5.0]; adjusted transactionally |
 | created_at / updated_at | datetime | yes | |
 
@@ -54,9 +56,10 @@ completeness = name + valid college_year + ≥3 interests.
 
 ## Mission
 
-Unified activity kind (replaces the old Event + Signal split). Two modes:
-`set` (fixed date/time) and `flex` (group schedules later). Created by
-`create_mission()`.
+The single activity kind. Two modes: `set` (fixed date/time chosen by the
+mission leader) and `flex` (still scheduling — the pod fills in availability
+and confirms a time, after which it behaves like a scheduled mission).
+Created by `create_mission()`.
 
 - **Kind:** `Mission` · **Key:** Auto int ID
 - **Not indexed:** `embedding`, `availability`, `images`, `description`
@@ -67,6 +70,7 @@ Unified activity kind (replaces the old Event + Signal split). Two modes:
 | description | string | no | ≤2000 chars |
 | tags | list<string> | no | ≤10; profanity-filtered |
 | location | string | no | |
+| college | string | no | stamped from the creator for feed distance filtering |
 | mode | string | yes | `set` or `flex` |
 | logo | string / null | no | |
 | images | list<string> | no | ≤3 GCS URLs |
@@ -86,22 +90,22 @@ Unified activity kind (replaces the old Event + Signal split). Two modes:
 | scheduling_window_days | int | no | 1–14, default 7 |
 | scheduleable_from / scheduleable_until | string | no | `YYYY-MM-DD` window |
 
-Expiration handled in `mission_service.check_mission_expiration()`: past end
-→ `completed`; past end + 2h → deleted (cascades to pods).
+Expiration handled in `mission_service.check_mission_expiration()`. Set mode:
+past end time → `completed`; past end + 24h grace → deleted (cascades to
+pods). Flex mode: same transitions keyed off end-of-day `scheduleable_until`
+in the creator's local time (`utc_offset`).
 
 ---
 
 ## Pod
 
-A formed group for a mission or signal. Created by `create_pod()` /
-`create_signal_pod()`.
+A formed group for a mission (either mode). Created by `create_pod()`.
 
 - **Kind:** `Pod` · **Key:** UUID string
 
 | Field | Type | Required | Notes |
 |---|---|---|---|
-| mission_id | int / null | one of mission/signal | → Mission |
-| signal_id | string / null | one of mission/signal | → Signal (flex pods) |
+| mission_id | int | yes | → Mission |
 | member_ids | list<int> | yes | **member_ids[0] = leader** (join order) |
 | max_size | int | yes | |
 | name | string / null | no | leader-editable |
@@ -182,32 +186,6 @@ This is the **primary analytics substrate today** — see
 
 ---
 
-## Signal
-
-Spontaneous "who's down" activity request (flex missions link to these). Created
-by `create_signal()`.
-
-- **Kind:** `Signal` · **Key:** UUID string
-- **Not indexed:** `availability`, `links`
-
-| Field | Type | Required | Notes |
-|---|---|---|---|
-| creator_id | int | yes | |
-| title / description | string | no | |
-| activity_category | string | yes | `Sports/Food/Movies/Hangout/Study/Custom` |
-| custom_activity_name | string / null | no | |
-| min_group_size / max_group_size | int | yes | 3+ / ≤10 |
-| availability | list<slot> | yes | `[{date, time_blocks[]}]` |
-| tags | list<string> | no | ≤6 |
-| links | list<string> | no | ≤2 |
-| time_range_start / time_range_end | int | no | default 9 / 21 |
-| rsvps | list<int> | yes | capped at 2×max_group_size |
-| pod_ids | list<string> | no | ≤2 pods, assigned on RSVP |
-| status | string | yes | `pending` → `active` at min_group_size |
-| created_at | datetime | yes | |
-
----
-
 ## Auth & social plumbing kinds
 
 | Kind | Key | Key fields | Purpose |
@@ -219,6 +197,7 @@ by `create_signal()`.
 | **SurveyResponse** | UUID | user_id, pod_id, mission_id, enjoyment_rating, added_interests, member_votes | Post-activity survey; one per user per pod |
 | **Notification** | UUID | user_id, type, title, body, data, read | In-app inbox (not APNS push) |
 | **PodInvite** | Auto int | pod_id, from_user_id, to_user_id, status | Direct pod invitation |
+| **AnalyticsEvent** | Named (event_id) | event_name, ts, received_ts, user_pseudo_id, session_id, platform, app_version, properties | Append-only behavioral event stream, idempotent by event_id; stores only the pseudonymous user id (see `docs/analytics-and-metrics.md`) |
 
 ---
 
@@ -231,7 +210,6 @@ by `create_signal()`.
 | ChatMessage | pod_id + created_at | ordered chat, `since` fetch |
 | Notification | user_id + created_at↓ | inbox newest-first |
 | Notification | user_id + read | mark-all-read query |
-| Signal | creator_id + created_at↓ | my signals |
 | Mission | creator_id + created_at↓ | my missions |
 | Mission | tags + status | tag-filtered discovery |
 | FriendRequest | to_user_id + status | incoming requests |

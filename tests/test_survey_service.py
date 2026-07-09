@@ -430,7 +430,7 @@ class TestHistoryEnrichment:
 
         mock_get_pod.return_value = {
             'id': 'pod-1', 'status': 'completed', 'member_ids': [1],
-            'mission_id': None,  # signal-based pod, no mission
+            'mission_id': None,  # pod with no linked mission
         }
         mock_existing.return_value = None
         mock_create.return_value = {'id': 'survey-1'}

@@ -86,7 +86,6 @@ common envelope; event-specific fields go in `properties`.
 | `attendance_confirmed` | `pod_id`, `mission_id` | confirm-attendance |
 | `mission_completed` | `pod_id`, `mission_id`, `duration_s`, `confirmed_count` | pod → `completed` |
 | `survey_submitted` | `pod_id`, `enjoyment_rating`, `added_interest_count` | survey POST |
-| `signal_created` / `signal_rsvped` | `signal_id`, `category` | signal actions |
 | `friend_request_sent` / `friend_accepted` | `target_pseudo_id` | friend actions |
 | `chat_message_sent` | `pod_id`, `is_dm` (bool) | message send (**no content**) |
 | `notification_opened` | `type` | inbox item tapped |

@@ -3,7 +3,7 @@
 //  Orbit
 //
 //  Fullscreen infinite 2D exploration — panning through tile-based clusters
-//  of missions and signals against a dense parallax star field.
+//  of missions against a dense parallax star field.
 //  Tap a solar system to zoom in and browse its events.
 //
 
@@ -435,20 +435,11 @@ struct VoyageView: View {
         isLoadingDetail = true
         Task {
             defer { isLoadingDetail = false }
-            if item.isMission {
-                do {
-                    let mission = try await MissionService.shared.getMission(id: item.id)
-                    selectedMission = mission
-                } catch {
-                    print("[Voyage] Failed to fetch mission \(item.id): \(error)")
-                }
-            } else {
-                do {
-                    let mission = try await MissionService.shared.getFlexMission(id: item.id)
-                    selectedMission = mission
-                } catch {
-                    print("[Voyage] Failed to fetch flex mission \(item.id): \(error)")
-                }
+            do {
+                let mission = try await MissionService.shared.getMission(id: item.id)
+                selectedMission = mission
+            } catch {
+                print("[Voyage] Failed to fetch mission \(item.id): \(error)")
             }
         }
     }

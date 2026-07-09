@@ -1,7 +1,7 @@
 import SwiftUI
 
 // MARK: - Pods View
-// Unified list of all pods the user has joined (missions + signals).
+// Unified list of all pods the user has joined.
 
 extension Notification.Name {
     static let unreadPodCountChanged = Notification.Name("unreadPodCountChanged")
@@ -15,24 +15,10 @@ enum PodFilter: String, CaseIterable {
     case done       = "Done"
 }
 
-// Unified item type for the pods list.
-private enum PodListItem: Identifiable {
-    case pod(Pod)
-    case signal(Mission)   // flex signal not yet matched into a pod
-
-    var id: String {
-        switch self {
-        case .pod(let p):    return "pod-\(p.id)"
-        case .signal(let m): return "sig-\(m.id)"
-        }
-    }
-}
-
 struct PodsView: View {
     @Binding var userProfile: Profile
     var isActive: Bool = false
     @State private var pods: [Pod] = []
-    @State private var rsvpedFlexMissions: [Mission] = []
     @State private var isLoading = false
     @State private var showProfile = false
     @State private var activeFilter: PodFilter = .all
@@ -41,19 +27,14 @@ struct PodsView: View {
     @State private var recommendedMissions: [Mission] = []
     @State private var recommendedMissionForDetail: Mission? = nil
     @State private var unreadPodIds: Set<String> = []
-    @State private var signalPendingDelete: Mission?
     @State private var notifications: [AppNotification] = []
 
     private var hasUnreadNotifications: Bool {
         notifications.contains { !$0.read }
     }
 
-    /// How many pods the user occupies (max 15) — pods plus flex RSVPs
-    /// that haven't been matched into a pod yet.
-    private var joinedPodCount: Int {
-        let rsvpPodIds = Set(rsvpedFlexMissions.compactMap { $0.podId })
-        return pods.filter { !rsvpPodIds.contains($0.id) }.count + rsvpedFlexMissions.count
-    }
+    /// How many pods the user occupies (max 15).
+    private var joinedPodCount: Int { pods.count }
 
     private var atPodLimit: Bool { joinedPodCount >= Constants.Validation.maxPods }
 
@@ -61,62 +42,27 @@ struct PodsView: View {
         UserDefaults.standard.integer(forKey: "orbit_user_id")
     }
 
-    /// Unified, filtered, sorted list of pods + unmatched flex signals.
-    private var filteredItems: [PodListItem] {
+    /// Filtered, sorted list of the user's pods.
+    private var filteredItems: [Pod] {
         let userId = currentUserId
 
-        // Pods that already have a pod ID in rsvpedFlexMissions — avoid duplicates.
-        let rsvpPodIds = Set(rsvpedFlexMissions.compactMap { $0.podId })
-
-        var items: [PodListItem] = []
-
-        for pod in pods {
-            guard !rsvpPodIds.contains(pod.id) else { continue }
-            let passes: Bool
+        let filtered = pods.filter { pod in
             switch activeFilter {
-            case .all:        passes = true
-            case .leading:    passes = pod.leaderId == userId
-            case .scheduling: passes = pod.isFlexPod && pod.isFlexForming
-            case .scheduled:  passes = pod.scheduledTime != nil && !pod.isActivityCompleted
-            case .done:       passes = pod.isActivityCompleted || pod.status == "completed"
+            case .all:        return true
+            case .leading:    return pod.leaderId == userId
+            case .scheduling: return pod.isFlexPod && pod.isFlexForming
+            case .scheduled:  return pod.scheduledTime != nil && !pod.isActivityCompleted
+            case .done:       return pod.isActivityCompleted || pod.status == "completed"
             }
-            if passes { items.append(.pod(pod)) }
-        }
-
-        for mission in rsvpedFlexMissions {
-            let passes: Bool
-            switch activeFilter {
-            case .all:        passes = true
-            case .leading:    passes = mission.creatorId == userId
-            case .scheduling: passes = mission.podId == nil
-            case .scheduled:  passes = mission.scheduledTime != nil
-            case .done:       passes = mission.isCompleted
-            }
-            if passes { items.append(.signal(mission)) }
         }
 
         // Sort: scheduled soonest first, then everything else
-        let sorted = items.sorted { a, b in
-            let dateA: Date
-            let dateB: Date
-            switch a {
-            case .pod(let p): dateA = p.parsedScheduledTime ?? .distantFuture
-            case .signal: dateA = .distantFuture
-            }
-            switch b {
-            case .pod(let p): dateB = p.parsedScheduledTime ?? .distantFuture
-            case .signal: dateB = .distantFuture
-            }
-            return dateA < dateB
+        let sorted = filtered.sorted { a, b in
+            (a.parsedScheduledTime ?? .distantFuture) < (b.parsedScheduledTime ?? .distantFuture)
         }
 
         guard !searchText.isEmpty else { return sorted }
-        return sorted.filter { item in
-            switch item {
-            case .pod(let p):    return p.displayName.localizedCaseInsensitiveContains(searchText)
-            case .signal(let m): return m.displayTitle.localizedCaseInsensitiveContains(searchText)
-            }
-        }
+        return sorted.filter { $0.displayName.localizedCaseInsensitiveContains(searchText) }
     }
 
     var body: some View {
@@ -124,7 +70,7 @@ struct PodsView: View {
             ZStack {
                 Color(.systemBackground).ignoresSafeArea()
 
-                if isLoading && pods.isEmpty && rsvpedFlexMissions.isEmpty {
+                if isLoading && pods.isEmpty {
                     ProgressView()
                         .tint(OrbitTheme.purple)
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -179,7 +125,7 @@ struct PodsView: View {
                                 Image(systemName: "person.3")
                                     .orbitFont(36)
                                     .foregroundStyle(OrbitTheme.gradient)
-                                Text(pods.isEmpty && rsvpedFlexMissions.isEmpty ? "No Pods Yet" : "No Matches")
+                                Text(pods.isEmpty ? "No Pods Yet" : "No Matches")
                                     .font(.headline)
                                 Text("Join a Mission to form a Pod")
                                     .font(.subheadline)
@@ -192,38 +138,15 @@ struct PodsView: View {
                         } else {
                             ScrollView {
                                 VStack(spacing: 14) {
-                                    ForEach(filteredItems) { item in
-                                        switch item {
-                                        case .pod(let pod):
-                                            PodRowCard(
-                                                pod: pod,
-                                                title: pod.displayName,
-                                                hasUnread: unreadPodIds.contains(pod.id),
-                                                onDismiss: { Task { await loadData() } },
-                                                onPodNotFound: { pods.removeAll { $0.id == pod.id } }
-                                            )
-                                            .padding(.horizontal, 20)
-                                        case .signal(let mission):
-                                            FlexMissionRsvpCard(
-                                                mission: mission,
-                                                hasUnread: {
-                                                    if let podId = mission.podId { return unreadPodIds.contains(podId) }
-                                                    return false
-                                                }(),
-                                                onDismiss: { Task { await loadData() } },
-                                                onPodNotFound: { rsvpedFlexMissions.removeAll { $0.id == mission.id } }
-                                            )
-                                            .contextMenu {
-                                                if mission.isCreatedByCurrentUser {
-                                                    Button(role: .destructive) {
-                                                        signalPendingDelete = mission
-                                                    } label: {
-                                                        Label("Delete Mission", systemImage: "trash")
-                                                    }
-                                                }
-                                            }
-                                            .padding(.horizontal, 20)
-                                        }
+                                    ForEach(filteredItems) { pod in
+                                        PodRowCard(
+                                            pod: pod,
+                                            title: pod.displayName,
+                                            hasUnread: unreadPodIds.contains(pod.id),
+                                            onDismiss: { Task { await loadData() } },
+                                            onPodNotFound: { pods.removeAll { $0.id == pod.id } }
+                                        )
+                                        .padding(.horizontal, 20)
                                     }
                                 }
                                 .padding(.top, 16)
@@ -305,26 +228,6 @@ struct PodsView: View {
                 })
             }
         }
-        .alert(
-            "Delete this mission?",
-            isPresented: Binding(
-                get: { signalPendingDelete != nil },
-                set: { if !$0 { signalPendingDelete = nil } }
-            )
-        ) {
-            Button("Delete", role: .destructive) {
-                if let mission = signalPendingDelete {
-                    Task {
-                        try? await MissionService.shared.deleteFlexMission(id: mission.id)
-                        await loadData()
-                    }
-                }
-                signalPendingDelete = nil
-            }
-            Button("Cancel", role: .cancel) { signalPendingDelete = nil }
-        } message: {
-            Text("This removes the mission and its pods for everyone.")
-        }
         .task { await loadData() }
         .onChange(of: isActive) { _, active in
             if active {
@@ -339,14 +242,10 @@ struct PodsView: View {
             endpoint: Constants.API.Endpoints.myPods,
             authenticated: true
         )
-        async let rsvpsResult: [Mission]? = try? MissionService.shared.rsvpedFlexMissions()
         async let conversationsResult = try? ChatService.shared.getPodConversations()
         async let notificationsResult = try? NotificationService.shared.getNotifications()
         if let newPods = await podsResult {
             pods = newPods
-        }
-        if let newMissions = await rsvpsResult {
-            rsvpedFlexMissions = newMissions
         }
         if let conversations = await conversationsResult {
             refreshUnread(from: conversations)
@@ -499,106 +398,6 @@ struct PodRowCard: View {
     }
 }
 
-// MARK: - Flex Mission RSVP Card (Black Theme)
-
-struct FlexMissionRsvpCard: View {
-    let mission: Mission
-    var hasUnread: Bool = false
-    var onDismiss: (() -> Void)? = nil
-    var onPodNotFound: (() -> Void)? = nil
-    @State private var showSheet = false
-
-    var body: some View {
-        Button(action: { showSheet = true }) {
-            HStack(spacing: 14) {
-                Rectangle()
-                    .fill(Color.white.opacity(0.5))
-                    .frame(width: 4)
-                    .cornerRadius(2)
-
-                VStack(alignment: .leading, spacing: 6) {
-                    HStack(spacing: 8) {
-                        Image(systemName: mission.logo ?? "star.fill")
-                            .font(.caption)
-                            .foregroundColor(.white.opacity(0.8))
-                        Text(mission.displayTitle)
-                            .font(.headline)
-                            .foregroundColor(.white)
-                        if mission.isCreatedByCurrentUser {
-                            MissionBadge(text: "Yours", color: OrbitTheme.purple, onDark: true)
-                        }
-                    }
-
-                    if let groupLabel = mission.flexGroupSizeLabel {
-                        HStack(spacing: 4) {
-                            Image(systemName: "person.2.fill")
-                                .font(.caption2)
-                            Text(groupLabel)
-                                .font(.caption)
-                        }
-                        .foregroundColor(.white.opacity(0.6))
-                    }
-
-                    if let score = mission.matchScore {
-                        Text("\(Int(score * 100))% match")
-                            .font(.caption2)
-                            .fontWeight(.semibold)
-                            .padding(.horizontal, 7)
-                            .padding(.vertical, 3)
-                            .background(
-                                (score >= 0.85 ? Color.green : score >= 0.70 ? Color.orange : Color.white.opacity(0.3))
-                                    .opacity(0.25)
-                            )
-                            .foregroundColor(score >= 0.85 ? .green : score >= 0.70 ? .orange : .white.opacity(0.7))
-                            .clipShape(Capsule())
-                    }
-
-                    if let summary = mission.flexAvailabilitySummary {
-                        HStack(spacing: 4) {
-                            Image(systemName: "calendar")
-                                .font(.caption2)
-                            Text(summary)
-                                .font(.caption)
-                        }
-                        .foregroundColor(.white.opacity(0.6))
-                    }
-
-                    if let status = mission.signalStatus {
-                        SignalStatusBadgeDark(status: status)
-                    }
-                }
-
-                Spacer()
-
-                ZStack(alignment: .topTrailing) {
-                    Image(systemName: mission.podId != nil ? "message.fill" : "antenna.radiowaves.left.and.right")
-                        .foregroundColor(.white.opacity(0.5))
-                    if hasUnread {
-                        Circle()
-                            .fill(Color.red)
-                            .frame(width: 10, height: 10)
-                            .offset(x: 3, y: -3)
-                    }
-                }
-            }
-            .padding(16)
-            .background(Color(red: 0.1, green: 0.1, blue: 0.14))
-            .cornerRadius(16)
-            .shadow(color: .black.opacity(0.15), radius: 8, x: 0, y: 2)
-        }
-        .buttonStyle(.plain)
-        .sheet(isPresented: $showSheet, onDismiss: {
-            onDismiss?()
-        }) {
-            if let podId = mission.podId {
-                PodView(podId: podId, title: mission.displayTitle, missionMode: .flex, onPodNotFound: onPodNotFound)
-            } else {
-                MissionDetailView(mission: mission, onJoined: { onDismiss?() })
-            }
-        }
-    }
-}
-
 // MARK: - Pod Inbox Sheet (notifications + recommendations)
 
 struct PodInboxSheet: View {
@@ -678,30 +477,6 @@ struct PodInboxSheet: View {
             }
             .navigationTitle("Inbox")
             .navigationBarTitleDisplayMode(.inline)
-        }
-    }
-}
-
-// MARK: - Signal Status Badge (Dark)
-
-struct SignalStatusBadgeDark: View {
-    let status: SignalStatus
-
-    var body: some View {
-        Text(status.label)
-            .font(.caption2)
-            .fontWeight(.semibold)
-            .padding(.horizontal, 8)
-            .padding(.vertical, 3)
-            .background(statusColor.opacity(0.25))
-            .foregroundColor(statusColor)
-            .clipShape(Capsule())
-    }
-
-    private var statusColor: Color {
-        switch status {
-        case .pending: return .orange
-        case .active:  return .green
         }
     }
 }

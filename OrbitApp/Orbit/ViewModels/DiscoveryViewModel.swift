@@ -2,7 +2,7 @@
 //  DiscoveryViewModel.swift
 //  Orbit
 //
-//  State management for the Discovery galaxy view — fetches missions (set + flex),
+//  State management for the Discovery galaxy view — fetches missions,
 //  AI recommendations, and generates template items from user interests.
 //
 
@@ -85,31 +85,19 @@ class DiscoveryViewModel: ObservableObject {
         guard !hasLoaded else { return }
         isLoading = true
 
-        // 4 core calls in parallel — typically fast (~2s).
-        async let missionsResult = MissionService.shared.listMissions()
-        async let myFlexResult   = MissionService.shared.myFlexMissions()
-        async let discoverResult = MissionService.shared.listFlexMissions()
-        async let rsvpResult     = MissionService.shared.rsvpedFlexMissions()
-
-        // The set-mission list is the primary content — surface its failure so
-        // the view can show an error state instead of an empty galaxy. The flex
-        // lists are supplementary and fail quietly to empty.
+        // One mission list covers both modes — set and flex missions live in
+        // the unified Mission kind and arrive with pod status annotated.
         let missions: [Mission]
         do {
-            missions = try await missionsResult
+            missions = try await MissionService.shared.listMissions()
             errorMessage = nil
         } catch {
             missions = []
             errorMessage = error.localizedDescription
         }
-        let myFlexMissions       = (try? await myFlexResult)   ?? []
-        let discoverFlexMissions = (try? await discoverResult) ?? []
-        let rsvpFlexMissions     = (try? await rsvpResult)     ?? []
 
         // Show planets immediately with no AI suggestions yet.
-        categorize(missions: missions, myFlexMissions: myFlexMissions,
-                   discoverFlexMissions: discoverFlexMissions, suggested: [],
-                   rsvpFlexMissions: rsvpFlexMissions)
+        categorize(missions: missions, suggested: [])
         hasLoaded = true
         isLoading = false
 
@@ -119,9 +107,7 @@ class DiscoveryViewModel: ObservableObject {
         suggestionsTask = Task {
             guard let suggested = try? await MissionService.shared.suggestedMissions(),
                   !Task.isCancelled else { return }
-            categorize(missions: missions, myFlexMissions: myFlexMissions,
-                       discoverFlexMissions: discoverFlexMissions, suggested: suggested,
-                       rsvpFlexMissions: rsvpFlexMissions)
+            categorize(missions: missions, suggested: suggested)
             startBellTimer()
         }
     }
@@ -138,15 +124,12 @@ class DiscoveryViewModel: ObservableObject {
 
     private func categorize(
         missions: [Mission],
-        myFlexMissions: [Mission],
-        discoverFlexMissions: [Mission],
-        suggested: [Mission],
-        rsvpFlexMissions: [Mission]
+        suggested: [Mission]
     ) {
         var result: [DiscoveryItem] = []
         let userId = currentUserId
 
-        // 1. Hosted + Joined set missions
+        // 1. Hosted + Joined missions (both modes)
         for mission in missions {
             if mission.creatorId == userId {
                 result.append(.hostedMission(mission))
@@ -155,35 +138,7 @@ class DiscoveryViewModel: ObservableObject {
             }
         }
 
-        // 2. Hosted flex missions (from mySignals)
-        for mission in myFlexMissions {
-            result.append(.hostedMission(mission))
-        }
-
-        // 3. Joined flex missions (from discover endpoint — have podId)
-        let hostedFlexIds = Set(myFlexMissions.map { $0.id })
-        for mission in discoverFlexMissions {
-            guard !hostedFlexIds.contains(mission.id) else { continue }
-            if mission.podId != nil {
-                result.append(.joinedMission(mission))
-            }
-        }
-
-        // 3b. RSVP'd flex missions (from /users/me/rsvps)
-        let alreadyAddedFlexIds = Set(result.compactMap { item -> String? in
-            switch item {
-            case .hostedMission(let m), .joinedMission(let m):
-                return m.isFlexMode ? m.id : nil
-            default: return nil
-            }
-        })
-        for mission in rsvpFlexMissions {
-            if !alreadyAddedFlexIds.contains(mission.id) {
-                result.append(.joinedMission(mission))
-            }
-        }
-
-        // 4. AI-recommended missions (process BEFORE discoverables so they get priority)
+        // 2. AI-recommended missions (process BEFORE discoverables so they get priority)
         recommendedItems = []
         for mission in suggested {
             let alreadyAdded = result.contains { item in
@@ -199,7 +154,7 @@ class DiscoveryViewModel: ObservableObject {
             }
         }
 
-        // 4b. Client-side fallback recommendations (when backend returns none)
+        // 2b. Client-side fallback recommendations (when backend returns none)
         if recommendedItems.isEmpty && !userInterests.isEmpty {
             let candidateMissions = missions.filter { mission in
                 mission.creatorId != userId
@@ -233,7 +188,7 @@ class DiscoveryViewModel: ObservableObject {
             }
         }
 
-        // 5. Discoverable set missions (not hosted, not joined, not AI-recommended)
+        // 3. Discoverable missions (not hosted, not joined, not AI-recommended)
         let addedMissionIds = Set(result.compactMap { item -> String? in
             switch item {
             case .hostedMission(let m), .joinedMission(let m), .recommendedMission(let m):
@@ -245,14 +200,6 @@ class DiscoveryViewModel: ObservableObject {
             if mission.creatorId != userId
                 && mission.userPodStatus != "in_pod"
                 && !addedMissionIds.contains(mission.id) {
-                result.append(.discoverableMission(mission))
-            }
-        }
-
-        // 6. Discoverable flex missions (not hosted, not RSVP'd)
-        for mission in discoverFlexMissions {
-            guard !hostedFlexIds.contains(mission.id) else { continue }
-            if mission.podId == nil && !addedMissionIds.contains(mission.id) {
                 result.append(.discoverableMission(mission))
             }
         }

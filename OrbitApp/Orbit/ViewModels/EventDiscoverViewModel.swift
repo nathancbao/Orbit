@@ -277,17 +277,13 @@ class MissionsViewModel: ObservableObject {
     /// Delete any mission (both modes now live in the Mission kind).
     func deleteMission(id: String) async {
         do {
-            try await MissionService.shared.deleteSetMission(id: id)
+            try await MissionService.shared.deleteMission(id: id)
             allMissions.removeAll { $0.id == id }
             showToastMessage("Mission removed")
         } catch {
             errorMessage = error.localizedDescription
         }
     }
-
-    // Back-compat aliases for callers (e.g. MissionDetailView).
-    func deleteFlexMission(id: String) async { await deleteMission(id: id) }
-    func deleteSetMission(id: String) async { await deleteMission(id: id) }
 
     private func replaceInFeed(_ mission: Mission) {
         if let idx = allMissions.firstIndex(where: { $0.id == mission.id }) {

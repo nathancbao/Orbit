@@ -339,7 +339,7 @@ PUT /api/users/me
 
 Returns the selectable college directory used for the profile college picker
 and server-side distance filtering. When a user sets both `college` and a
-nonzero `max_distance_miles`, mission/signal feeds (explore, suggested,
+nonzero `max_distance_miles`, mission feeds (explore, suggested,
 discover, voyage) only include items whose creator's college is within that
 radius. Items with no college (seeded/AI/legacy) are always shown.
 
@@ -661,7 +661,7 @@ Note: Returns a flat array of mission objects, limited to 50 results.
 **Visibility & expiry rules:**
 - Results are distance-filtered by the caller's `college` + `max_distance_miles` profile settings (no-op when either is unset).
 - A mission whose end time has passed is marked `completed` and is only returned to users in one of its pods; everyone else stops seeing it immediately.
-- 24 hours after the end time the mission is hard-deleted (cascading its pods, chat, and votes). Signals expire 24 hours after their latest availability date (fallback: 14 days after creation). A daily App Engine cron (`GET /api/tasks/cleanup`, cron-only) sweeps anything lazy deletion missed.
+- 24 hours after the end time the mission is hard-deleted (cascading its pods, chat, and votes). A daily App Engine cron (`GET /api/tasks/cleanup`, cron-only) sweeps anything lazy deletion missed.
 
 ---
 

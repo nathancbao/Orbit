@@ -11,7 +11,7 @@ import Foundation
 
 enum MissionMode: String, Codable {
     case set = "set"    // Fixed date/time (traditional mission)
-    case flex = "flex"  // Group picks time via availability grid (formerly "Signal")
+    case flex = "flex"  // Group picks time via availability grid
 }
 
 // MARK: - Mission
@@ -53,12 +53,10 @@ struct Mission: Codable, Identifiable {
     // ── Flex mode fields (optional, only populated when mode == .flex) ──
 
     var customActivityName: String?
-    var minGroupSize: Int?          // legacy alias for minPodSize (Signal payloads)
     var availability: [AvailabilitySlot]?
     var timeRangeStart: Int?
     var timeRangeEnd: Int?
     var links: [String]?
-    var signalStatus: SignalStatus?  // pending | active (flex mode status)
     var podId: String?              // user's pod from RSVP (flex mode)
     var scheduledTime: String?      // confirmed meeting time (flex mode, set by leader)
     var schedulingWindowDays: Int?  // how many days out the group may schedule (1–14)
@@ -84,12 +82,10 @@ struct Mission: Codable, Identifiable {
         case pods
         case logo
         case customActivityName = "custom_activity_name"
-        case minGroupSize       = "min_group_size"
         case availability
         case timeRangeStart     = "time_range_start"
         case timeRangeEnd       = "time_range_end"
         case links
-        case signalStatus       = "signal_status"
         case podId              = "pod_id"
         case scheduledTime      = "scheduled_time"
         case schedulingWindowDays = "scheduling_window_days"
@@ -129,12 +125,10 @@ struct Mission: Codable, Identifiable {
         // Flex mode fields
         logo              = try? c.decode(String.self, forKey: .logo)
         customActivityName = try? c.decode(String.self, forKey: .customActivityName)
-        minGroupSize      = try? c.decode(Int.self, forKey: .minGroupSize)
         availability      = try? c.decode([AvailabilitySlot].self, forKey: .availability)
         timeRangeStart    = try? c.decode(Int.self, forKey: .timeRangeStart)
         timeRangeEnd      = try? c.decode(Int.self, forKey: .timeRangeEnd)
         links             = try? c.decode([String].self, forKey: .links)
-        signalStatus      = try? c.decode(SignalStatus.self, forKey: .signalStatus)
         podId             = try? c.decode(String.self, forKey: .podId)
         scheduledTime     = try? c.decode(String.self, forKey: .scheduledTime)
         schedulingWindowDays = try? c.decode(Int.self, forKey: .schedulingWindowDays)
@@ -168,12 +162,10 @@ struct Mission: Codable, Identifiable {
         pods: [PodSummary]? = nil,
         mode: MissionMode = .set,
         customActivityName: String? = nil,
-        minGroupSize: Int? = nil,
         availability: [AvailabilitySlot]? = nil,
         timeRangeStart: Int? = nil,
         timeRangeEnd: Int? = nil,
         links: [String]? = nil,
-        signalStatus: SignalStatus? = nil,
         podId: String? = nil,
         scheduledTime: String? = nil,
         schedulingWindowDays: Int? = nil,
@@ -203,12 +195,10 @@ struct Mission: Codable, Identifiable {
         self.pods = pods
         self.mode = mode
         self.customActivityName = customActivityName
-        self.minGroupSize = minGroupSize
         self.availability = availability
         self.timeRangeStart = timeRangeStart
         self.timeRangeEnd = timeRangeEnd
         self.links = links
-        self.signalStatus = signalStatus
         self.podId = podId
         self.scheduledTime = scheduledTime
         self.schedulingWindowDays = schedulingWindowDays
@@ -350,12 +340,9 @@ struct Mission: Codable, Identifiable {
         return "\(totalSlots) slot\(totalSlots == 1 ? "" : "s") over \(days) day\(days == 1 ? "" : "s")"
     }
 
-    /// Unified minimum pod size (new `min_pod_size`, falling back to legacy flex `min_group_size`).
-    var effectiveMinPodSize: Int? { minPodSize ?? minGroupSize }
-
     /// Group size label (e.g. "3–8 people").
     var flexGroupSizeLabel: String? {
-        guard let min = effectiveMinPodSize else { return nil }
+        guard let min = minPodSize else { return nil }
         let max = maxPodSize
         return min == max ? "\(min) people" : "\(min)–\(max) people"
     }
@@ -371,35 +358,6 @@ struct Mission: Codable, Identifiable {
         f.dateFormat = ""
         f.timeStyle = .short
         return f.string(from: d)
-    }
-
-    // ── Factory: Convert Signal → Mission (flex mode) ───────────────────
-
-    /// Convert a Signal (backend flex entity) to a Mission with mode: .flex.
-    static func fromSignal(_ signal: Signal) -> Mission {
-        Mission(
-            id: signal.id,
-            title: signal.title,
-            description: signal.description,
-            tags: signal.tags ?? [],
-            location: "",
-            date: "",
-            creatorId: signal.creatorId,
-            maxPodSize: signal.maxGroupSize,
-            logo: signal.activityCategory.icon,
-            status: signal.status.rawValue,
-            mode: .flex,
-            customActivityName: signal.customActivityName,
-            minGroupSize: signal.minGroupSize,
-            availability: signal.availability,
-            timeRangeStart: signal.timeRangeStart,
-            timeRangeEnd: signal.timeRangeEnd,
-            links: signal.links,
-            signalStatus: signal.status,
-            podId: signal.podId,
-            scheduledTime: signal.scheduledTime,
-            createdAt: signal.createdAt
-        )
     }
 }
 

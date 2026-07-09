@@ -10,7 +10,6 @@ from OrbitServer.api.users import users_bp, colleges_bp
 from OrbitServer.api.missions import missions_bp
 from OrbitServer.api.pods import pods_bp
 from OrbitServer.api.chat import chat_bp
-from OrbitServer.api.signals import signals_bp
 from OrbitServer.api.notifications import notifications_bp
 from OrbitServer.api.friends import friends_bp
 from OrbitServer.api.dm import dm_bp
@@ -61,7 +60,6 @@ app.register_blueprint(colleges_bp)
 app.register_blueprint(missions_bp)
 app.register_blueprint(pods_bp)
 app.register_blueprint(chat_bp)
-app.register_blueprint(signals_bp)
 app.register_blueprint(notifications_bp)
 app.register_blueprint(friends_bp)
 app.register_blueprint(dm_bp)
@@ -268,7 +266,7 @@ def warmup():
 
     try:
         # Lightweight keys-only query to force gRPC channel init
-        q = client.query(kind='Signal')
+        q = client.query(kind='Mission')
         q.keys_only()
         list(q.fetch(limit=1))
     except Exception:

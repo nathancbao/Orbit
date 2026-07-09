@@ -24,6 +24,14 @@ logger = logging.getLogger(__name__)
 _embedding_cache: dict = {}
 _cache_lock = threading.Lock()
 
+# In-process cache for user-interest embeddings: interests-tuple -> np.ndarray.
+# get_user_embedding runs on every /missions/suggested call, but a user's
+# interests rarely change between requests, so recomputing the same fastembed
+# inference each time is wasted CPU (and CPU is what App Engine bills). Bounded
+# to cap memory on a small instance.
+_user_embedding_cache: dict = {}
+_USER_CACHE_MAX = 512
+
 # Lazy-loaded fastembed model
 _fastembed_model = None
 _model_lock = threading.Lock()
@@ -105,8 +113,24 @@ def get_or_create_mission_embedding(mission_id: int) -> Optional[np.ndarray]:
 
 
 def get_user_embedding(interests: list) -> Optional[np.ndarray]:
-    """Generate an embedding for a user's interests."""
-    return _generate_embedding(_build_user_text(interests))
+    """Generate an embedding for a user's interests, cached by interest set.
+
+    Keyed on the interests themselves (not user id), so a profile edit naturally
+    produces a new key and a fresh embedding.
+    """
+    key = tuple(interests or [])
+    with _cache_lock:
+        cached = _user_embedding_cache.get(key)
+    if cached is not None:
+        return cached
+
+    vec = _generate_embedding(_build_user_text(interests))
+    if vec is not None:
+        with _cache_lock:
+            if len(_user_embedding_cache) >= _USER_CACHE_MAX:
+                _user_embedding_cache.clear()  # crude bound; fine at this scale
+            _user_embedding_cache[key] = vec
+    return vec
 
 
 def cosine_similarity(a: np.ndarray, b: np.ndarray) -> float:

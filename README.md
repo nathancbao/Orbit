@@ -91,7 +91,7 @@ Profiles are set up during onboarding via a multi-section form and can be edited
 OrbitApp/Orbit/
 ├── ContentView.swift             # App state routing (launch → auth → profile setup → home)
 ├── OrbitApp.swift                # Entry point, deep link handling
-├── Models/                       # Data structs (Profile, Mission, Signal, Pod, ChatMessage, Vote, etc.)
+├── Models/                       # Data structs (Profile, Mission, Pod, ChatMessage, Vote, etc.)
 ├── ViewModels/                   # @MainActor ObservableObjects per feature
 ├── Services/                     # Networking layer (APIService + feature-specific services)
 ├── Views/
@@ -109,7 +109,7 @@ OrbitApp/Orbit/
 Key patterns:
 
 - **Custom tab bar** — `MainTabView` uses a ZStack (not TabView) so all four tabs stay alive and preserve state across switches
-- **Unified mission model** — Both set and flex missions are represented by a single `Mission` struct with a `mode` field (`.set` or `.flex`). Flex missions are converted from the backend Signal entity via `Mission.fromSignal()`
+- **Unified mission model** — Both set and flex missions are represented by a single `Mission` struct with a `mode` field (`.set` or `.flex`). A flex mission becomes scheduled once its pod confirms a time, so both modes end as a scheduled activity
 - **Singleton services** — `APIService`, `AuthService`, `ProfileService`, `EventService`, `PodService`, `ChatService`, `FriendService`, `ScheduleService`, `VoyageService`
 - **Token management** — Access and refresh tokens stored in Keychain; `APIService` automatically refreshes on 401
 - **Image handling** — Photos are downscaled to 512px max dimension before upload via multipart/form-data
@@ -122,7 +122,6 @@ OrbitServer/
 │   ├── auth.py                   # Email verification, JWT tokens
 │   ├── users.py                  # Profile CRUD, photo uploads
 │   ├── missions.py               # Set mission endpoints
-│   ├── signals.py                # Flex mission endpoints
 │   ├── pods.py                   # Pod management, scheduling, voting
 │   ├── chat.py                   # Pod chat messages
 │   ├── friends.py                # Friend requests and management
@@ -135,7 +134,6 @@ OrbitServer/
 │   ├── auth_service.py
 │   ├── user_service.py
 │   ├── mission_service.py        # Set mission logic
-│   ├── signal_service.py         # Flex mission logic
 │   ├── pod_service.py
 │   ├── chat_service.py
 │   ├── ai_suggestion_service.py  # Hybrid recommendation engine
@@ -161,7 +159,7 @@ Key patterns:
 - **Layered architecture** — Routes (blueprints) → Services (business logic) → Models (Datastore queries)
 - **Standardized responses** — All endpoints return `{"success": true/false, "data": ..., "error": ...}`
 - **Auth decorator** — `@require_auth` extracts the user ID from the JWT on protected routes
-- **Transactional writes** — Signal RSVP and pod updates use Datastore transactions for atomicity
+- **Transactional writes** — Pod joins and updates use Datastore transactions for atomicity
 - **In-memory caching** — User, mission, and pod caches with TTL-based invalidation
 
 ## AI Recommendation Engine
@@ -195,7 +193,6 @@ All iOS networking goes through `APIService.shared`, which provides a generic `r
 - `/auth/*` — Send code, verify code, refresh, logout
 - `/users/me/*` — Profile CRUD, photo uploads, gallery management
 - `/missions/*` — List, create, join, leave, skip; AI-suggested missions
-- `/signals/*` — Discover, create, RSVP, update, delete (flex missions)
 - `/pods/*` — Details, rename, leave, kick vote, confirm attendance
 - `/pods/*/messages` — Chat messages
 - `/pods/*/votes` — Vote creation and responses
